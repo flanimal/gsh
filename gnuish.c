@@ -54,20 +54,20 @@
 #define GNUISH_PROMPT "@ "
 #define GNUISH_MAX_ARGS 64
 
-void gnuish_shell_prompt()
+void gnuish_put_prompt()
 {
 	write(STDOUT_FILENO, GNUISH_PROMPT, sizeof(GNUISH_PROMPT));
 }
 
-void gnuish_ch_workdir(struct gnuish_state* sh_state, const char* pathname)
+void gnuish_chdir(struct gnuish_state* sh_state, const char* pathname)
 {
 	chdir(pathname);
 	sh_state->max_input = pathconf(pathname, _PC_MAX_INPUT);
 }
 
-ssize_t gnuish_read_line(struct gnuish_state* sh_state, char* out_line)
+ssize_t gnuish_read_ln(struct gnuish_state* sh_state, char* out_line)
 {
-	gnuish_shell_prompt();
+	gnuish_put_prompt();
 
 	ssize_t nbytes = read(STDIN_FILENO, out_line, (size_t)sh_state->max_input);
 	out_line[nbytes] = '\0'; // Must remember to include newline as delimiter!
@@ -75,12 +75,12 @@ ssize_t gnuish_read_line(struct gnuish_state* sh_state, char* out_line)
 	if (nbytes > 0)
 		write(STDOUT_FILENO, &out_line, (size_t)nbytes); // Echo line of input.
 
-	gnuish_add_history(sh_state, out_line);
+	gnuish_add_hist(sh_state, out_line);
 
 	return nbytes;
 }
 
-void gnuish_parse_line(const char* line, char** out_args)
+void gnuish_parse_ln(const char* line, char** out_args)
 {
 	char* lineTmp = malloc(strlen(line));
 	strcpy(lineTmp, line);
@@ -93,7 +93,7 @@ void gnuish_parse_line(const char* line, char** out_args)
 	free(lineTmp);
 }
 
-void gnuish_add_history(struct gnuish_state* sh_state, char* line)
+void gnuish_add_hist(struct gnuish_state* sh_state, char* line)
 {
 	// Allocate memory for the node.
 	struct gnuish_past_cmd* last_cmd = malloc(sizeof(struct gnuish_past_cmd));
@@ -106,7 +106,7 @@ void gnuish_add_history(struct gnuish_state* sh_state, char* line)
 	sh_state->cmd_history = last_cmd;
 }
 
-void gnuish_recall_history(struct gnuish_state* sh_state, int n)
+void gnuish_recall(struct gnuish_state* sh_state, int n)
 {
 	struct gnuish_past_cmd* cmd_it = sh_state->cmd_history;
 
@@ -122,28 +122,28 @@ void gnuish_run_cmd(struct gnuish_state* sh_state, const char* line)
 {
 	char** args = malloc(sizeof(char*) * GNUISH_MAX_ARGS);
 
-	gnuish_parse_line(line, args);
+	gnuish_parse_ln(line, args);
 	char* pathname = args[0];
 
 	if (strcmp(pathname, "cd") == 0)
 	{
-		gnuish_ch_workdir(sh_state, args[1]);
+		gnuish_chdir(sh_state, args[1]);
 	}
 	else if (strcmp(pathname, "r") == 0)
 	{
-		gnuish_recall_history(sh_state, atoi(args[1]));
+		gnuish_recall(sh_state, atoi(args[1]));
 	}
 	else if (strcmp(pathname, "exit") == 0)
 	{
-		gnuish_exit_shell(sh_state);
+		gnuish_exit(sh_state);
 	}
 	else
 	{
-		gnuish_execute(sh_state, args);
+		gnuish_exec(sh_state, args);
 	}
 }
 
-void gnuish_execute(struct gnuish_state* sh_state, char** args)
+void gnuish_exec(struct gnuish_state* sh_state, char** args)
 {
 	pid_t cmdPid = fork();
 
@@ -157,7 +157,7 @@ void gnuish_execute(struct gnuish_state* sh_state, char** args)
 	}
 }
 
-void gnuish_exit_shell(struct gnuish_state* sh_state)
+void gnuish_exit(struct gnuish_state* sh_state)
 {
 	exit(0);
 }
