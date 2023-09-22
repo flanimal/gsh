@@ -54,15 +54,35 @@
 #define GNUISH_PROMPT "@ "
 #define GNUISH_MAX_ARGS 64
 
-void gnuish_put_prompt()
+static void gnuish_put_prompt()
 {
 	write(STDOUT_FILENO, GNUISH_PROMPT, sizeof(GNUISH_PROMPT));
 }
 
-void gnuish_chdir(struct gnuish_state* sh_state, const char* pathname)
+static void gnuish_parse_line(const char* line, char** out_args)
 {
-	chdir(pathname);
-	sh_state->max_input = pathconf(pathname, _PC_MAX_INPUT);
+	char* lineTmp = malloc(strlen(line));
+	strcpy(lineTmp, line);
+
+	out_args[0] = strtok(lineTmp, " \n");
+
+	for (int arg_n = 1; (out_args[arg_n++] = strtok(NULL, " ")) && arg_n <= GNUISH_MAX_ARGS; )
+		;
+
+	free(lineTmp);
+}
+
+static void gnuish_add_hist(struct gnuish_state* sh_state, char* line)
+{
+	// Allocate memory for the node.
+	struct gnuish_past_cmd* last_cmd = malloc(sizeof(struct gnuish_past_cmd));
+
+	last_cmd->line = malloc(strlen(line));
+
+	strcpy(last_cmd->line, line);
+
+	last_cmd->next = sh_state->cmd_history;
+	sh_state->cmd_history = last_cmd;
 }
 
 ssize_t gnuish_read_line(struct gnuish_state* sh_state, char* out_line)
@@ -80,30 +100,10 @@ ssize_t gnuish_read_line(struct gnuish_state* sh_state, char* out_line)
 	return nbytes;
 }
 
-void gnuish_parse_line(const char* line, char** out_args)
+void gnuish_chdir(struct gnuish_state* sh_state, const char* pathname)
 {
-	char* lineTmp = malloc(strlen(line));
-	strcpy(lineTmp, line);
-
-	out_args[0] = strtok(lineTmp, " \n");
-
-	for (int arg_n = 1; (out_args[arg_n++] = strtok(NULL, " ")) && arg_n <= GNUISH_MAX_ARGS; )
-		;
-
-	free(lineTmp);
-}
-
-void gnuish_add_hist(struct gnuish_state* sh_state, char* line)
-{
-	// Allocate memory for the node.
-	struct gnuish_past_cmd* last_cmd = malloc(sizeof(struct gnuish_past_cmd));
-
-	last_cmd->line = malloc(strlen(line));
-
-	strcpy(last_cmd->line, line);
-
-	last_cmd->next = sh_state->cmd_history;
-	sh_state->cmd_history = last_cmd;
+	chdir(pathname);
+	sh_state->max_input = pathconf(pathname, _PC_MAX_INPUT);
 }
 
 void gnuish_recall(struct gnuish_state* sh_state, int n)
