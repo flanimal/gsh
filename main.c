@@ -10,7 +10,9 @@ int main(int argc, char* argv[], char* envp[])
 	struct gnuish_state sh_state;
 	sh_state.env = envp; // TODO: We will probably need to copy the original environment.
 
-	char* line = malloc(sh_state.max_input);
+	gnuish_ch_workdir(&sh_state, "~");
+
+	char* line = malloc((size_t)sh_state.max_input);
 
 	/* Main loop. */
 	for (ssize_t nbytes; (nbytes = gnuish_read_line(&sh_state, line)) > 0; )

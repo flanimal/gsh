@@ -65,18 +65,19 @@ void gnuish_ch_workdir(struct gnuish_state* sh_state, const char* pathname)
 	sh_state->max_input = pathconf(pathname, _PC_MAX_INPUT);
 }
 
-// TODO: parse_line?
-
 ssize_t gnuish_read_line(struct gnuish_state* sh_state, char* out_line)
 {
 	gnuish_shell_prompt();
 
-	ssize_t nbytes = read(STDIN_FILENO, out_line, sh_state->max_input);
+	ssize_t nbytes = read(STDIN_FILENO, out_line, (size_t)sh_state->max_input);
 	out_line[nbytes] = '\0'; // Must remember to include newline as delimiter!
 
-	write(STDOUT_FILENO, &out_line, nbytes); // Echo line of input.
+	if (nbytes > 0)
+		write(STDOUT_FILENO, &out_line, (size_t)nbytes); // Echo line of input.
 
 	gnuish_add_history(sh_state, out_line);
+
+	return nbytes;
 }
 
 void gnuish_parse_line(const char* line, char** out_args)
@@ -84,7 +85,7 @@ void gnuish_parse_line(const char* line, char** out_args)
 	char* lineTmp = malloc(strlen(line));
 	strcpy(lineTmp, line);
 
-	char* pathname = (out_args[0] = strtok(lineTmp, " \n"));
+	out_args[0] = strtok(lineTmp, " \n");
 
 	for (int arg_n = 1; (out_args[arg_n++] = strtok(NULL, " ")) && arg_n <= GNUISH_MAX_ARGS; )
 		;
@@ -124,7 +125,7 @@ void gnuish_run_cmd(struct gnuish_state* sh_state, const char* line)
 	gnuish_parse_line(line, args);
 	char* pathname = args[0];
 
-	if (strcmp(pathname, "chdir") == 0)
+	if (strcmp(pathname, "cd") == 0)
 	{
 		gnuish_ch_workdir(sh_state, args[1]);
 	}
