@@ -14,7 +14,7 @@ int main(int argc, char* argv[], char* envp[])
 	char* line = malloc((size_t)sh_state.max_input);
 
 	/* Main loop. */
-	for (ssize_t nbytes; (nbytes = gnuish_read_ln(&sh_state, line)) > 0; )
+	for (ssize_t nbytes; (nbytes = gnuish_read_line(&sh_state, line)) > 0; )
 	{
 		gnuish_run_cmd(&sh_state, line);
 	}

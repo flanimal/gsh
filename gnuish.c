@@ -65,7 +65,7 @@ void gnuish_chdir(struct gnuish_state* sh_state, const char* pathname)
 	sh_state->max_input = pathconf(pathname, _PC_MAX_INPUT);
 }
 
-ssize_t gnuish_read_ln(struct gnuish_state* sh_state, char* out_line)
+ssize_t gnuish_read_line(struct gnuish_state* sh_state, char* out_line)
 {
 	gnuish_put_prompt();
 
@@ -80,7 +80,7 @@ ssize_t gnuish_read_ln(struct gnuish_state* sh_state, char* out_line)
 	return nbytes;
 }
 
-void gnuish_parse_ln(const char* line, char** out_args)
+void gnuish_parse_line(const char* line, char** out_args)
 {
 	char* lineTmp = malloc(strlen(line));
 	strcpy(lineTmp, line);
@@ -122,7 +122,7 @@ void gnuish_run_cmd(struct gnuish_state* sh_state, const char* line)
 {
 	char** args = malloc(sizeof(char*) * GNUISH_MAX_ARGS);
 
-	gnuish_parse_ln(line, args);
+	gnuish_parse_line(line, args);
 	char* pathname = args[0];
 
 	if (strcmp(pathname, "cd") == 0)
