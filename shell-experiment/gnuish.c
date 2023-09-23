@@ -3,6 +3,8 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
 
 #include "gnuish.h"
 
@@ -48,15 +50,16 @@
 *	Also see the Makefile, which:
 *		1. Compiles all source code.
 *		2. Cleans up the directory.
-*		3. Performs otehr tasks as required.
+*		3. Performs other tasks as required.
 */
 
 #define GNUISH_PROMPT "@ "
 #define GNUISH_MAX_ARGS 64
 
-static void gnuish_put_prompt()
+static void gnuish_put_prompt(struct gnuish_state *sh_state)
 {
-	write(STDOUT_FILENO, GNUISH_PROMPT, sizeof(GNUISH_PROMPT));
+	write(STDOUT_FILENO, sh_state->cwd, strlen(sh_state->cwd));
+	write(STDOUT_FILENO, GNUISH_PROMPT, sizeof(GNUISH_PROMPT) - 1);
 }
 
 static void gnuish_parse_line(const char *line, char **out_args)
@@ -89,7 +92,7 @@ static void gnuish_add_hist(struct gnuish_state *sh_state, char *line)
 
 ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 {
-	gnuish_put_prompt();
+	gnuish_put_prompt(sh_state);
 
 	ssize_t nbytes =
 		read(STDIN_FILENO, out_line, (size_t)sh_state->max_input);
@@ -108,7 +111,12 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 
 void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname)
 {
-	chdir(pathname);
+	if (chdir(pathname) == -1) {
+		const char* err_str = strerror(errno);
+		write(STDOUT_FILENO, err_str, strlen(err_str));
+	}
+
+	strcpy(sh_state->cwd, pathname); // TODO: ...
 	sh_state->max_input = pathconf(pathname, _PC_MAX_INPUT);
 }
 

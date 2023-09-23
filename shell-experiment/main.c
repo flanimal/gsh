@@ -11,7 +11,8 @@ int main(int argc, char *argv[], char *envp[])
 	// TODO: We will probably need to copy the original environment.
 	sh_state.env = envp;
 
-	gnuish_chdir(&sh_state, "~");
+	sh_state.cwd = getcwd(NULL, 0);
+	sh_state.max_input = pathconf(sh_state.cwd, _PC_MAX_INPUT);
 
 	/* Main loop. */
 	char *line = malloc((size_t)sh_state.max_input);
