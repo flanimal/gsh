@@ -18,15 +18,18 @@ struct gnuish_past_cmd {
 
 struct gnuish_state {
 	long			max_input;
+	long			max_path;
 	// If we need a buffer to get the current working directory anyway,
 	// then we might as well store it in the shell state structure
 	// to have on hand.
-	char*			cwd;
+	char			*cwd;
 
 	struct gnuish_past_cmd	*cmd_history;
 
 	char			**env;
 };
+
+void gnuish_init(struct gnuish_state *sh_state, char** envp);
 
 ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line);
 

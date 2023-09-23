@@ -90,6 +90,27 @@ static void gnuish_add_hist(struct gnuish_state *sh_state, char *line)
 	sh_state->cmd_history = last_cmd;
 }
 
+void gnuish_init(struct gnuish_state* sh_state, char** envp)
+{
+	// TODO: We will probably need to copy the original environment.
+	sh_state->env = envp;
+
+	// Maximum length of input line on terminal.
+	sh_state->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
+
+	sh_state->cwd = malloc(_POSIX_PATH_MAX);
+	sh_state->max_path = _POSIX_PATH_MAX;
+
+	if (!getcwd(sh_state->cwd, (size_t)sh_state->max_path)) {
+		// Current working path longer than 256 chars.
+		free(sh_state->cwd);
+		// We will use the memory allocated by `getcwd`
+		// to store the working directory from now on.
+		sh_state->cwd = getcwd(NULL, 0);
+		sh_state->max_path = pathconf(sh_state->cwd, _PC_PATH_MAX);
+	}
+}
+
 ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 {
 	gnuish_put_prompt(sh_state);
@@ -117,7 +138,6 @@ void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname)
 	}
 
 	strcpy(sh_state->cwd, pathname); // TODO: ...
-	sh_state->max_input = pathconf(pathname, _PC_MAX_INPUT);
 }
 
 void gnuish_recall(struct gnuish_state *sh_state, int n)
@@ -139,6 +159,7 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, const char *line)
 	char *pathname = args[0];
 	// TODO: How would you execute a program by name in a directory without looping
 	// over ALL entries?
+	// One way would be a hash table.
 	if (strcmp(pathname, "cd") == 0) {
 		gnuish_chdir(sh_state, args[1]);
 	} else if (strcmp(pathname, "r") == 0) {
