@@ -93,12 +93,13 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 
 	ssize_t nbytes =
 		read(STDIN_FILENO, out_line, (size_t)sh_state->max_input);
-	out_line[nbytes] =
-		'\0'; // Must remember to include newline as delimiter!
+
+	// Must remember to include newline as delimiter!
+	out_line[nbytes] = '\0';
 
 	if (nbytes > 0)
 		// Echo line of input.
-		write(STDOUT_FILENO, &out_line, (size_t)nbytes); 
+		write(STDOUT_FILENO, &out_line, (size_t)nbytes);
 
 	gnuish_add_hist(sh_state, out_line);
 
@@ -128,7 +129,8 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, const char *line)
 
 	gnuish_parse_line(line, args);
 	char *pathname = args[0];
-
+	// TODO: How would you execute a program by name in a directory without looping
+	// over ALL entries?
 	if (strcmp(pathname, "cd") == 0) {
 		gnuish_chdir(sh_state, args[1]);
 	} else if (strcmp(pathname, "r") == 0) {

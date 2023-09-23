@@ -1,7 +1,6 @@
 #pragma once
 
-enum gnuish_built_in
-{
+enum gnuish_built_in {
 	EXIT,
 	CHDIR,
 	KILL,
@@ -12,31 +11,28 @@ enum gnuish_built_in
 	RECALL,
 };
 
-struct gnuish_past_cmd
-{
-	char* line;
-	struct gnuish_past_cmd* next;
+struct gnuish_past_cmd {
+	char			*line;
+	struct gnuish_past_cmd	*next;
 };
 
-struct gnuish_state
-{
-	struct gnuish_past_cmd* cmd_history;
+struct gnuish_state {
+	long			max_input;
 
-	char* last_line;
+	struct gnuish_past_cmd	*cmd_history;
+	char			*last_line;
 
-	char** env;
-
-	long max_input;
+	char			**env;
 };
 
-ssize_t gnuish_read_line(struct gnuish_state* sh_state, char* out_line);
+ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line);
 
-void gnuish_chdir(struct gnuish_state* sh_state, const char* pathname);
+void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname);
 
-void gnuish_recall(struct gnuish_state* sh_state, int n);
+void gnuish_recall(struct gnuish_state *sh_state, int n);
 
-void gnuish_run_cmd(struct gnuish_state* sh_state, const char* line);
+void gnuish_run_cmd(struct gnuish_state *sh_state, const char *line);
 
-void gnuish_exec(struct gnuish_state* sh_state, char** args);
+void gnuish_exec(struct gnuish_state *sh_state, char **args);
 
-void gnuish_exit(struct gnuish_state* sh_state);
+void gnuish_exit(struct gnuish_state *sh_state);
