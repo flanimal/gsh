@@ -182,13 +182,13 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
 {
 	// TODO: We don't need to reallocate and free this each time.
+	// TODO: Number of args? Put NULL at end of args list?
 	char **args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
 
-	// Recall `r` should NOT be added to history.
-	if (strncmp(line, "r ", 2) != 0)
+	if (strncmp(line, "r ", 2) != 0) // Recall `r` should NOT be added to
+					 // history.
 		gnuish_add_hist(sh_state, line);
 
-	// TODO: Number of args? Put NULL at end of args list?
 	gnuish_parse_line(line, args);
 
 	char *pathname = args[0];
@@ -200,7 +200,7 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
 		gnuish_chdir(sh_state, args[1]);
 
 	else if (strcmp(pathname, "r") == 0)
-
+		// TODO: Make index optional.
 		gnuish_recall(sh_state, atoi(args[1]));
 
 	else if (strcmp(pathname, "exit") == 0)
@@ -224,13 +224,14 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
 
 void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname)
 {
-	// TODO: Handle `.`, `..` approproiately.
+	realpath(pathname, sh_state->cwd); // TODO: ...
+
 	if (chdir(pathname) == -1) {
 		const char *err_str = strerror(errno);
 		write(STDOUT_FILENO, err_str, strlen(err_str));
+		write(STDOUT_FILENO, "\n", 1);
 	}
 
-	strcpy(sh_state->cwd, pathname); // TODO: ...
 }
 
 void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
@@ -244,7 +245,7 @@ void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
 
 	if (execve(args[0], args, sh_state->env) == -1) {
 		const char *err_str = strerror(errno);
-		write(STDOUT_FILENO, err_str, strlen(err_str));
+		write(STDOUT_FILENO, err_str, strlen(err_str)); // TODO: Passing result of `strlen` here may be bad practice.
 		write(STDOUT_FILENO, "\n", 1);
 	}
 }
