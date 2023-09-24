@@ -58,7 +58,7 @@
 #define GNUISH_PROMPT "@ "
 #define GNUISH_MAX_ARGS 64
 
-static void gnuish_put_prompt(struct gnuish_state *sh_state)
+static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 {
 	write(STDOUT_FILENO, sh_state->cwd, strlen(sh_state->cwd));
 	write(STDOUT_FILENO, GNUISH_PROMPT, sizeof(GNUISH_PROMPT) - 1);
@@ -78,7 +78,7 @@ static void gnuish_parse_line(const char *line, char **out_args)
 	free(lineTmp);
 }
 
-static void gnuish_add_hist(struct gnuish_state *sh_state, char *line)
+static void gnuish_add_hist(struct gnuish_state *sh_state, const char *line)
 {
 	// Allocate memory for the node.
 	struct gnuish_past_cmd *last_cmd =
@@ -92,7 +92,7 @@ static void gnuish_add_hist(struct gnuish_state *sh_state, char *line)
 	sh_state->cmd_history = last_cmd;
 }
 
-void gnuish_init(struct gnuish_state *sh_state, char **envp)
+void gnuish_init(struct gnuish_state *sh_state, const char **envp)
 {
 	// TODO: We will probably need to copy the original environment.
 	sh_state->env = envp;
@@ -174,7 +174,7 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, const char *line)
 	}
 }
 
-void gnuish_exec(struct gnuish_state *sh_state, char **args)
+void gnuish_exec(struct gnuish_state *sh_state, const char **args)
 {
 	pid_t cmdPid = fork();
 
