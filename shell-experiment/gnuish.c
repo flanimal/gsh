@@ -1,10 +1,12 @@
 #include <unistd.h>
 #include <limits.h>
-#include <string.h>
 #include <sys/wait.h>
+
+#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <assert.h>
 
 #include "gnuish.h"
 
@@ -90,7 +92,7 @@ static void gnuish_add_hist(struct gnuish_state *sh_state, char *line)
 	sh_state->cmd_history = last_cmd;
 }
 
-void gnuish_init(struct gnuish_state* sh_state, char** envp)
+void gnuish_init(struct gnuish_state *sh_state, char **envp)
 {
 	// TODO: We will probably need to copy the original environment.
 	sh_state->env = envp;
@@ -106,6 +108,7 @@ void gnuish_init(struct gnuish_state* sh_state, char** envp)
 		free(sh_state->cwd);
 		// We will use the memory allocated by `getcwd`
 		// to store the working directory from now on.
+		// TODO: We may need to do this in `chdir` as well.
 		sh_state->cwd = getcwd(NULL, 0);
 		sh_state->max_path = pathconf(sh_state->cwd, _PC_PATH_MAX);
 	}
@@ -123,7 +126,7 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 
 	if (nbytes > 0)
 		// Echo line of input.
-		write(STDOUT_FILENO, &out_line, (size_t)nbytes);
+		write(STDOUT_FILENO, out_line, (size_t)nbytes);
 
 	gnuish_add_hist(sh_state, out_line);
 
@@ -133,7 +136,7 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname)
 {
 	if (chdir(pathname) == -1) {
-		const char* err_str = strerror(errno);
+		const char *err_str = strerror(errno);
 		write(STDOUT_FILENO, err_str, strlen(err_str));
 	}
 
