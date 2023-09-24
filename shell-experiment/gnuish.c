@@ -68,7 +68,7 @@ static void gnuish_parse_line(char *line, char **out_args)
 {
 	out_args[0] = strtok(line, " \n");
 
-	for (int arg_n = 1; (out_args[arg_n++] = strtok(NULL, " ")) &&
+	for (int arg_n = 1; (out_args[arg_n++] = strtok(NULL, " \n")) &&
 			    arg_n <= GNUISH_MAX_ARGS;)
 		;
 }
@@ -152,7 +152,7 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
 
 void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname)
 {
-	if (chdir(pathname) == -1) {
+	if (chdir(pathname) == -1) { // FIXME
 		const char *err_str = strerror(errno);
 		write(STDOUT_FILENO, err_str, strlen(err_str));
 	}
@@ -176,7 +176,6 @@ void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
 	pid_t cmdPid = fork();
 
 	if (cmdPid == 0) {
-		write(STDOUT_FILENO, args[0], strlen(args[0]));
 		execve(args[0], args, sh_state->env);
 	} else {
 		waitpid(cmdPid, NULL, 0);
