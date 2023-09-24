@@ -13,7 +13,7 @@ enum gnuish_built_in {
 
 struct gnuish_past_cmd {
 	char *line;
-	struct gnuish_past_cmd *next;
+	struct gnuish_past_cmd *prev, *next;
 };
 
 struct gnuish_state {
@@ -24,7 +24,8 @@ struct gnuish_state {
 	// to have on hand.
 	char *cwd;
 
-	struct gnuish_past_cmd *cmd_history;
+	struct gnuish_past_cmd *cmd_history, *oldest_cmd;
+	int hist_n;
 
 	char *const *env;
 };

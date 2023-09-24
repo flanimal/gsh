@@ -21,11 +21,13 @@
 *
 *	Commands
 *
-*		<command> [<args>...]	 Run command or program with optional arguments.
+ *		<command> [<args>...]	 Run command or program with optional
+ *arguments.
 *
 *		r [<n>]		Execute the nth last line.
-*					The line will be placed in history, not the `r` invocation.
-*					The line in question will be echoed to the screen before being executed.
+ *					The line will be placed in history, not the `r`
+ *invocation. The line in question will be echoed to the screen before being
+ *executed.
 *
 *	Built-ins:
 *
@@ -75,16 +77,61 @@ static void gnuish_parse_line(char *line, char **out_args)
 
 static void gnuish_add_hist(struct gnuish_state *sh_state, const char *line)
 {
-	// Allocate memory for the node.
 	struct gnuish_past_cmd *last_cmd =
 		malloc(sizeof(struct gnuish_past_cmd));
 
-	last_cmd->line = malloc(strlen(line));
-
-	strcpy(last_cmd->line, line);
+	last_cmd->prev = NULL;
 
 	last_cmd->next = sh_state->cmd_history;
+
+	if (sh_state->cmd_history)
+		sh_state->cmd_history->prev = last_cmd;
+
 	sh_state->cmd_history = last_cmd;
+
+	strcpy((last_cmd->line = malloc(strlen(line))), line);
+
+	if (sh_state->hist_n == 10) {
+		sh_state->oldest_cmd = sh_state->oldest_cmd->prev;
+
+		free(sh_state->oldest_cmd->next);
+		sh_state->oldest_cmd->next = NULL;
+
+		return;
+	}
+
+	if (sh_state->hist_n == 0)
+		sh_state->oldest_cmd = last_cmd;
+
+	sh_state->hist_n++;
+}
+
+static void gnuish_list_hist(const struct gnuish_state *sh_state)
+{
+	// It is not possible for cmd_history to be NULL here,
+	// as it will at least contain the `hist` invocation.
+
+	char cmd_n = '0';
+	for (struct gnuish_past_cmd *cmd_it = sh_state->cmd_history; cmd_it;
+	     cmd_it = cmd_it->next) {
+		write(STDOUT_FILENO, &cmd_n, 1);
+		write(STDOUT_FILENO, ": ", 2);
+		write(STDOUT_FILENO, cmd_it->line, strlen(cmd_it->line));
+		write(STDOUT_FILENO, "\n", 1);
+		cmd_n++;
+	}
+}
+
+static void gnuish_recall(struct gnuish_state *sh_state, int n)
+{
+	// TODO: Recall `r` should NOT be added to history.
+	struct gnuish_past_cmd *cmd_it = sh_state->cmd_history;
+
+	while (cmd_it->next && n-- > 0) {
+		cmd_it = cmd_it->next;
+	}
+
+	gnuish_run_cmd(sh_state, cmd_it->line);
 }
 
 void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
@@ -107,6 +154,9 @@ void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
 		sh_state->cwd = getcwd(NULL, 0);
 		sh_state->max_path = pathconf(sh_state->cwd, _PC_PATH_MAX);
 	}
+
+	sh_state->cmd_history = sh_state->oldest_cmd = NULL;
+	sh_state->hist_n = 0;
 }
 
 ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
@@ -134,15 +184,16 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
 	gnuish_parse_line(line, args);
 
 	char *pathname = args[0];
-	// TODO: How would you execute a program by name in a directory without looping
-	// over ALL entries?
-	// One way would be a hash table.
+	// TODO: How would you execute a program by name in a directory without
+	// looping over ALL entries? One way would be a hash table.
 	if (strcmp(pathname, "cd") == 0) {
 		gnuish_chdir(sh_state, args[1]);
 	} else if (strcmp(pathname, "r") == 0) {
 		gnuish_recall(sh_state, atoi(args[1]));
 	} else if (strcmp(pathname, "exit") == 0) {
 		gnuish_exit(sh_state);
+	} else if (strcmp(pathname, "hist") == 0) {
+		gnuish_list_hist(sh_state);
 	} else {
 		gnuish_exec(sh_state, args);
 	}
