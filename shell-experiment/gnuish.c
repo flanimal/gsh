@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <limits.h>
+#include <search.h>
 #include <sys/wait.h>
 
 #include <string.h>
@@ -77,38 +78,36 @@ static void gnuish_parse_line(char *line, char **out_args)
 
 static void gnuish_add_hist(struct gnuish_state *sh_state, const char *line)
 {
-	struct gnuish_hist_ent *last_cmd =
-		malloc(sizeof(struct gnuish_hist_ent));
+	struct gnuish_hist_ent *last_cmd = malloc(sizeof(*last_cmd));
 
-	LIST_INSERT_HEAD(&sh_state->cmd_history, last_cmd, adjacent_cmds);
+	insque(last_cmd, sh_state->cmd_history);
+	sh_state->cmd_history = last_cmd;
 
 	strcpy((last_cmd->line = malloc(strlen(line))), line);
 
 	if (sh_state->hist_n == 10) {
-		struct gnuish_hist_ent *popped_ent =
-			LIST_FIRST(&sh_state->oldest_cmd);
+		struct gnuish_hist_ent *popped_ent = sh_state->oldest_cmd;
+		sh_state->oldest_cmd = popped_ent->forward;
 
-		LIST_REMOVE(popped_ent, adjacent_cmds);
+		remque(popped_ent);
 		free(popped_ent);
 
 		return;
+	} else if (sh_state->hist_n == 0) {
+		sh_state->oldest_cmd = last_cmd;
 	}
-
-	if (sh_state->hist_n == 0)
-		LIST_FIRST(&sh_state->oldest_cmd) = last_cmd;
 
 	sh_state->hist_n++;
 }
 
 static void gnuish_list_hist(const struct gnuish_state *sh_state)
 {
-	// It is not possible for cmd_history to be NULL here,
+	// It is not possible for `cmd_history` to be NULL here,
 	// as it will at least contain the `hist` invocation.
 
 	char cmd_n = '0';
-	struct gnuish_hist_ent *cmd_it;
-	LIST_FOREACH(cmd_it, &sh_state->cmd_history, adjacent_cmds)
-	{
+	struct gnuish_hist_ent *cmd_it = sh_state->cmd_history;
+	for (; cmd_it; cmd_it = cmd_it->backward) {
 		write(STDOUT_FILENO, &cmd_n, 1);
 		write(STDOUT_FILENO, ": ", 2);
 		write(STDOUT_FILENO, cmd_it->line, strlen(cmd_it->line));
@@ -119,14 +118,12 @@ static void gnuish_list_hist(const struct gnuish_state *sh_state)
 
 static void gnuish_recall(struct gnuish_state *sh_state, int n)
 {
-	struct gnuish_hist_ent *cmd_it;
-	LIST_FOREACH(cmd_it, &sh_state->cmd_history, adjacent_cmds)
-	{
-		if (n-- == 0) {
-			gnuish_run_cmd(sh_state, cmd_it->line);
-			return;
-		}
-	}
+	struct gnuish_hist_ent *cmd_it = sh_state->cmd_history;
+
+	while (cmd_it && n-- > 0)
+		cmd_it = cmd_it->forward;
+
+	gnuish_run_cmd(sh_state, cmd_it->line);
 }
 
 void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
@@ -150,8 +147,7 @@ void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
 		sh_state->max_path = pathconf(sh_state->cwd, _PC_PATH_MAX);
 	}
 
-	LIST_INIT(&sh_state->cmd_history);
-	LIST_INIT(&sh_state->oldest_cmd);
+	sh_state->cmd_history = sh_state->oldest_cmd = NULL;
 	sh_state->hist_n = 0;
 }
 
@@ -180,10 +176,6 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 	//	write(STDOUT_FILENO, out_line, (size_t)len); // TODO: Correct
 	// nbytes?
 
-	// Recall `r` should NOT be added to history.
-	if (strncmp(out_line, "r ", 2) != 0)
-		gnuish_add_hist(sh_state, out_line);
-
 	return len;
 }
 
@@ -192,25 +184,40 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
 	// TODO: We don't need to reallocate and free this each time.
 	char **args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
 
+	// Recall `r` should NOT be added to history.
+	if (strncmp(line, "r ", 2) != 0)
+		gnuish_add_hist(sh_state, line);
+
 	// TODO: Number of args? Put NULL at end of args list?
 	gnuish_parse_line(line, args);
 
 	char *pathname = args[0];
 	// TODO: How would you execute a program by name in a directory without
 	// looping over ALL entries? One way would be a hash table.
-	if (strcmp(pathname, "cd") == 0) {
+
+	if (strcmp(pathname, "cd") == 0)
+
 		gnuish_chdir(sh_state, args[1]);
-	} else if (strcmp(pathname, "r") == 0) {
+
+	else if (strcmp(pathname, "r") == 0)
+
 		gnuish_recall(sh_state, atoi(args[1]));
-	} else if (strcmp(pathname, "exit") == 0) {
+
+	else if (strcmp(pathname, "exit") == 0)
+
 		gnuish_exit(sh_state);
-	} else if (strcmp(pathname, "hist") == 0) {
+
+	else if (strcmp(pathname, "hist") == 0)
+
 		gnuish_list_hist(sh_state);
-	} else if (strcmp(pathname, "echo") == 0) {
+
+	else if (strcmp(pathname, "echo") == 0)
+
 		gnuish_echo(sh_state, args);
-	} else {
+
+	else
+
 		gnuish_exec(sh_state, args);
-	}
 
 	free(args);
 }
@@ -229,12 +236,11 @@ void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname)
 void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
 {
 	pid_t cmdPid = fork();
-
-	if (cmdPid == 0) {
+	// FIXME: Handle errors, pathname not existing, etc.
+	if (cmdPid == 0)
 		execve(args[0], args, sh_state->env);
-	} else {
+	else
 		waitpid(cmdPid, NULL, 0);
-	}
 }
 
 void gnuish_exit(struct gnuish_state *sh_state)

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <sys/queue.h>
-
 enum gnuish_built_in {
 	EXIT,
 	CHDIR,
@@ -14,11 +12,9 @@ enum gnuish_built_in {
 };
 
 struct gnuish_hist_ent {
+	struct gnuish_hist_ent *forward, *backward;
 	char *line;
-	LIST_ENTRY(gnuish_hist_ent) adjacent_cmds;
 };
-
-LIST_HEAD(gnuish_hist_head, gnuish_hist_ent);
 
 struct gnuish_state {
 	long max_input;
@@ -28,7 +24,7 @@ struct gnuish_state {
 	// to have on hand.
 	char *cwd;
 	
-	struct gnuish_hist_head cmd_history, oldest_cmd;
+	struct gnuish_hist_ent *cmd_history, *oldest_cmd;
 	int hist_n;
 
 	char *const *env;
