@@ -38,8 +38,6 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, char *line);
 
 void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname);
 
-void gnuish_recall(struct gnuish_state *sh_state, int n);
-
 void gnuish_exec(struct gnuish_state *sh_state, char *const *args);
 
 void gnuish_exit(struct gnuish_state *sh_state);

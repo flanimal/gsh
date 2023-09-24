@@ -11,53 +11,53 @@
 #include "gnuish.h"
 
 /*
-*	gnuish - GNU island shell
-*
-*	gnuish displays the current working directory in the shell prompt:
-*
-*		~ @
-*		/usr/ @
-*		/mnt/.../repos @
-*
-*	Commands
-*
+ *	gnuish - GNU island shell
+ *
+ *	gnuish displays the current working directory in the shell prompt:
+ *
+ *		~ @
+ *		/usr/ @
+ *		/mnt/.../repos @
+ *
+ *	Commands
+ *
  *		<command> [<args>...]	 Run command or program with optional
  *arguments.
-*
-*		r [<n>]		Execute the nth last line.
+ *
+ *		r [<n>]		Execute the nth last line.
  *					The line will be placed in history, not the `r`
  *invocation. The line in question will be echoed to the screen before being
  *executed.
-*
-*	Built-ins:
-*
-*		exit		Exit the shell.
-*
-*		hist		Display up to 10 last lines entered, numbered.
-*
-*		----
-*
-*		echo		Write to stdout.
-*
-*		kill		Send a signal to a process.
-*
-*		help		Display this help page.
-*
-*	Globbing
-*
-*		TODO: globbing
-*
-*	***
-*
-*	See the "Readme" file within this directory.
-*
-*	Also see the Makefile, which:
-*		1. Compiles all source code.
-*		2. Cleans up the directory.
-*		3. Performs other tasks as required.
-*/
+ *
+ *	Built-ins:
+ *
+ *		exit		Exit the shell.
+ *
+ *		hist		Display up to 10 last lines entered, numbered.
+ *
+ *		----
+ *
+ *		echo		Write to stdout.
+ *
+ *		kill		Send a signal to a process.
+ *
+ *		help		Display this help page.
+ *
+ *	Globbing
+ *
+ *		TODO: globbing
+ *
+ *	***
+ *
+ *	See the "Readme" file within this directory.
+ *
+ *	Also see the Makefile, which:
+ *		1. Compiles all source code.
+ *		2. Cleans up the directory.
+ *		3. Performs other tasks as required.
+ */
 
-#define GNUISH_PROMPT "@ "
+#define GNUISH_PROMPT " @ "
 #define GNUISH_MAX_ARGS 64
 
 static void gnuish_put_prompt(const struct gnuish_state *sh_state)
@@ -165,12 +165,19 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 
 	ssize_t len = read(STDIN_FILENO, out_line, (size_t)sh_state->max_input);
 
-	// Must remember to include newline as delimiter!
-	out_line[len] = '\0';
+	// Must remember to include null terminator!
+	//
+	// * Adding the null at index `len` INCLUDES the newline entered on the
+	// terminal. So it has the effect of automatically inserting line breaks
+	// when command history is printed. However, if a line with the maximum
+	// length was entered, this would be indexing out of bounds.
+	out_line[len - 1] = '\0';
 
-	if (len > 0)
-		// Echo line of input.
-		write(STDOUT_FILENO, out_line, (size_t)len);
+	// TODO: Make this optional.
+	// if (len > 0)
+	//	// Echo line of input.
+	//	write(STDOUT_FILENO, out_line, (size_t)len); // TODO: Correct
+	//nbytes?
 
 	gnuish_add_hist(sh_state, out_line);
 
@@ -179,6 +186,7 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 
 void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
 {
+	// TODO: We don't need to reallocate and free this each time.
 	char **args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
 
 	gnuish_parse_line(line, args);
@@ -203,23 +211,13 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
 
 void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname)
 {
-	if (chdir(pathname) == -1) { // FIXME
+	// TODO: Handle `.`, `..` approproiately.
+	if (chdir(pathname) == -1) {
 		const char *err_str = strerror(errno);
 		write(STDOUT_FILENO, err_str, strlen(err_str));
 	}
 
 	strcpy(sh_state->cwd, pathname); // TODO: ...
-}
-
-void gnuish_recall(struct gnuish_state *sh_state, int n)
-{
-	struct gnuish_past_cmd *cmd_it = sh_state->cmd_history;
-
-	while (cmd_it->next && n-- > 0) {
-		cmd_it = cmd_it->next;
-	}
-
-	gnuish_run_cmd(sh_state, cmd_it->line);
 }
 
 void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
@@ -235,5 +233,6 @@ void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
 
 void gnuish_exit(struct gnuish_state *sh_state)
 {
+	// TODO: Kill all started processes?
 	exit(0);
 }
