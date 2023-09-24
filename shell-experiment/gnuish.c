@@ -124,7 +124,6 @@ static void gnuish_list_hist(const struct gnuish_state *sh_state)
 
 static void gnuish_recall(struct gnuish_state *sh_state, int n)
 {
-	// TODO: Recall `r` should NOT be added to history.
 	struct gnuish_past_cmd *cmd_it = sh_state->cmd_history;
 
 	while (cmd_it->next && n-- > 0) {
@@ -179,6 +178,8 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 	//	write(STDOUT_FILENO, out_line, (size_t)len); // TODO: Correct
 	//nbytes?
 
+	// Recall `r` should NOT be added to history.
+	if (strncmp(out_line, "r ", 2) != 0)
 	gnuish_add_hist(sh_state, out_line);
 
 	return len;
