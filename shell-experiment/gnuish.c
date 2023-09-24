@@ -236,11 +236,17 @@ void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname)
 void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
 {
 	pid_t cmdPid = fork();
-	// FIXME: Handle errors, pathname not existing, etc.
-	if (cmdPid == 0)
-		execve(args[0], args, sh_state->env);
-	else
+
+	if (cmdPid != 0) {
 		waitpid(cmdPid, NULL, 0);
+		return;
+	}
+
+	if (execve(args[0], args, sh_state->env) == -1) {
+		const char *err_str = strerror(errno);
+		write(STDOUT_FILENO, err_str, strlen(err_str));
+		write(STDOUT_FILENO, "\n", 1);
+	}
 }
 
 void gnuish_exit(struct gnuish_state *sh_state)
