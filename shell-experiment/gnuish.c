@@ -92,7 +92,7 @@ static void gnuish_add_hist(struct gnuish_state *sh_state, const char *line)
 	sh_state->cmd_history = last_cmd;
 }
 
-void gnuish_init(struct gnuish_state *sh_state, const char **envp)
+void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
 {
 	// TODO: We will probably need to copy the original environment.
 	sh_state->env = envp;
@@ -133,6 +133,29 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 	return nbytes;
 }
 
+void gnuish_run_cmd(struct gnuish_state *sh_state, const char *line)
+{
+	char **args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
+
+	gnuish_parse_line(line, args);
+
+	char *pathname = args[0];
+	// TODO: How would you execute a program by name in a directory without looping
+	// over ALL entries?
+	// One way would be a hash table.
+	if (strcmp(pathname, "cd") == 0) {
+		gnuish_chdir(sh_state, args[1]);
+	} else if (strcmp(pathname, "r") == 0) {
+		gnuish_recall(sh_state, atoi(args[1]));
+	} else if (strcmp(pathname, "exit") == 0) {
+		gnuish_exit(sh_state);
+	} else {
+		gnuish_exec(sh_state, args);
+	}
+
+	free(args);
+}
+
 void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname)
 {
 	if (chdir(pathname) == -1) {
@@ -154,27 +177,7 @@ void gnuish_recall(struct gnuish_state *sh_state, int n)
 	gnuish_run_cmd(sh_state, cmd_it->line);
 }
 
-void gnuish_run_cmd(struct gnuish_state *sh_state, const char *line)
-{
-	char **args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
-
-	gnuish_parse_line(line, args);
-	char *pathname = args[0];
-	// TODO: How would you execute a program by name in a directory without looping
-	// over ALL entries?
-	// One way would be a hash table.
-	if (strcmp(pathname, "cd") == 0) {
-		gnuish_chdir(sh_state, args[1]);
-	} else if (strcmp(pathname, "r") == 0) {
-		gnuish_recall(sh_state, atoi(args[1]));
-	} else if (strcmp(pathname, "exit") == 0) {
-		gnuish_exit(sh_state);
-	} else {
-		gnuish_exec(sh_state, args);
-	}
-}
-
-void gnuish_exec(struct gnuish_state *sh_state, const char **args)
+void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
 {
 	pid_t cmdPid = fork();
 
