@@ -90,6 +90,7 @@
     <ClCompile />
     <ClCompile>
       <CLanguageStandard>gnu11</CLanguageStandard>
+      <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

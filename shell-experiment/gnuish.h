@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sys/queue.h>
+
 enum gnuish_built_in {
 	EXIT,
 	CHDIR,
@@ -11,10 +13,12 @@ enum gnuish_built_in {
 	RECALL,
 };
 
-struct gnuish_past_cmd {
+struct gnuish_hist_ent {
 	char *line;
-	struct gnuish_past_cmd *prev, *next;
+	LIST_ENTRY(gnuish_hist_ent) adjacent_cmds;
 };
+
+LIST_HEAD(gnuish_hist_head, gnuish_hist_ent);
 
 struct gnuish_state {
 	long max_input;
@@ -23,14 +27,16 @@ struct gnuish_state {
 	// then we might as well store it in the shell state structure
 	// to have on hand.
 	char *cwd;
-
-	struct gnuish_past_cmd *cmd_history, *oldest_cmd;
+	
+	struct gnuish_hist_head cmd_history, oldest_cmd;
 	int hist_n;
 
 	char *const *env;
 };
 
 void gnuish_init(struct gnuish_state *sh_state, char *const *envp);
+
+void gnuish_echo(struct gnuish_state *sh_state, char **args);
 
 ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line);
 
