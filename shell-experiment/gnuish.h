@@ -33,7 +33,7 @@ void gnuish_init(struct gnuish_state *sh_state, char *const *envp);
 
 ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line);
 
-void gnuish_run_cmd(struct gnuish_state *sh_state, const char *line);
+void gnuish_run_cmd(struct gnuish_state *sh_state, char *line);
 
 void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname);
 

@@ -64,18 +64,13 @@ static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 	write(STDOUT_FILENO, GNUISH_PROMPT, sizeof(GNUISH_PROMPT) - 1);
 }
 
-static void gnuish_parse_line(const char *line, char **out_args)
+static void gnuish_parse_line(char *line, char **out_args)
 {
-	char *lineTmp = malloc(strlen(line));
-	strcpy(lineTmp, line);
-
-	out_args[0] = strtok(lineTmp, " \n");
+	out_args[0] = strtok(line, " \n");
 
 	for (int arg_n = 1; (out_args[arg_n++] = strtok(NULL, " ")) &&
 			    arg_n <= GNUISH_MAX_ARGS;)
 		;
-
-	free(lineTmp);
 }
 
 static void gnuish_add_hist(struct gnuish_state *sh_state, const char *line)
@@ -118,22 +113,21 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 {
 	gnuish_put_prompt(sh_state);
 
-	ssize_t nbytes =
-		read(STDIN_FILENO, out_line, (size_t)sh_state->max_input);
+	ssize_t len = read(STDIN_FILENO, out_line, (size_t)sh_state->max_input);
 
 	// Must remember to include newline as delimiter!
-	out_line[nbytes] = '\0';
+	out_line[len] = '\0';
 
-	if (nbytes > 0)
+	if (len > 0)
 		// Echo line of input.
-		write(STDOUT_FILENO, out_line, (size_t)nbytes);
+		write(STDOUT_FILENO, out_line, (size_t)len);
 
 	gnuish_add_hist(sh_state, out_line);
 
-	return nbytes;
+	return len;
 }
 
-void gnuish_run_cmd(struct gnuish_state *sh_state, const char *line)
+void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
 {
 	char **args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
 
@@ -182,6 +176,7 @@ void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
 	pid_t cmdPid = fork();
 
 	if (cmdPid == 0) {
+		write(STDOUT_FILENO, args[0], strlen(args[0]));
 		execve(args[0], args, sh_state->env);
 	} else {
 		waitpid(cmdPid, NULL, 0);
