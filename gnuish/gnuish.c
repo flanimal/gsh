@@ -80,7 +80,8 @@ static void gnuish_parse_line(char *line, char **out_pathname, char **out_args)
 		;
 }
 
-static void gnuish_add_hist(struct gnuish_state *sh_state, const char *line)
+static void gnuish_add_hist(struct gnuish_state *sh_state, size_t len,
+			    const char *line)
 {
 	struct gnuish_hist_ent *last_cmd = malloc(sizeof(*last_cmd));
 
@@ -93,7 +94,7 @@ static void gnuish_add_hist(struct gnuish_state *sh_state, const char *line)
 
 	if (sh_state->hist_n == 10) {
 		struct gnuish_hist_ent *popped_ent = sh_state->oldest_cmd;
-		sh_state->oldest_cmd = popped_ent->forward;
+		sh_state->oldest_cmd = popped_ent->back;
 
 		remque(popped_ent);
 		free(popped_ent);
@@ -127,6 +128,7 @@ static void gnuish_recall(struct gnuish_state *sh_state)
 		cmd_it = cmd_it->forw;
 
 	printf("%s\n", cmd_it->line);
+	gnuish_run_cmd(sh_state, cmd_it->len, cmd_it->line);
 }
 
 void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
@@ -168,24 +170,17 @@ size_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 
 	ssize_t len = getline(&out_line, &sh_state->max_input, stdin);
 
-	// Must remember to include null terminator!
+	if (len == -1) {
 		printf("%m\n", errno);
-	// * Adding the null at index `len` INCLUDES the newline entered on the
-	// terminal. So it has the effect of automatically inserting line breaks
-	// when command history is printed. However, if a line with the maximum
-	// length was entered, this would be indexing out of bounds.
-	out_line[len - 1] = '\0';
+		exit(EXIT_FAILURE);
+	}
 
-	// TODO: Make this optional.
-	// if (len > 0)
-	//	// Echo line of input.
-	//	write(STDOUT_FILENO, out_line, (size_t)len); // TODO: Correct
-	// nbytes?
+	out_line[len - 1] = '\0'; // Remove newline.
 
-	return len;
+	return (size_t)len;
 }
 
-void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
+void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 {
 	char *pathname;
 

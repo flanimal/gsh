@@ -1,7 +1,8 @@
 #pragma once
 
 struct gnuish_hist_ent {
-	struct gnuish_hist_ent *forward, *backward;
+	struct gnuish_hist_ent *back, *forw;
+	size_t len;
 	char *line;
 };
 
