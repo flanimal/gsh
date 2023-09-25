@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stddef.h>
+
 struct gnuish_hist_ent {
 	struct gnuish_hist_ent *back, *forw;
 	size_t len;
