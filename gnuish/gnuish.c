@@ -60,12 +60,22 @@ static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 	printf("%s %s ", sh_state->cwd, GNUISH_PROMPT);
 }
 
-static void gnuish_parse_line(char *line, char **out_args)
+/*	Returns argument list terminated with NULL, and pathname.
+ *	A NULL pathname means the PATH environment variable must be used.
+ */
+static void gnuish_parse_line(char *line, char **out_pathname, char **out_args)
 {
+	*out_pathname = NULL;
 	out_args[0] = strtok(line, " \n");
 
-	for (int arg_n = 1; (out_args[arg_n++] = strtok(NULL, " \n")) &&
-			    arg_n <= GNUISH_MAX_ARGS;)
+	if (**out_args == '/') {
+		*out_pathname = out_args[0];
+		out_args[0] = strrchr(out_args[0], '/') + 1;
+	}
+
+	for (int arg_n = 1; (out_args[arg_n] = strtok(NULL, " \n")) &&
+			    arg_n <= GNUISH_MAX_ARGS;
+	     ++arg_n)
 		;
 }
 
@@ -76,7 +86,9 @@ static void gnuish_add_hist(struct gnuish_state *sh_state, const char *line)
 	insque(last_cmd, sh_state->cmd_history);
 	sh_state->cmd_history = last_cmd;
 
-	strcpy((last_cmd->line = malloc(strlen(line))), line);
+	// Take care to include null character.
+	strcpy((last_cmd->line = malloc(len)), line);
+	last_cmd->len = len;
 
 	if (sh_state->hist_n == 10) {
 		struct gnuish_hist_ent *popped_ent = sh_state->oldest_cmd;
@@ -90,15 +102,14 @@ static void gnuish_add_hist(struct gnuish_state *sh_state, const char *line)
 		sh_state->oldest_cmd = last_cmd;
 	}
 
-	sh_state->hist_n++;
+	++sh_state->hist_n;
 }
 
 static void gnuish_list_hist(const struct gnuish_state *sh_state)
 {
 	// It is not possible for `cmd_history` to be NULL here,
-	// as it will at least contain the `hist` invocation.
-
-	char cmd_n = '0';
+	// as it will contain at least the `hist` invocation.
+	int cmd_n = 1;
 	struct gnuish_hist_ent *cmd_it = sh_state->cmd_history;
 
 	for (; cmd_it; cmd_it = cmd_it->forw)
@@ -106,12 +117,14 @@ static void gnuish_list_hist(const struct gnuish_state *sh_state)
 	}
 }
 
-static void gnuish_recall(struct gnuish_state *sh_state, int n)
+/* Re-run the n-th previous line of input. */
+static void gnuish_recall(struct gnuish_state *sh_state)
 {
 	struct gnuish_hist_ent *cmd_it = sh_state->cmd_history;
+	int hist_n = (sh_state->args[1] ? atoi(sh_state->args[1]) : 1);
 
-	while (cmd_it && n-- > 0)
-		cmd_it = cmd_it->forward;
+	while (cmd_it && hist_n-- > 1)
+		cmd_it = cmd_it->forw;
 
 	printf("%s\n", cmd_it->line);
 }
@@ -143,9 +156,7 @@ void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
 	sh_state->hist_n = 0;
 }
 
-void gnuish_echo(struct gnuish_state *sh_state, char **args)
-{
-	// for ()
+	sh_state->args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
 }
 
 ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
@@ -181,47 +192,42 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
 					 // history.
 		gnuish_add_hist(sh_state, line);
 
-	gnuish_parse_line(line, args);
+	gnuish_parse_line(line, &pathname, sh_state->args);
+	char *const filename = sh_state->args[0];
 
-	char *pathname = args[0];
-	// TODO: How would you execute a program by name in a directory without
-	// looping over ALL entries? One way would be a hash table.
+	// TODO:
+	if (strcmp(filename, "cd") == 0)
 
-	if (strcmp(pathname, "cd") == 0)
+		gnuish_chdir(sh_state);
 
-		gnuish_chdir(sh_state, args[1]);
+	else if (strcmp(filename, "r") == 0)
 
-	else if (strcmp(pathname, "r") == 0)
-		// TODO: Make index optional.
-		gnuish_recall(sh_state, atoi(args[1]));
+		gnuish_recall(sh_state);
 
-	else if (strcmp(pathname, "exit") == 0)
+	else if (strcmp(filename, "exit") == 0)
 
-		gnuish_exit(sh_state);
+		exit(EXIT_SUCCESS);
 
-	else if (strcmp(pathname, "hist") == 0)
+	else if (strcmp(filename, "hist") == 0)
 
 		gnuish_list_hist(sh_state);
 
-	else if (strcmp(pathname, "echo") == 0)
+	else if (strcmp(filename, "echo") == 0)
 
-		gnuish_echo(sh_state, args);
+		gnuish_echo(sh_state);
 
 	else
 
-		gnuish_exec(sh_state, args);
-
-	free(args);
+		gnuish_exec(sh_state, pathname);
 }
 
-void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname)
+void gnuish_exec(struct gnuish_state *sh_state, char *pathname)
 {
-	realpath(pathname, sh_state->cwd); // TODO: ...
+	pid_t cmd_pid = fork();
 
-	if (chdir(pathname) == -1) {
-		const char *err_str = strerror(errno);
-		write(STDOUT_FILENO, err_str, strlen(err_str));
-		write(STDOUT_FILENO, "\n", 1);
+	if (cmd_pid != 0) {
+		waitpid(cmd_pid, NULL, 0);
+		return;
 	}
 
 }
@@ -235,7 +241,7 @@ void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
 		return;
 	}
 
-	if (execve(args[0], args, sh_state->env) == -1) {
+	if (execve(pathname, sh_state->args, sh_state->env) == -1)
 		printf("%m\n", errno);
 		write(STDOUT_FILENO, err_str, strlen(err_str)); // TODO: Passing result of `strlen` here may be bad practice.
 		write(STDOUT_FILENO, "\n", 1);
