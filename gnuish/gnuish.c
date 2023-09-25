@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <search.h>
+#include <envz.h>
 #include <sys/wait.h>
 
 #include <string.h>
@@ -115,7 +116,6 @@ static void gnuish_list_hist(const struct gnuish_state *sh_state)
 	for (; cmd_it; cmd_it = cmd_it->forw)
 		printf("%i: %s\n", cmd_n++, cmd_it->line);
 	}
-}
 
 /* Re-run the n-th previous line of input. */
 static void gnuish_recall(struct gnuish_state *sh_state)
@@ -131,10 +131,14 @@ static void gnuish_recall(struct gnuish_state *sh_state)
 
 void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
 {
-	// TODO: We will probably need to copy the original environment.
 	sh_state->env = envp;
 
-	// Maximum length of input line on terminal.
+	size_t env_len = 0;
+	for (; *envp; ++envp)
+		env_len += strlen(*envp);
+
+	sh_state->path = envz_get(*sh_state->env, env_len, "PATH");
+
 	sh_state->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
 
 	sh_state->cwd = malloc(_POSIX_PATH_MAX);
@@ -154,12 +158,11 @@ void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
 
 	sh_state->cmd_history = sh_state->oldest_cmd = NULL;
 	sh_state->hist_n = 0;
-}
 
 	sh_state->args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
 }
 
-ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
+size_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 {
 	gnuish_put_prompt(sh_state);
 
@@ -184,9 +187,7 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 
 void gnuish_run_cmd(struct gnuish_state *sh_state, char *line)
 {
-	// TODO: We don't need to reallocate and free this each time.
-	// TODO: Number of args? Put NULL at end of args list?
-	char **args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
+	char *pathname;
 
 	if (strncmp(line, "r ", 2) != 0) // Recall `r` should NOT be added to
 					 // history.
@@ -230,22 +231,31 @@ void gnuish_exec(struct gnuish_state *sh_state, char *pathname)
 		return;
 	}
 
+	if (!pathname) {
+		char *path = malloc(strlen(sh_state->path) + 1);
+		strcpy(path, sh_state->path);
+
+		int code = -1;
+
+		char *exec_pathname = malloc((size_t)sh_state->max_path);
+
+		for (char *path_it = strtok(path, ":"); code == -1 && path_it;
+		     path_it = strtok(NULL, ":")) {
+			sprintf(exec_pathname, "%s/%s", path_it,
+				sh_state->args[0]);
+
+			code = execve(exec_pathname, sh_state->args,
+				      sh_state->env);
 }
 
-void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
+		if (code == -1)
 			printf("%m\n", errno);
-	pid_t cmdPid = fork();
 
-	if (cmdPid != 0) {
-		waitpid(cmdPid, NULL, 0);
 		return;
 	}
 
 	if (execve(pathname, sh_state->args, sh_state->env) == -1)
 		printf("%m\n", errno);
-		write(STDOUT_FILENO, err_str, strlen(err_str)); // TODO: Passing result of `strlen` here may be bad practice.
-		write(STDOUT_FILENO, "\n", 1);
-	}
 }
 
 void gnuish_echo(struct gnuish_state *sh_state)
