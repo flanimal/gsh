@@ -78,6 +78,9 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <WSLPath>Ubuntu</WSLPath>
+    <RemotePostBuildEventUseInBuild>false</RemotePostBuildEventUseInBuild>
+    <RemotePreLinkEventUseInBuild>false</RemotePreLinkEventUseInBuild>
+    <RemotePreBuildEventUseInBuild>false</RemotePreBuildEventUseInBuild>
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="gnuish.c" />
