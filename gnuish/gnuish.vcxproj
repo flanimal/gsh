@@ -89,12 +89,17 @@
   <ItemGroup>
     <ClInclude Include="gnuish.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Makefile" />
+    <None Include="README.md" />
+  </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile />
     <ClCompile />
     <ClCompile>
       <CLanguageStandard>gnu11</CLanguageStandard>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalOptions />
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
