@@ -17,7 +17,7 @@ struct gnuish_state {
 	// then we might as well store it in the shell state structure
 	// to have on hand.
 	char *cwd;
-	
+
 	/* Tail and head of command history queue. */
 	struct gnuish_hist_ent *cmd_history, *oldest_cmd;
 

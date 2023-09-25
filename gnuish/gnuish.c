@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <assert.h>
+#include <ctype.h>
 
 #include "gnuish.h"
 
@@ -116,7 +117,7 @@ static void gnuish_list_hist(const struct gnuish_state *sh_state)
 
 	for (; cmd_it; cmd_it = cmd_it->forw)
 		printf("%i: %s\n", cmd_n++, cmd_it->line);
-	}
+}
 
 /* Re-run the n-th previous line of input. */
 static void gnuish_recall(struct gnuish_state *sh_state)
@@ -184,9 +185,10 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 {
 	char *pathname;
 
-	if (strncmp(line, "r ", 2) != 0) // Recall `r` should NOT be added to
-					 // history.
-		gnuish_add_hist(sh_state, line);
+	if (!(line[0] == 'r' &&
+	      (line[1] == '\0' || isspace(line[1])))) // Recall `r` should NOT
+						      // be added to history.
+		gnuish_add_hist(sh_state, len, line);
 
 	gnuish_parse_line(line, &pathname, sh_state->args);
 	char *const filename = sh_state->args[0];
@@ -241,7 +243,7 @@ void gnuish_exec(struct gnuish_state *sh_state, char *pathname)
 
 			code = execve(exec_pathname, sh_state->args,
 				      sh_state->env);
-}
+		}
 
 		if (code == -1)
 			printf("%m\n", errno);
