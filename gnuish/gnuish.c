@@ -57,8 +57,7 @@
 
 static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 {
-	write(STDOUT_FILENO, sh_state->cwd, strlen(sh_state->cwd));
-	write(STDOUT_FILENO, GNUISH_PROMPT, sizeof(GNUISH_PROMPT) - 1);
+	printf("%s %s ", sh_state->cwd, GNUISH_PROMPT);
 }
 
 static void gnuish_parse_line(char *line, char **out_args)
@@ -101,12 +100,9 @@ static void gnuish_list_hist(const struct gnuish_state *sh_state)
 
 	char cmd_n = '0';
 	struct gnuish_hist_ent *cmd_it = sh_state->cmd_history;
-	for (; cmd_it; cmd_it = cmd_it->backward) {
-		write(STDOUT_FILENO, &cmd_n, 1);
-		write(STDOUT_FILENO, ": ", 2);
-		write(STDOUT_FILENO, cmd_it->line, strlen(cmd_it->line));
-		write(STDOUT_FILENO, "\n", 1);
-		cmd_n++;
+
+	for (; cmd_it; cmd_it = cmd_it->forw)
+		printf("%i: %s\n", cmd_n++, cmd_it->line);
 	}
 }
 
@@ -117,7 +113,7 @@ static void gnuish_recall(struct gnuish_state *sh_state, int n)
 	while (cmd_it && n-- > 0)
 		cmd_it = cmd_it->forward;
 
-	gnuish_run_cmd(sh_state, cmd_it->line);
+	printf("%s\n", cmd_it->line);
 }
 
 void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
@@ -132,9 +128,11 @@ void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
 	sh_state->max_path = _POSIX_PATH_MAX;
 
 	if (!getcwd(sh_state->cwd, (size_t)sh_state->max_path)) {
-		// Current working path longer than 256 chars.
+		/* Current working path longer than 256 chars. */
+
 		free(sh_state->cwd);
-		// We will use the memory allocated by `getcwd`
+
+		// We will use the buffer allocated by `getcwd`
 		// to store the working directory from now on.
 		// TODO: We may need to do this in `chdir` as well.
 		sh_state->cwd = getcwd(NULL, 0);
@@ -154,10 +152,10 @@ ssize_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 {
 	gnuish_put_prompt(sh_state);
 
-	ssize_t len = read(STDIN_FILENO, out_line, (size_t)sh_state->max_input);
+	ssize_t len = getline(&out_line, &sh_state->max_input, stdin);
 
 	// Must remember to include null terminator!
-	//
+		printf("%m\n", errno);
 	// * Adding the null at index `len` INCLUDES the newline entered on the
 	// terminal. So it has the effect of automatically inserting line breaks
 	// when command history is printed. However, if a line with the maximum
@@ -229,7 +227,7 @@ void gnuish_chdir(struct gnuish_state *sh_state, const char *pathname)
 }
 
 void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
-{
+			printf("%m\n", errno);
 	pid_t cmdPid = fork();
 
 	if (cmdPid != 0) {
@@ -238,7 +236,7 @@ void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
 	}
 
 	if (execve(args[0], args, sh_state->env) == -1) {
-		const char *err_str = strerror(errno);
+		printf("%m\n", errno);
 		write(STDOUT_FILENO, err_str, strlen(err_str)); // TODO: Passing result of `strlen` here may be bad practice.
 		write(STDOUT_FILENO, "\n", 1);
 	}
@@ -248,4 +246,7 @@ void gnuish_exit(struct gnuish_state *sh_state)
 {
 	// TODO: Kill all started processes?
 	exit(0);
+		printf("%s ", *args);
 }
+
+		printf("%m\n", errno);
