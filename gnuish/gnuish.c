@@ -40,13 +40,7 @@
  *
  *		echo		Write to stdout.
  *
- *		kill		Send a signal to a process.
- *
  *		help		Display this help page.
- *
- *	Globbing
- *
- *		TODO: globbing
  *
  *	***
  *
@@ -58,7 +52,7 @@
  *		3. Performs other tasks as required.
  */
 
-#define GNUISH_PROMPT " @ "
+#define GNUISH_PROMPT "@"
 #define GNUISH_MAX_ARGS 64
 
 static void gnuish_put_prompt(const struct gnuish_state *sh_state)
