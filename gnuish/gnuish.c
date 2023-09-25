@@ -13,47 +13,6 @@
 
 #include "gnuish.h"
 
-/*
- *	gnuish - GNU island shell
- *
- *	gnuish displays the current working directory in the shell prompt:
- *
- *		~ @
- *		/usr/ @
- *		/mnt/.../repos @
- *
- *	Commands
- *
- *		<command> [<args>...]	 Run command or program with optional
- *arguments.
- *
- *		r [<n>]		Execute the nth last line.
- *					The line will be placed in history, not
- *the `r` invocation. The line in question will be echoed to the screen before
- *being executed.
- *
- *	Built-ins:
- *
- *		exit		Exit the shell.
- *
- *		hist		Display up to 10 last lines entered, numbered.
- *
- *		----
- *
- *		echo		Write to stdout.
- *
- *		help		Display this help page.
- *
- *	***
- *
- *	See the "Readme" file within this directory.
- *
- *	Also see the Makefile, which:
- *		1. Compiles all source code.
- *		2. Cleans up the directory.
- *		3. Performs other tasks as required.
- */
-
 #define GNUISH_PROMPT "@"
 #define GNUISH_MAX_ARGS 64
 
