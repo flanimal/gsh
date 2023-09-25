@@ -242,11 +242,25 @@ void gnuish_exec(struct gnuish_state *sh_state, char *const *args)
 	}
 }
 
-void gnuish_exit(struct gnuish_state *sh_state)
+void gnuish_echo(struct gnuish_state *sh_state)
 {
-	// TODO: Kill all started processes?
-	exit(0);
+	char *const *args = sh_state->args;
+
+	// Increment at start to skip name of builtin.
+	for (++args; *args; ++args)
 		printf("%s ", *args);
+
+	putchar('\n');
 }
 
+void gnuish_chdir(struct gnuish_state *sh_state)
+{
+	char *const pathname = sh_state->args[1];
+
+	realpath(pathname, sh_state->cwd);
+
+	if (chdir(pathname) == -1) {
 		printf("%m\n", errno);
+		return;
+	}
+}
