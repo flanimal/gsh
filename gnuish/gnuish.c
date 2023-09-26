@@ -24,7 +24,7 @@ static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 /*	Returns argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
-static void gnuish_parse_line(char *line, char **out_pathname, char **out_args)
+static void gnuish_parse_line(char *line, const char **out_pathname, char **out_args)
 {
 	*out_pathname = NULL;
 	out_args[0] = strtok(line, " \n");
@@ -129,7 +129,7 @@ void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
 	sh_state->path = envz_get(*sh_state->env, env_len, "PATH");
 
 	// Get working dir and its max path length.
-	sh_state->cwd = malloc((sh_state->max_path = _POSIX_PATH_MAX));
+	sh_state->cwd = malloc((size_t)(sh_state->max_path = _POSIX_PATH_MAX));
 	gnuish_getcwd(sh_state);
 
 	// Get maximum length of terminal input line.
@@ -159,7 +159,7 @@ size_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 
 void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 {
-	char *pathname;
+	const char *pathname;
 
 	if (!(line[0] == 'r' &&
 	      (line[1] == '\0' || isspace(line[1])))) // Recall `r` should NOT
@@ -195,7 +195,7 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 		gnuish_exec(sh_state, pathname);
 }
 
-void gnuish_exec(struct gnuish_state *sh_state, char *pathname)
+void gnuish_exec(struct gnuish_state *sh_state, const char *pathname)
 {
 	pid_t cmd_pid = fork();
 
@@ -233,7 +233,7 @@ void gnuish_exec(struct gnuish_state *sh_state, char *pathname)
 
 void gnuish_echo(struct gnuish_state *sh_state)
 {
-	const char *const *args = sh_state->args;
+	char *const *args = sh_state->args;
 
 	// Increment at start to skip name of builtin.
 	for (++args; *args; ++args)

@@ -47,7 +47,7 @@ size_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line);
 void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line);
 
 /* Fork and exec a program. */
-void gnuish_exec(struct gnuish_state *sh_state, char *pathname);
+void gnuish_exec(struct gnuish_state *sh_state, const char *pathname);
 
 /* 
 	Shell builtins. 
