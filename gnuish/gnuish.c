@@ -57,6 +57,8 @@ static void gnuish_add_hist(struct gnuish_state *sh_state, size_t len,
 		sh_state->oldest_cmd = popped_ent->back;
 
 		remque(popped_ent);
+
+		free(popped_ent->line);
 		free(popped_ent);
 
 		return;
@@ -212,10 +214,14 @@ static int gnuish_exec_path(struct gnuish_state *sh_state)
 		code = execve(exec_pathname, sh_state->args, sh_state->env);
 	}
 
+	// FIXME:
+	free(path);
+	free(exec_pathname);
+
 	return code;
 }
 
-void gnuish_exec(struct gnuish_state *sh_state, char *pathname)
+void gnuish_exec(struct gnuish_state *sh_state, const char *pathname)
 {
 	pid_t cmd_pid = fork();
 
