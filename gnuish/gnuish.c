@@ -225,8 +225,10 @@ void gnuish_exec(struct gnuish_state *sh_state, char *pathname)
 	}
 
 	if (-1 == (pathname ? execve(pathname, sh_state->args, sh_state->env) :
-			      gnuish_exec_path(sh_state)))
+			      gnuish_exec_path(sh_state))) {
 		gnuish_bad_cmd(sh_state, errno);
+		exit(EXIT_FAILURE);
+	}
 }
 
 void gnuish_echo(struct gnuish_state *sh_state)
