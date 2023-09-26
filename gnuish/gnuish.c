@@ -60,9 +60,10 @@ static void gnuish_add_hist(struct gnuish_state *sh_state, size_t len,
 		free(popped_ent);
 
 		return;
-	} else if (sh_state->hist_n == 0) {
-		sh_state->oldest_cmd = last_cmd;
 	}
+
+	if (sh_state->hist_n == 0)
+		sh_state->oldest_cmd = last_cmd;
 
 	++sh_state->hist_n;
 }
@@ -93,7 +94,7 @@ static void gnuish_recall(struct gnuish_state *sh_state)
 	
 	int n_arg = (sh_state->args[1] ? atoi(sh_state->args[1]) : 1);
 
-	if (0 <= n_arg || n_arg > sh_state->hist_n) {
+	if (0 >= n_arg || sh_state->hist_n < n_arg) {
 		gnuish_bad_cmd(sh_state, 0);
 		return;	
 	}
