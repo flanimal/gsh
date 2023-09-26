@@ -196,7 +196,26 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 		gnuish_exec(sh_state, pathname);
 }
 
-void gnuish_exec(struct gnuish_state *sh_state, const char *pathname)
+static int gnuish_exec_path(struct gnuish_state *sh_state)
+{
+	int code = -1;
+
+		char *path = malloc(strlen(sh_state->path) + 1);
+		strcpy(path, sh_state->path);
+
+		char *exec_pathname = malloc((size_t)sh_state->max_path);
+
+		for (char *path_it = strtok(path, ":"); code == -1 && path_it;
+		     path_it = strtok(NULL, ":")) {
+		sprintf(exec_pathname, "%s/%s", path_it, sh_state->args[0]);
+
+		code = execve(exec_pathname, sh_state->args, sh_state->env);
+	}
+
+	return code;
+}
+
+void gnuish_exec(struct gnuish_state *sh_state, char *pathname)
 {
 	pid_t cmd_pid = fork();
 
@@ -205,30 +224,8 @@ void gnuish_exec(struct gnuish_state *sh_state, const char *pathname)
 		return;
 	}
 
-	if (!pathname) {
-		char *path = malloc(strlen(sh_state->path) + 1);
-		strcpy(path, sh_state->path);
-
-		int code = -1;
-
-		char *exec_pathname = malloc((size_t)sh_state->max_path);
-
-		for (char *path_it = strtok(path, ":"); code == -1 && path_it;
-		     path_it = strtok(NULL, ":")) {
-			sprintf(exec_pathname, "%s/%s", path_it,
-				sh_state->args[0]);
-
-			code = execve(exec_pathname, sh_state->args,
-				      sh_state->env);
-		}
-
-		if (code == -1)
-			gnuish_bad_cmd(sh_state, errno);
-
-		return;
-	}
-
-	if (execve(pathname, sh_state->args, sh_state->env) == -1)
+	if (-1 == (pathname ? execve(pathname, sh_state->args, sh_state->env) :
+			      gnuish_exec_path(sh_state)))
 		gnuish_bad_cmd(sh_state, errno);
 }
 
