@@ -78,13 +78,27 @@ static void gnuish_list_hist(const struct gnuish_state *sh_state)
 		printf("%i: %s\n", cmd_n++, cmd_it->line);
 }
 
+static void gnuish_bad_cmd(struct gnuish_state *sh_state, int err)
+{
+	if (err)
+		printf("not a command: %m\n", err);
+	else
+		printf("not a command\n");
+}
+
 /* Re-run the n-th previous line of input. */
 static void gnuish_recall(struct gnuish_state *sh_state)
 {
 	struct gnuish_hist_ent *cmd_it = sh_state->cmd_history;
-	int hist_n = (sh_state->args[1] ? atoi(sh_state->args[1]) : 1);
 
-	while (cmd_it && hist_n-- > 1)
+	int n_arg = (sh_state->args[1] ? atoi(sh_state->args[1]) : 1);
+
+	if (0 <= n_arg || n_arg > sh_state->hist_n) {
+		gnuish_bad_cmd(sh_state, 0);
+		return;	
+	}
+
+	while (cmd_it && n_arg-- > 1)
 		cmd_it = cmd_it->forw;
 
 	printf("%s\n", cmd_it->line);
@@ -205,13 +219,13 @@ void gnuish_exec(struct gnuish_state *sh_state, char *pathname)
 		}
 
 		if (code == -1)
-			printf("%m\n", errno);
+			gnuish_bad_cmd(sh_state, errno);
 
 		return;
 	}
 
 	if (execve(pathname, sh_state->args, sh_state->env) == -1)
-		printf("%m\n", errno);
+		gnuish_bad_cmd(sh_state, errno);
 }
 
 void gnuish_echo(struct gnuish_state *sh_state)
