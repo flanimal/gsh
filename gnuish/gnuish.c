@@ -90,7 +90,7 @@ static void gnuish_bad_cmd(struct gnuish_state *sh_state, int err)
 static void gnuish_recall(struct gnuish_state *sh_state)
 {
 	struct gnuish_hist_ent *cmd_it = sh_state->cmd_history;
-
+	
 	int n_arg = (sh_state->args[1] ? atoi(sh_state->args[1]) : 1);
 
 	if (0 <= n_arg || n_arg > sh_state->hist_n) {
@@ -105,6 +105,19 @@ static void gnuish_recall(struct gnuish_state *sh_state)
 	gnuish_run_cmd(sh_state, cmd_it->len, cmd_it->line);
 }
 
+static void gnuish_getcwd(struct gnuish_state *sh_state)
+{
+	if (!getcwd(sh_state->cwd, (size_t)sh_state->max_path)) {
+		/* Current working path longer than max_path chars. */
+		free(sh_state->cwd);
+
+		// We will use the buffer allocated by `getcwd`
+		// to store the working directory from now on.
+		sh_state->cwd = getcwd(NULL, 0);
+		sh_state->max_path = pathconf(sh_state->cwd, _PC_PATH_MAX);
+	}
+}
+
 void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
 {
 	sh_state->env = envp;
@@ -115,22 +128,12 @@ void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
 
 	sh_state->path = envz_get(*sh_state->env, env_len, "PATH");
 
+	// Get working dir and its max path length.
+	sh_state->cwd = malloc((sh_state->max_path = _POSIX_PATH_MAX));
+	gnuish_getcwd(sh_state);
+
+	// Get maximum length of terminal input line.
 	sh_state->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
-
-	sh_state->cwd = malloc(_POSIX_PATH_MAX);
-	sh_state->max_path = _POSIX_PATH_MAX;
-
-	if (!getcwd(sh_state->cwd, (size_t)sh_state->max_path)) {
-		/* Current working path longer than 256 chars. */
-
-		free(sh_state->cwd);
-
-		// We will use the buffer allocated by `getcwd`
-		// to store the working directory from now on.
-		// TODO: We may need to do this in `chdir` as well.
-		sh_state->cwd = getcwd(NULL, 0);
-		sh_state->max_path = pathconf(sh_state->cwd, _PC_PATH_MAX);
-	}
 
 	sh_state->cmd_history = sh_state->oldest_cmd = NULL;
 	sh_state->hist_n = 0;
@@ -243,8 +246,8 @@ void gnuish_chdir(struct gnuish_state *sh_state)
 {
 	const char *const pathname = sh_state->args[1];
 
-	if (chdir(pathname) == -1) {
+	if (chdir(pathname) == -1)
 		printf("%m\n", errno);
-		return;
-	}
+
+	gnuish_getcwd(sh_state);
 }
