@@ -164,7 +164,7 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 		gnuish_add_hist(sh_state, len, line);
 
 	gnuish_parse_line(line, &pathname, sh_state->args);
-	char *const filename = sh_state->args[0];
+	const char *const filename = sh_state->args[0];
 
 	// TODO:
 	if (strcmp(filename, "cd") == 0)
@@ -230,7 +230,7 @@ void gnuish_exec(struct gnuish_state *sh_state, char *pathname)
 
 void gnuish_echo(struct gnuish_state *sh_state)
 {
-	char *const *args = sh_state->args;
+	const char *const *args = sh_state->args;
 
 	// Increment at start to skip name of builtin.
 	for (++args; *args; ++args)
@@ -241,9 +241,7 @@ void gnuish_echo(struct gnuish_state *sh_state)
 
 void gnuish_chdir(struct gnuish_state *sh_state)
 {
-	char *const pathname = sh_state->args[1];
-
-	realpath(pathname, sh_state->cwd);
+	const char *const pathname = sh_state->args[1];
 
 	if (chdir(pathname) == -1) {
 		printf("%m\n", errno);
