@@ -24,16 +24,24 @@ static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 /*	Returns argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
-static void gnuish_parse_line(char *line, const char **out_pathname, char **out_args)
+static void gnuish_parse_line(char *line, const char **out_pathname,
+			      char **out_args)
 {
-	*out_pathname = NULL;
+	// Get file/pathname.
 	out_args[0] = strtok(line, " \n");
-
-	if (**out_args == '/') {
-		*out_pathname = out_args[0];
-		out_args[0] = strrchr(out_args[0], '/') + 1;
+	{
+		// Get the pathname, whether relative or absolute, if one
+		// preceded the filename.
+		char *last_dir_sep = strrchr(out_args[0], '/');
+		if (last_dir_sep) {
+			*out_pathname = out_args[0];
+			out_args[0] = last_dir_sep + 1;
+		} else {
+			*out_pathname = NULL;
+		}
 	}
 
+	// Get arguments.
 	for (int arg_n = 1; (out_args[arg_n] = strtok(NULL, " \n")) &&
 			    arg_n <= GNUISH_MAX_ARGS;
 	     ++arg_n)
@@ -93,12 +101,12 @@ static void gnuish_bad_cmd(struct gnuish_state *sh_state, int err)
 static void gnuish_recall(struct gnuish_state *sh_state)
 {
 	struct gnuish_hist_ent *cmd_it = sh_state->cmd_history;
-	
+
 	int n_arg = (sh_state->args[1] ? atoi(sh_state->args[1]) : 1);
 
 	if (0 >= n_arg || sh_state->hist_n < n_arg) {
 		gnuish_bad_cmd(sh_state, 0);
-		return;	
+		return;
 	}
 
 	while (cmd_it && n_arg-- > 1)
@@ -202,13 +210,13 @@ static int gnuish_exec_path(struct gnuish_state *sh_state)
 {
 	int code = -1;
 
-		char *path = malloc(strlen(sh_state->path) + 1);
-		strcpy(path, sh_state->path);
+	char *path = malloc(strlen(sh_state->path) + 1);
+	strcpy(path, sh_state->path);
 
-		char *exec_pathname = malloc((size_t)sh_state->max_path);
+	char *exec_pathname = malloc((size_t)sh_state->max_path);
 
-		for (char *path_it = strtok(path, ":"); code == -1 && path_it;
-		     path_it = strtok(NULL, ":")) {
+	for (char *path_it = strtok(path, ":"); code == -1 && path_it;
+	     path_it = strtok(NULL, ":")) {
 		sprintf(exec_pathname, "%s/%s", path_it, sh_state->args[0]);
 
 		code = execve(exec_pathname, sh_state->args, sh_state->env);
