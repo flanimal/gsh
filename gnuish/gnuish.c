@@ -218,16 +218,20 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 		gnuish_exec(sh_state, pathname);
 }
 
-static bool gnuish_copy_path(int *len, char *dest_path, char *src_path)
+/* Copy a path from PATH variable, stopping when a colon ':' or null terminator
+ * is encountered. */
+static void gnuish_copy_path(int *len, char *dest_path, char **path_it)
 {
-	for (*len = 0;; ++(*len)) {
-		switch ((dest_path[*len] = src_path[*len])) {
+	for (*len = 0;; ++(*len), ++(*path_it)) {
+		switch (**path_it) {
 		case ':':
-			dest_path[*len] = '\0';
-			return true;
+			++(*path_it); // Move to next path following the colon.
+			/* fall through */
 		case '\0':
-			return false;
+			dest_path[*len] = '\0';
+			return;
 		default:
+			dest_path[*len] = **path_it;
 			continue;
 		}
 	}
@@ -236,14 +240,12 @@ static bool gnuish_copy_path(int *len, char *dest_path, char *src_path)
 static int gnuish_exec_path(struct gnuish_state *sh_state)
 {
 	int code = -1;
+	
 	char *exec_pathname = malloc((size_t)sh_state->max_path);
+	int len; // The length of current iteration of exec_pathname.
 
-	int len;
-
-	for (char *path_it = sh_state->pathvar; path_it; path_it += len + 1) {
-		if (!gnuish_copy_path(&len, exec_pathname, path_it))
-			break;
-
+	for (char *path_it = sh_state->pathvar; *path_it;) {
+		gnuish_copy_path(&len, exec_pathname, &path_it);
 		sprintf(exec_pathname + len, "/%s", sh_state->args[0]);
 
 		if (-1 != (code = execve(exec_pathname, sh_state->args,
@@ -258,12 +260,12 @@ static int gnuish_exec_path(struct gnuish_state *sh_state)
 
 void gnuish_exec(struct gnuish_state *sh_state, const char *pathname)
 {
-	 pid_t cmd_pid = fork();
+	pid_t cmd_pid = fork();
 
-	 if (cmd_pid != 0) {
+	if (cmd_pid != 0) {
 		waitpid(cmd_pid, NULL, 0);
 		return;
-	 }
+	}
 
 	if (-1 == (pathname ? execve(pathname, sh_state->args, sh_state->env) :
 			      gnuish_exec_path(sh_state))) {
