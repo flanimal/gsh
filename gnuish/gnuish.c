@@ -4,12 +4,10 @@
 #include <envz.h>
 #include <sys/wait.h>
 
-#include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <assert.h>
 #include <ctype.h>
 
 #include "gnuish.h"
@@ -192,7 +190,7 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 
 	const char *const filename = sh_state->args[0];
 
-	// TODO:
+	// TODO: hash table or something
 	if (strcmp(filename, "cd") == 0)
 
 		gnuish_chdir(sh_state);
@@ -218,20 +216,21 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 		gnuish_exec(sh_state, pathname);
 }
 
-/* Copy a path from PATH variable, stopping when a colon ':' or null terminator
- * is encountered. */
-static void gnuish_copy_path(int *len, char *dest_path, char **path_it)
+/* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
+ * null terminator is encountered. */
+static void gnuish_copy_path(char **exec_it, char **path_it)
 {
-	for (*len = 0;; ++(*len), ++(*path_it)) {
+	for (;; ++(*exec_it), ++(*path_it)) {
 		switch (**path_it) {
 		case ':':
 			++(*path_it); // Move to next path following the colon.
+
 			/* fall through */
 		case '\0':
-			dest_path[*len] = '\0';
+			**exec_it = '\0';
 			return;
 		default:
-			dest_path[*len] = **path_it;
+			**exec_it = **path_it;
 			continue;
 		}
 	}
@@ -240,20 +239,21 @@ static void gnuish_copy_path(int *len, char *dest_path, char **path_it)
 static int gnuish_exec_path(struct gnuish_state *sh_state)
 {
 	int code = -1;
-	
-	char *exec_pathname = malloc((size_t)sh_state->max_path);
-	int len; // The length of current iteration of exec_pathname.
+
+	char *const exec_buf = malloc((size_t)sh_state->max_path);
 
 	for (char *path_it = sh_state->pathvar; *path_it;) {
-		gnuish_copy_path(&len, exec_pathname, &path_it);
-		sprintf(exec_pathname + len, "/%s", sh_state->args[0]);
+		char *exec_pathname = exec_buf;
 
-		if (-1 != (code = execve(exec_pathname, sh_state->args,
-					 sh_state->env)))
+		gnuish_copy_path(&exec_pathname, &path_it);
+		sprintf(exec_pathname, "/%s", sh_state->args[0]);
+
+		if (-1 !=
+		    (code = execve(exec_buf, sh_state->args, sh_state->env)))
 			break;
 	}
 
-	free(exec_pathname);
+	free(exec_buf);
 
 	return code;
 }
