@@ -54,21 +54,21 @@ void gnuish_init(struct gnuish_state *sh_state, char **envp);
 
 /* Get a null-terminated line of input from the terminal,
  * including the newline. */
-size_t gnuish_read_line(struct gnuish_state *sh_state, char **out_line);
+size_t gnuish_read_line(const struct gnuish_state *sh_state, char **out_line);
 
 /* Execute a null-terminated line of input.
  * The line will be modified by calls to `strtok`. */
 void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line);
 
 /* Fork and exec a program. */
-void gnuish_exec(struct gnuish_state *sh_state, const char *pathname);
+void gnuish_exec(const struct gnuish_state *sh_state, const char *pathname);
 
 /*
  *	Shell builtins.
  */
 
 /* Write arguments to stdout. */
-void gnuish_echo(struct gnuish_state *sh_state);
+void gnuish_echo(const struct gnuish_state *sh_state);
 
 /* Change the process working directory. */
 void gnuish_chdir(struct gnuish_state *sh_state);

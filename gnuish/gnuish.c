@@ -22,8 +22,8 @@ static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 /*	Returns argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
-static int gnuish_parse_line(char *line, const char **out_pathname,
-			     char **out_args)
+static int gnuish_parse_line(char *const line, const char **const out_pathname,
+			     char **const out_args)
 {
 	if (!(out_args[0] = strtok(line, " \n")))
 		return -1;	// Make sure line isn't empty.
@@ -50,7 +50,7 @@ static int gnuish_parse_line(char *line, const char **out_pathname,
 }
 
 static void gnuish_add_hist(struct gnuish_state *sh_state, size_t len,
-			    const char *line)
+			    const char *const line)
 {
 	struct gnuish_hist_ent *last_cmd = malloc(sizeof(*last_cmd));
 
@@ -143,7 +143,7 @@ static void gnuish_get_paths(struct gnuish_state *sh_state, char **envp)
 	sh_state->pathvar = envz_get(*sh_state->env, env_len, "PATH");
 }
 
-void gnuish_init(struct gnuish_state *sh_state, char **envp)
+void gnuish_init(struct gnuish_state *sh_state, char **const envp)
 {
 	gnuish_get_paths(sh_state, envp);
 
@@ -160,7 +160,7 @@ void gnuish_init(struct gnuish_state *sh_state, char **envp)
 	sh_state->args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
 }
 
-size_t gnuish_read_line(struct gnuish_state *sh_state, char **out_line)
+size_t gnuish_read_line(const struct gnuish_state *sh_state, char **out_line)
 {
 	gnuish_put_prompt(sh_state);
 
@@ -211,7 +211,7 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
  * null terminator is encountered. */
-static void gnuish_copy_path(char **exec_it, char **path_it)
+static void gnuish_copy_path(char **const exec_it, char **const path_it)
 {
 	for (;; ++(*exec_it), ++(*path_it)) {
 		switch (**path_it) {
@@ -229,7 +229,7 @@ static void gnuish_copy_path(char **exec_it, char **path_it)
 	}
 }
 
-static int gnuish_exec_path(struct gnuish_state *sh_state)
+static int gnuish_exec_path(const struct gnuish_state *sh_state)
 {
 	int code = -1;
 
@@ -251,7 +251,7 @@ static int gnuish_exec_path(struct gnuish_state *sh_state)
 	return code;
 }
 
-void gnuish_exec(struct gnuish_state *sh_state, const char *pathname)
+void gnuish_exec(const struct gnuish_state *sh_state, const char *pathname)
 {
 	pid_t cmd_pid = fork();
 
@@ -267,7 +267,7 @@ void gnuish_exec(struct gnuish_state *sh_state, const char *pathname)
 	}
 }
 
-void gnuish_echo(struct gnuish_state *sh_state)
+void gnuish_echo(const struct gnuish_state *sh_state)
 {
 	char *const *args = sh_state->args;
 
