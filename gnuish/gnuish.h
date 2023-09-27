@@ -54,7 +54,7 @@ void gnuish_init(struct gnuish_state *sh_state, char **envp);
 
 /* Get a null-terminated line of input from the terminal,
  * including the newline. */
-size_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line);
+size_t gnuish_read_line(struct gnuish_state *sh_state, char **out_line);
 
 /* Execute a null-terminated line of input.
  * The line will be modified by calls to `strtok`. */

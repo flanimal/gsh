@@ -161,18 +161,18 @@ void gnuish_init(struct gnuish_state *sh_state, char **envp)
 	sh_state->args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
 }
 
-size_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
+size_t gnuish_read_line(struct gnuish_state *sh_state, char **out_line)
 {
 	gnuish_put_prompt(sh_state);
 
-	ssize_t len = getline(&out_line, (size_t*)&sh_state->max_input, stdin);
+	ssize_t len = getline(out_line, (size_t*)&sh_state->max_input, stdin);
 
 	if (len == -1) {
 		printf("%s\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
-	out_line[len - 1] = '\0'; // Remove newline.
+	(*out_line)[len - 1] = '\0'; // Remove newline.
 
 	return (size_t)len;
 }
