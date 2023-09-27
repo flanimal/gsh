@@ -2,6 +2,9 @@
 
 #include <stddef.h>
 
+/* The maximum number of arguments that can be passed on the command line. */
+#define GNUISH_MAX_ARGS 64
+
 struct gnuish_hist_ent {
 	struct gnuish_hist_ent *back, *forw;
 	size_t len;
@@ -9,14 +12,21 @@ struct gnuish_hist_ent {
 };
 
 struct gnuish_state {
+	/*
+	 *	Runtime constants.
+	 */
 	/* Maximum length of newline-terminated input line on terminal. */
 	long max_input;
 
 	/* Maximum length of pathnames, including null character. */
 	long max_path;
 
-	// NOTE: If we need a buffer to get the current working directory anyway,
-	// then we might as well store it in the shell state structure
+	/*
+	 *	Buffers.
+	 */
+	/* Current working directory of the shell process. */
+	// NOTE: If we need a buffer to get the current working directory
+	// anyway, then we might as well store it in the shell state structure
 	// to have on hand.
 	char *cwd;
 
@@ -29,16 +39,20 @@ struct gnuish_state {
 	/* Argument buffer. */
 	char **args;
 
-	char *path;
+	/*
+	 *	Environment.
+	 */
+	/* Null-terminated value of PATH. */
+	char *pathvar;
 
-	/* Rest of environment passed to `main`. */
+	/* Rest of environment passed to `main`, null-terminated. */
 	char *const *env;
 };
 
 /* Set initial values and resources for the shell. */
-void gnuish_init(struct gnuish_state *sh_state, char *const *envp);
+void gnuish_init(struct gnuish_state *sh_state, char **envp);
 
-/* Get a null-terminated line of input from the terminal, 
+/* Get a null-terminated line of input from the terminal,
  * including the newline. */
 size_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line);
 
@@ -49,9 +63,9 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line);
 /* Fork and exec a program. */
 void gnuish_exec(struct gnuish_state *sh_state, const char *pathname);
 
-/* 
-	Shell builtins. 
-*/
+/*
+ *	Shell builtins.
+ */
 
 /* Write arguments to stdout. */
 void gnuish_echo(struct gnuish_state *sh_state);

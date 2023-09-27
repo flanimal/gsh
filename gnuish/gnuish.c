@@ -14,7 +14,6 @@
 #include "gnuish.h"
 
 #define GNUISH_PROMPT "@"
-#define GNUISH_MAX_ARGS 64
 
 static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 {
@@ -129,15 +128,21 @@ static void gnuish_getcwd(struct gnuish_state *sh_state)
 	}
 }
 
-void gnuish_init(struct gnuish_state *sh_state, char *const *envp)
+static void gnuish_get_paths(struct gnuish_state *sh_state, char **envp)
 {
 	sh_state->env = envp;
 
 	size_t env_len = 0;
+
 	for (; *envp; ++envp)
 		env_len += strlen(*envp);
 
-	sh_state->path = envz_get(*sh_state->env, env_len, "PATH");
+	sh_state->pathvar = envz_get(*sh_state->env, env_len, "PATH");
+}
+
+void gnuish_init(struct gnuish_state *sh_state, char **envp)
+{
+	gnuish_get_paths(sh_state, envp);
 
 	// Get working dir and its max path length.
 	sh_state->cwd = malloc((size_t)(sh_state->max_path = _POSIX_PATH_MAX));
@@ -209,21 +214,22 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 static int gnuish_exec_path(struct gnuish_state *sh_state)
 {
 	int code = -1;
-
-	char *path = malloc(strlen(sh_state->path) + 1);
-	strcpy(path, sh_state->path);
-
 	char *exec_pathname = malloc((size_t)sh_state->max_path);
 
-	for (char *path_it = strtok(path, ":"); code == -1 && path_it;
-	     path_it = strtok(NULL, ":")) {
-		sprintf(exec_pathname, "%s/%s", path_it, sh_state->args[0]);
+	int len;
 
-		code = execve(exec_pathname, sh_state->args, sh_state->env);
+	for (char *path_it = sh_state->pathvar; path_it; path_it += len + 1) {
+		for (len = 0; (exec_pathname[len] = path_it[len]) != ':'; ++len)
+			;
+
+		exec_pathname[len] = '\0';
+		sprintf(exec_pathname + len, "/%s", sh_state->args[0]);
+
+		if (-1 != (code = execve(exec_pathname, sh_state->args,
+					 sh_state->env)))
+			break;
 	}
 
-	// FIXME:
-	free(path);
 	free(exec_pathname);
 
 	return code;
