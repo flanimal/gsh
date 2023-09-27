@@ -4,6 +4,7 @@
 #include <envz.h>
 #include <sys/wait.h>
 
+#include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,7 +25,7 @@ static void gnuish_put_prompt(const struct gnuish_state *sh_state)
  *	A NULL pathname means the PATH environment variable must be used.
  */
 static int gnuish_parse_line(char *line, const char **out_pathname,
-			      char **out_args)
+			     char **out_args)
 {
 	if (!(out_args[0] = strtok(line, " \n")))
 		return -1; // Make sure line isn't empty.
@@ -44,7 +45,7 @@ static int gnuish_parse_line(char *line, const char **out_pathname,
 	// Get arguments.
 	int arg_n = 1;
 	for (; (out_args[arg_n] = strtok(NULL, " \n")) &&
-			    arg_n <= GNUISH_MAX_ARGS;
+	       arg_n <= GNUISH_MAX_ARGS;
 	     ++arg_n)
 		;
 
@@ -165,7 +166,7 @@ size_t gnuish_read_line(struct gnuish_state *sh_state, char **out_line)
 {
 	gnuish_put_prompt(sh_state);
 
-	ssize_t len = getline(out_line, (size_t*)&sh_state->max_input, stdin);
+	ssize_t len = getline(out_line, (size_t *)&sh_state->max_input, stdin);
 
 	if (len == -1) {
 		printf("%s\n", strerror(errno));
@@ -217,6 +218,21 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 		gnuish_exec(sh_state, pathname);
 }
 
+static bool gnuish_copy_path(int *len, char *dest_path, char *src_path)
+{
+	for (*len = 0;; ++(*len)) {
+		switch ((dest_path[*len] = src_path[*len])) {
+		case ':':
+			dest_path[*len] = '\0';
+			return true;
+		case '\0':
+			return false;
+		default:
+			continue;
+		}
+	}
+}
+
 static int gnuish_exec_path(struct gnuish_state *sh_state)
 {
 	int code = -1;
@@ -225,10 +241,9 @@ static int gnuish_exec_path(struct gnuish_state *sh_state)
 	int len;
 
 	for (char *path_it = sh_state->pathvar; path_it; path_it += len + 1) {
-		for (len = 0; (exec_pathname[len] = path_it[len]) != ':'; ++len)
-			;
+		if (!gnuish_copy_path(&len, exec_pathname, path_it))
+			break;
 
-		exec_pathname[len] = '\0';
 		sprintf(exec_pathname + len, "/%s", sh_state->args[0]);
 
 		if (-1 != (code = execve(exec_pathname, sh_state->args,
@@ -243,12 +258,12 @@ static int gnuish_exec_path(struct gnuish_state *sh_state)
 
 void gnuish_exec(struct gnuish_state *sh_state, const char *pathname)
 {
-	pid_t cmd_pid = fork();
+	 pid_t cmd_pid = fork();
 
-	if (cmd_pid != 0) {
+	 if (cmd_pid != 0) {
 		waitpid(cmd_pid, NULL, 0);
 		return;
-	}
+	 }
 
 	if (-1 == (pathname ? execve(pathname, sh_state->args, sh_state->env) :
 			      gnuish_exec_path(sh_state))) {
