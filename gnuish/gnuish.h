@@ -72,3 +72,6 @@ void gnuish_echo(const struct gnuish_state *sh_state);
 
 /* Change the process working directory. */
 void gnuish_chdir(struct gnuish_state *sh_state);
+
+/* Prints usage information. */
+void gnuish_usage();

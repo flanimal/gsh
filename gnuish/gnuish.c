@@ -205,6 +205,9 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 	else if (strcmp(filename, "echo") == 0)
 		gnuish_echo(sh_state);
 
+	else if (strcmp(filename, "help") == 0)
+		gnuish_usage();
+
 	else
 		gnuish_exec(sh_state, pathname);
 }
@@ -286,4 +289,32 @@ void gnuish_chdir(struct gnuish_state *sh_state)
 		printf("%s\n", strerror(errno));
 
 	gnuish_getcwd(sh_state);
+}
+
+void gnuish_usage()
+{
+	puts("\ngnuish - GNU island shell");
+	puts("\ngnuish displays the current working directory in the shell prompt :");
+
+		puts("\n\t~@ /");
+		puts("\n\tusr/ @"); 
+		puts("\n\t/mnt/.../repos @");
+
+	puts("\nCommands");
+	puts("\n\t<command>[<args>...]\tRun command or program with optional arguments.");
+	
+	puts("\n\tr[<n>]\tExecute the nth last line.");
+		puts("\t\tThe line will be placed in history--not the `r` invocation.");
+		puts("\t\tThe line in question will be echoed to the screen before being executed.");
+
+	puts("\nShell builtins");
+		puts("\n\texit\tExit the shell.");
+		puts("\n\thist\tDisplay up to 10 last lines entered, numbered.");
+
+		puts("\n\t----");
+
+		puts("\n\techo\tWrite to standard output.");
+		puts("\n\thelp\tDisplay this help page.");
+
+	putchar('\n');
 }
