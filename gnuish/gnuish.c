@@ -88,10 +88,10 @@ static void gnuish_list_hist(const struct gnuish_state *sh_state)
 		printf("%i: %s\n", cmd_n++, cmd_it->line);
 }
 
-static void gnuish_bad_cmd(struct gnuish_state *sh_state, int err)
+static void gnuish_bad_cmd(int err)
 {
 	if (err)
-		printf("not a command: %m\n", err);
+		printf("not a command: %s\n", strerror(err));
 	else
 		printf("not a command\n");
 }
@@ -104,7 +104,7 @@ static void gnuish_recall(struct gnuish_state *sh_state)
 	int n_arg = (sh_state->args[1] ? atoi(sh_state->args[1]) : 1);
 
 	if (0 >= n_arg || sh_state->hist_n < n_arg) {
-		gnuish_bad_cmd(sh_state, 0);
+		gnuish_bad_cmd(0);
 		return;
 	}
 
@@ -161,10 +161,10 @@ size_t gnuish_read_line(struct gnuish_state *sh_state, char *out_line)
 {
 	gnuish_put_prompt(sh_state);
 
-	ssize_t len = getline(&out_line, &sh_state->max_input, stdin);
+	ssize_t len = getline(&out_line, (size_t*)&sh_state->max_input, stdin);
 
 	if (len == -1) {
-		printf("%m\n", errno);
+		printf("%s\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
@@ -246,7 +246,7 @@ void gnuish_exec(struct gnuish_state *sh_state, const char *pathname)
 
 	if (-1 == (pathname ? execve(pathname, sh_state->args, sh_state->env) :
 			      gnuish_exec_path(sh_state))) {
-		gnuish_bad_cmd(sh_state, errno);
+		gnuish_bad_cmd(errno);
 		exit(EXIT_FAILURE);
 	}
 }
@@ -267,7 +267,7 @@ void gnuish_chdir(struct gnuish_state *sh_state)
 	const char *const pathname = sh_state->args[1];
 
 	if (chdir(pathname) == -1)
-		printf("%m\n", errno);
+		printf("%s\n", strerror(errno));
 
 	gnuish_getcwd(sh_state);
 }

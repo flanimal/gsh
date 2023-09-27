@@ -3,7 +3,8 @@
 
 #include "gnuish.h"
 
-int main(int argc, char *argv[], char *envp[])
+int main(__attribute_maybe_unused__ int argc,
+	 __attribute_maybe_unused__ char *argv[], char *envp[])
 {
 	struct gnuish_state sh_state;
 
