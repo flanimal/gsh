@@ -23,11 +23,12 @@ static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 /*	Returns argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
-static void gnuish_parse_line(char *line, const char **out_pathname,
+static int gnuish_parse_line(char *line, const char **out_pathname,
 			      char **out_args)
 {
-	// Get file/pathname.
-	out_args[0] = strtok(line, " \n");
+	if (!(out_args[0] = strtok(line, " \n")))
+		return -1; // Make sure line isn't empty.
+
 	{
 		// Get the pathname, whether relative or absolute, if one
 		// preceded the filename.
@@ -41,10 +42,13 @@ static void gnuish_parse_line(char *line, const char **out_pathname,
 	}
 
 	// Get arguments.
-	for (int arg_n = 1; (out_args[arg_n] = strtok(NULL, " \n")) &&
+	int arg_n = 1;
+	for (; (out_args[arg_n] = strtok(NULL, " \n")) &&
 			    arg_n <= GNUISH_MAX_ARGS;
 	     ++arg_n)
 		;
+
+	return arg_n + 1;
 }
 
 static void gnuish_add_hist(struct gnuish_state *sh_state, size_t len,
@@ -182,7 +186,9 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 						      // be added to history.
 		gnuish_add_hist(sh_state, len, line);
 
-	gnuish_parse_line(line, &pathname, sh_state->args);
+	if (-1 == gnuish_parse_line(line, &pathname, sh_state->args))
+		return;
+
 	const char *const filename = sh_state->args[0];
 
 	// TODO:
