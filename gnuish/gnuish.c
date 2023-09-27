@@ -26,7 +26,7 @@ static int gnuish_parse_line(char *line, const char **out_pathname,
 			     char **out_args)
 {
 	if (!(out_args[0] = strtok(line, " \n")))
-		return -1; // Make sure line isn't empty.
+		return -1;	// Make sure line isn't empty.
 
 	{
 		// Get the pathname, whether relative or absolute, if one
@@ -41,11 +41,10 @@ static int gnuish_parse_line(char *line, const char **out_pathname,
 	}
 
 	// Get arguments.
-	int arg_n = 1;
-	for (; (out_args[arg_n] = strtok(NULL, " \n")) &&
-	       arg_n <= GNUISH_MAX_ARGS;
-	     ++arg_n)
-		;
+	int arg_n;
+
+	for (arg_n = 1; (out_args[arg_n] = strtok(NULL, " \n"))
+	     && arg_n <= GNUISH_MAX_ARGS; ++arg_n) ;
 
 	return arg_n + 1;
 }
@@ -120,15 +119,16 @@ static void gnuish_recall(struct gnuish_state *sh_state)
 
 static void gnuish_getcwd(struct gnuish_state *sh_state)
 {
-	if (!getcwd(sh_state->cwd, (size_t)sh_state->max_path)) {
-		/* Current working path longer than max_path chars. */
-		free(sh_state->cwd);
+	if (getcwd(sh_state->cwd, (size_t)sh_state->max_path))
+		return;
 
-		// We will use the buffer allocated by `getcwd`
-		// to store the working directory from now on.
-		sh_state->cwd = getcwd(NULL, 0);
-		sh_state->max_path = pathconf(sh_state->cwd, _PC_PATH_MAX);
-	}
+	/* Current working path longer than max_path chars. */
+	free(sh_state->cwd);
+
+	// We will use the buffer allocated by `getcwd`
+	// to store the working directory from now on.
+	sh_state->cwd = getcwd(NULL, 0);
+	sh_state->max_path = pathconf(sh_state->cwd, _PC_PATH_MAX);
 }
 
 static void gnuish_get_paths(struct gnuish_state *sh_state, char **envp)
@@ -171,7 +171,7 @@ size_t gnuish_read_line(struct gnuish_state *sh_state, char **out_line)
 		exit(EXIT_FAILURE);
 	}
 
-	(*out_line)[len - 1] = '\0'; // Remove newline.
+	(*out_line)[len - 1] = '\0';	// Remove newline.
 
 	return (size_t)len;
 }
@@ -180,9 +180,8 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 {
 	const char *pathname;
 
-	if (!(line[0] == 'r' &&
-	      (line[1] == '\0' || isspace(line[1])))) // Recall `r` should NOT
-						      // be added to history.
+	// Recall `r` should NOT be added to history.
+	if (!(line[0] == 'r' && (line[1] == '\0' || isspace(line[1]))))
 		gnuish_add_hist(sh_state, len, line);
 
 	if (-1 == gnuish_parse_line(line, &pathname, sh_state->args))
@@ -192,27 +191,21 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 
 	// TODO: hash table or something
 	if (strcmp(filename, "cd") == 0)
-
 		gnuish_chdir(sh_state);
 
 	else if (strcmp(filename, "r") == 0)
-
 		gnuish_recall(sh_state);
 
 	else if (strcmp(filename, "exit") == 0)
-
 		exit(EXIT_SUCCESS);
 
 	else if (strcmp(filename, "hist") == 0)
-
 		gnuish_list_hist(sh_state);
 
 	else if (strcmp(filename, "echo") == 0)
-
 		gnuish_echo(sh_state);
 
 	else
-
 		gnuish_exec(sh_state, pathname);
 }
 
@@ -223,7 +216,7 @@ static void gnuish_copy_path(char **exec_it, char **path_it)
 	for (;; ++(*exec_it), ++(*path_it)) {
 		switch (**path_it) {
 		case ':':
-			++(*path_it); // Move to next path following the colon.
+			++(*path_it);	// Move to next path following the colon.
 
 			/* fall through */
 		case '\0':
@@ -268,7 +261,7 @@ void gnuish_exec(struct gnuish_state *sh_state, const char *pathname)
 	}
 
 	if (-1 == (pathname ? execve(pathname, sh_state->args, sh_state->env) :
-			      gnuish_exec_path(sh_state))) {
+		   gnuish_exec_path(sh_state))) {
 		gnuish_bad_cmd(errno);
 		exit(EXIT_FAILURE);
 	}
