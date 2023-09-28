@@ -19,10 +19,23 @@ static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 	printf("%s %s ", sh_state->cwd, GNUISH_PROMPT);
 }
 
+static void gnuish_parse_arg(const struct gnuish_state *sh_state, char **arg)
+{
+	switch (**arg)
+	{
+	case '$':
+		*arg = envz_get(*sh_state->env, sh_state->env_len, *arg + 1);
+		return;
+	default:
+		return;
+	}
+}
+
 /*	Returns argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
-static int gnuish_parse_line(char *const line, const char **const out_pathname,
+static int gnuish_parse_line(const struct gnuish_state *sh_state,
+			     char *const line, const char **const out_pathname,
 			     char **const out_args)
 {
 	if (!(out_args[0] = strtok(line, " \n")))
@@ -43,8 +56,10 @@ static int gnuish_parse_line(char *const line, const char **const out_pathname,
 	// Get arguments.
 	int arg_n;
 
-	for (arg_n = 1; (out_args[arg_n] = strtok(NULL, " \n"))
-	     && arg_n <= GNUISH_MAX_ARGS; ++arg_n) ;
+	for (arg_n = 1; (out_args[arg_n] = strtok(NULL, " \n")) &&
+			arg_n <= GNUISH_MAX_ARGS;
+	     ++arg_n)
+		gnuish_parse_arg(sh_state, &out_args[arg_n]);
 
 	return arg_n + 1;
 }
@@ -131,21 +146,20 @@ static void gnuish_getcwd(struct gnuish_state *sh_state)
 	sh_state->max_path = pathconf(sh_state->cwd, _PC_PATH_MAX);
 }
 
-static void gnuish_get_paths(struct gnuish_state *sh_state, char **envp)
+static void gnuish_init_env(struct gnuish_state *sh_state, char **envp)
 {
 	sh_state->env = envp;
-
-	size_t env_len = 0;
+	sh_state->env_len = 0;
 
 	for (; *envp; ++envp)
-		env_len += strlen(*envp);
+		sh_state->env_len += strlen(*envp);
 
-	sh_state->pathvar = envz_get(*sh_state->env, env_len, "PATH");
+	sh_state->pathvar = envz_get(*sh_state->env, sh_state->env_len, "PATH");
 }
 
 void gnuish_init(struct gnuish_state *sh_state, char **const envp)
 {
-	gnuish_get_paths(sh_state, envp);
+	gnuish_init_env(sh_state, envp);
 
 	// Get working dir and its max path length.
 	sh_state->cwd = malloc((size_t)(sh_state->max_path = _POSIX_PATH_MAX));
@@ -184,7 +198,7 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 	if (!(line[0] == 'r' && (line[1] == '\0' || isspace(line[1]))))
 		gnuish_add_hist(sh_state, len, line);
 
-	if (-1 == gnuish_parse_line(line, &pathname, sh_state->args))
+	if (-1 == gnuish_parse_line(sh_state, line, &pathname, sh_state->args))
 		return;
 
 	const char *const filename = sh_state->args[0];
@@ -295,26 +309,25 @@ void gnuish_usage()
 {
 	puts("\ngnuish - GNU island shell");
 	puts("\ngnuish displays the current working directory in the shell prompt :");
-
-		puts("\n\t~@ /");
-		puts("\n\tusr/ @"); 
-		puts("\n\t/mnt/.../repos @");
+	puts("\t~@ /");
+	puts("\tusr/ @");
+	puts("\t/mnt/.../repos @");
 
 	puts("\nCommands");
 	puts("\n\t<command>[<args>...]\tRun command or program with optional arguments.");
-	
+
 	puts("\n\tr[<n>]\tExecute the nth last line.");
-		puts("\t\tThe line will be placed in history--not the `r` invocation.");
-		puts("\t\tThe line in question will be echoed to the screen before being executed.");
+	puts("\t\tThe line will be placed in history--not the `r` invocation.");
+	puts("\t\tThe line in question will be echoed to the screen before being executed.");
 
 	puts("\nShell builtins");
-		puts("\n\texit\tExit the shell.");
-		puts("\n\thist\tDisplay up to 10 last lines entered, numbered.");
+	puts("\n\texit\tExit the shell.");
+	puts("\thist\tDisplay up to 10 last lines entered, numbered.");
 
-		puts("\n\t----");
+	puts("\t----");
 
-		puts("\n\techo\tWrite to standard output.");
-		puts("\n\thelp\tDisplay this help page.");
+	puts("\techo\tWrite to standard output.");
+	puts("\thelp\tDisplay this help page.");
 
 	putchar('\n');
 }

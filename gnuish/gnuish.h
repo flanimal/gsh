@@ -47,10 +47,11 @@ struct gnuish_state {
 
 	/* Rest of environment passed to `main`, null-terminated. */
 	char *const *env;
+	size_t env_len;
 };
 
 /* Set initial values and resources for the shell. */
-void gnuish_init(struct gnuish_state *sh_state, char **envp);
+void gnuish_init(struct gnuish_state *sh_state, char **const envp);
 
 /* Get a null-terminated line of input from the terminal,
  * including the newline. */
