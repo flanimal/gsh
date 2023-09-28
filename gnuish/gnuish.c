@@ -16,17 +16,13 @@
 
 static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 {
-	const char *const home =
-	    envz_get(*sh_state->env, sh_state->env_len, "HOME");
-	const size_t home_len = strlen(home);
-
-	if (strncmp(sh_state->cwd, home, home_len) == 0)
-		printf(GNUISH_PROMPT("~%s"), sh_state->cwd + home_len);
+	if (strncmp(sh_state->cwd, sh_state->homevar, sh_state->home_len) == 0)
+		printf(GNUISH_PROMPT("~%s"), sh_state->cwd + sh_state->home_len);
 	else
 		printf(GNUISH_PROMPT("%s"), sh_state->cwd);
 }
 
-static void gnuish_parse_arg(const struct gnuish_state *sh_state, char **arg)
+static void gnuish_parse_arg(struct gnuish_state *sh_state, char **const arg)
 {
 	// TODO: globbing, piping
 	switch (**arg) {
@@ -34,7 +30,13 @@ static void gnuish_parse_arg(const struct gnuish_state *sh_state, char **arg)
 		*arg = envz_get(*sh_state->env, sh_state->env_len, *arg + 1);
 		return;
 	case '~':
-		*arg = envz_get(*sh_state->env, sh_state->env_len, "HOME");
+		char *arg_subst = malloc(strlen(*arg) + sh_state->home_len + 1);
+
+		strcpy(stpcpy(arg_subst, sh_state->homevar), *arg + 1);
+		*arg = arg_subst;
+
+		sh_state->args_alloc[sh_state->args_alloc_n++] = *arg;
+
 		return;
 	default:
 		return;
@@ -44,7 +46,7 @@ static void gnuish_parse_arg(const struct gnuish_state *sh_state, char **arg)
 /*	Returns argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
-static int gnuish_parse_line(const struct gnuish_state *sh_state,
+static int gnuish_parse_line(struct gnuish_state *sh_state,
 			     char *const line, const char **const out_pathname,
 			     char **const out_args)
 {
@@ -54,10 +56,10 @@ static int gnuish_parse_line(const struct gnuish_state *sh_state,
 	{
 		// Get the pathname, whether relative or absolute, if one
 		// preceded the filename.
-		char *last_dir_sep = strrchr(out_args[0], '/');
-		if (last_dir_sep) {
+		char *last_slash = strrchr(out_args[0], '/');
+		if (last_slash) {
 			*out_pathname = out_args[0];
-			out_args[0] = last_dir_sep + 1;
+			out_args[0] = last_slash + 1;
 		} else {
 			*out_pathname = NULL;
 		}
@@ -74,7 +76,7 @@ static int gnuish_parse_line(const struct gnuish_state *sh_state,
 }
 
 static void gnuish_add_hist(struct gnuish_state *sh_state, size_t len,
-			    const char *const line)
+			    const char *line)
 {
 	struct gnuish_hist_ent *last_cmd = malloc(sizeof(*last_cmd));
 
@@ -164,6 +166,9 @@ static void gnuish_init_env(struct gnuish_state *sh_state, char **envp)
 		sh_state->env_len += strlen(*envp);
 
 	sh_state->pathvar = envz_get(*sh_state->env, sh_state->env_len, "PATH");
+
+	sh_state->homevar = envz_get(*sh_state->env, sh_state->env_len, "HOME");
+	sh_state->home_len = strlen(sh_state->homevar);
 }
 
 void gnuish_init(struct gnuish_state *sh_state, char **const envp)
@@ -181,9 +186,12 @@ void gnuish_init(struct gnuish_state *sh_state, char **const envp)
 	sh_state->hist_n = 0;
 
 	sh_state->args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
+	sh_state->args_alloc = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
+	sh_state->args_alloc_n = 0;
 }
 
-size_t gnuish_read_line(const struct gnuish_state *sh_state, char **out_line)
+size_t gnuish_read_line(const struct gnuish_state *sh_state,
+			char **const out_line)
 {
 	gnuish_put_prompt(sh_state);
 
@@ -208,6 +216,7 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 		gnuish_add_hist(sh_state, len, line);
 
 	if (-1 == gnuish_parse_line(sh_state, line, &pathname, sh_state->args))
+		// The line is empty.
 		return;
 
 	const char *const filename = sh_state->args[0];
@@ -233,6 +242,10 @@ void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 
 	else
 		gnuish_exec(sh_state, pathname);
+
+	// Delete dynamically allocated arguments.
+	while (sh_state->args_alloc_n > 0)
+		free(sh_state->args_alloc[sh_state->args_alloc_n--]);
 }
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
@@ -258,7 +271,6 @@ static void gnuish_copy_path(char **const exec_it, char **const path_it)
 static int gnuish_exec_path(const struct gnuish_state *sh_state)
 {
 	int code = -1;
-
 	char *const exec_buf = malloc((size_t)sh_state->max_path);
 
 	for (char *path_it = sh_state->pathvar; *path_it;) {

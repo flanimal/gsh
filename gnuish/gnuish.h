@@ -11,6 +11,7 @@ struct gnuish_hist_ent {
 	char *line;
 };
 
+// TODO: Split these sections into three structs?
 struct gnuish_state {
 	/*
 	 *	Runtime constants.
@@ -36,11 +37,19 @@ struct gnuish_state {
 	/* Argument buffer. */
 	char **args;
 
+	/* Dynamically allocated arguments in argument buffer. */
+	char **args_alloc;
+	size_t args_alloc_n;
+
 	/*
 	 *	Environment.
 	 */
 	/* Null-terminated value of PATH. */
 	char *pathvar;
+
+	/* Null-terminated value of HOME. */
+	char *homevar;
+	size_t home_len;
 
 	/* Rest of environment passed to `main`, null-terminated. */
 	char *const *env;
@@ -52,7 +61,7 @@ void gnuish_init(struct gnuish_state *sh_state, char **const envp);
 
 /* Get a null-terminated line of input from the terminal,
  * including the newline. */
-size_t gnuish_read_line(const struct gnuish_state *sh_state, char **out_line);
+size_t gnuish_read_line(const struct gnuish_state *sh_state, char **const out_line);
 
 /* Execute a null-terminated line of input.
  * The line will be modified by calls to `strtok`. */
