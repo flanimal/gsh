@@ -12,19 +12,26 @@
 
 #include "gnuish.h"
 
-#define GNUISH_PROMPT "@"
-
 static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 {
-	printf("%s %s ", sh_state->cwd, GNUISH_PROMPT);
+	const char *const home =
+	    envz_get(*sh_state->env, sh_state->env_len, "HOME");
+	const size_t home_len = strlen(home);
+
+	if (strncmp(sh_state->cwd, home, home_len) == 0)
+		printf("~%s@ ", sh_state->cwd + home_len);
+	else
+		printf("%s@ ", sh_state->cwd);
 }
 
 static void gnuish_parse_arg(const struct gnuish_state *sh_state, char **arg)
 {
-	switch (**arg)
-	{
+	switch (**arg) {
 	case '$':
 		*arg = envz_get(*sh_state->env, sh_state->env_len, *arg + 1);
+		return;
+	case '~':
+		*arg = envz_get(*sh_state->env, sh_state->env_len, "HOME");
 		return;
 	default:
 		return;
@@ -57,8 +64,7 @@ static int gnuish_parse_line(const struct gnuish_state *sh_state,
 	int arg_n;
 
 	for (arg_n = 1; (out_args[arg_n] = strtok(NULL, " \n")) &&
-			arg_n <= GNUISH_MAX_ARGS;
-	     ++arg_n)
+	     arg_n <= GNUISH_MAX_ARGS; ++arg_n)
 		gnuish_parse_arg(sh_state, &out_args[arg_n]);
 
 	return arg_n + 1;
