@@ -18,14 +18,16 @@ static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 	    envz_get(*sh_state->env, sh_state->env_len, "HOME");
 	const size_t home_len = strlen(home);
 
-	if (strncmp(sh_state->cwd, home, home_len) == 0)
-		printf("~%s@ ", sh_state->cwd + home_len);
-	else
-		printf("%s@ ", sh_state->cwd);
+	if (strncmp(sh_state->cwd, home, home_len) == 0) {
+		printf("\033[46m~%s\033[49m@ ", sh_state->cwd + home_len);
+	} else {
+		printf("\033[46m%s\033[49m@ ", sh_state->cwd);
+	}
 }
 
 static void gnuish_parse_arg(const struct gnuish_state *sh_state, char **arg)
 {
+	// TODO: globbing, piping
 	switch (**arg) {
 	case '$':
 		*arg = envz_get(*sh_state->env, sh_state->env_len, *arg + 1);

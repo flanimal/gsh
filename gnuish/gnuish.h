@@ -25,9 +25,6 @@ struct gnuish_state {
 	 *	Buffers.
 	 */
 	/* Current working directory of the shell process. */
-	// NOTE: If we need a buffer to get the current working directory
-	// anyway, then we might as well store it in the shell state structure
-	// to have on hand.
 	char *cwd;
 
 	/* Tail and head of command history queue. */
@@ -74,5 +71,5 @@ void gnuish_echo(const struct gnuish_state *sh_state);
 /* Change the process working directory. */
 void gnuish_chdir(struct gnuish_state *sh_state);
 
-/* Prints usage information. */
+/* Print usage information. */
 void gnuish_usage();
