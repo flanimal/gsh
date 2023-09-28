@@ -12,17 +12,18 @@
 
 #include "gnuish.h"
 
+#define GNUISH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
+
 static void gnuish_put_prompt(const struct gnuish_state *sh_state)
 {
 	const char *const home =
 	    envz_get(*sh_state->env, sh_state->env_len, "HOME");
 	const size_t home_len = strlen(home);
 
-	if (strncmp(sh_state->cwd, home, home_len) == 0) {
-		printf("\033[46m~%s\033[49m@ ", sh_state->cwd + home_len);
-	} else {
-		printf("\033[46m%s\033[49m@ ", sh_state->cwd);
-	}
+	if (strncmp(sh_state->cwd, home, home_len) == 0)
+		printf(GNUISH_PROMPT("~%s"), sh_state->cwd + home_len);
+	else
+		printf(GNUISH_PROMPT("%s"), sh_state->cwd);
 }
 
 static void gnuish_parse_arg(const struct gnuish_state *sh_state, char **arg)
