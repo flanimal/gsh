@@ -83,7 +83,7 @@ static void gnuish_put_prompt(const struct gnuish_workdir *sh_wd,
 		printf(GNUISH_PROMPT("%s"), sh_wd->cwd);
 }
 
-static void gnuish_parse_tok(struct gnuish_arg_buf *sh_args,
+static void gnuish_puthelp()
 			     const struct gnuish_env *sh_env, char **const arg)
 {
 	// TODO: globbing, piping
@@ -437,6 +437,7 @@ void gnuish_usage()
 	puts("\thist\tDisplay up to 10 last lines entered, numbered.");
 
 	puts("\t----");
+		gnuish_puthelp();
 
 	puts("\techo\tWrite to standard output.");
 	puts("\thelp\tDisplay this help page.");
