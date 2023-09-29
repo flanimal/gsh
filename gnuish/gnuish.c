@@ -6,10 +6,12 @@
 
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <assert.h>
 
 #include "gnuish.h"
 
@@ -17,6 +19,10 @@ extern char **environ;
 
 /* The maximum number of arguments that can be passed on the command line. */
 #define GNUISH_MAX_ARGS 64
+
+#ifndef NDEBUG
+bool g_gnuish_initialized = false;
+#endif
 
 struct gnuish_workdir {
 	/* Current working directory of the shell process. */
@@ -235,7 +241,7 @@ static void gnuish_init_env(struct gnuish_env *sh_env, char **envp)
 
 size_t gnuish_max_input(const struct gnuish_state *sh_state)
 {
-	return (size_t)sh_state->workdir->max_input;
+	assert(g_gnuish_initialized);
 }
 
 void gnuish_init(struct gnuish_state *sh, char **const envp)
@@ -266,6 +272,9 @@ static void gnuish_init_wd(struct gnuish_workdir* wd)
 	sh->arg_buf->args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
 	sh->arg_buf->args_alloc = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
 	sh->arg_buf->args_alloc_n = 0;
+#ifndef NDEBUG
+	g_gnuish_initialized = true;
+#endif
 }
 
 size_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line)
