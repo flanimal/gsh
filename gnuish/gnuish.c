@@ -47,7 +47,7 @@ static void gnuish_parse_arg(struct gnuish_state *sh_state, char **const arg)
  *	A NULL pathname means the PATH environment variable must be used.
  */
 static int gnuish_parse_line(struct gnuish_state *sh_state,
-			     char *const line, const char **const out_pathname,
+			     char *const line, char **const out_pathname,
 			     char **const out_args)
 {
 	if (!(out_args[0] = strtok(line, " \n")))
@@ -59,10 +59,16 @@ static int gnuish_parse_line(struct gnuish_state *sh_state,
 		char *last_slash = strrchr(out_args[0], '/');
 		if (last_slash) {
 			*out_pathname = out_args[0];
+			// Parse pathname.
+			gnuish_parse_arg(sh_state, out_pathname);
+
 			out_args[0] = last_slash + 1;
 		} else {
 			*out_pathname = NULL;
 		}
+
+		// Parse filename.
+		gnuish_parse_arg(sh_state, &out_args[0]);
 	}
 
 	// Get arguments.
@@ -209,7 +215,7 @@ size_t gnuish_read_line(const struct gnuish_state *sh_state,
 
 void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
 {
-	const char *pathname;
+	char *pathname;
 
 	// Recall `r` should NOT be added to history.
 	if (!(line[0] == 'r' && (line[1] == '\0' || isspace(line[1]))))
@@ -278,7 +284,7 @@ static int gnuish_exec_path(const struct gnuish_state *sh_state)
 
 		gnuish_copy_path(&exec_pathname, &path_it);
 		sprintf(exec_pathname, "/%s", sh_state->args[0]);
-
+		
 		if (-1 !=
 		    (code = execve(exec_buf, sh_state->args, sh_state->env)))
 			break;
@@ -335,7 +341,7 @@ void gnuish_usage()
 	puts("\t/mnt/.../repos @");
 
 	puts("\nCommands");
-	puts("\n\t<command>[<args>...]\tRun command or program with optional arguments.");
+	puts("\n\t<command> [<arg>...]\tRun command or program with optional arguments.");
 
 	puts("\n\tr[<n>]\tExecute the nth last line.");
 	puts("\t\tThe line will be placed in history--not the `r` invocation.");

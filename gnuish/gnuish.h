@@ -13,6 +13,9 @@ struct gnuish_hist_ent {
 
 // TODO: Split these sections into three structs?
 struct gnuish_state {
+	/* Current working directory of the shell process. */
+	char *cwd;
+
 	/*
 	 *	Runtime constants.
 	 */
@@ -23,17 +26,17 @@ struct gnuish_state {
 	long max_path;
 
 	/*
-	 *	Buffers.
+	 *	Command history.
 	 */
-	/* Current working directory of the shell process. */
-	char *cwd;
-
 	/* Tail and head of command history queue. */
 	struct gnuish_hist_ent *cmd_history, *oldest_cmd;
 
 	/* Number of commands in history (maximum 10). */
 	int hist_n;
 
+	/*
+	 *	Arguments.
+	 */
 	/* Argument buffer. */
 	char **args;
 
