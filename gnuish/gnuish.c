@@ -13,6 +13,8 @@
 
 #include "gnuish.h"
 
+extern char **environ;
+
 /* The maximum number of arguments that can be passed on the command line. */
 #define GNUISH_MAX_ARGS 64
 
@@ -62,15 +64,12 @@ struct gnuish_env {
 	char *homevar;
 	size_t home_len;
 
-	/* Rest of environment passed to `main`, null-terminated. */
-	char *const *envz;
 	size_t env_len;
 };
 
 #define GNUISH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
 
 static void gnuish_put_prompt(const struct gnuish_workdir *sh_wd,
-			      const struct gnuish_env *sh_env)
 {
 	if (strncmp(sh_wd->cwd, sh_env->homevar, sh_env->home_len) == 0)
 		printf(GNUISH_PROMPT("~%s"), sh_wd->cwd + sh_env->home_len);
@@ -84,7 +83,7 @@ static void gnuish_parse_tok(struct gnuish_arg_buf *sh_args,
 	// TODO: globbing, piping
 	switch (**arg) {
 	case '$':
-		*arg = envz_get(*sh_env->envz, sh_env->env_len, *arg + 1);
+		*tok = envz_get(*environ, env_info->env_len, *tok + 1);
 		return;
 	case '~':
 		char *arg_subst = malloc(strlen(*arg) + sh_env->home_len + 1);
@@ -241,13 +240,18 @@ size_t gnuish_max_input(const struct gnuish_state *sh_state)
 
 void gnuish_init(struct gnuish_state *sh, char **const envp)
 {
-	sh->arg_buf = malloc(sizeof(*sh->arg_buf));
-	sh->env = malloc(sizeof(*sh->env));
-	sh->hist = malloc(sizeof(*sh->hist));
-	sh->workdir = malloc(sizeof(*sh->workdir));
+	env_info->env_len = 0;
+	for (char **env_it = environ; *env_it; ++env_it)
+		env_info->env_len += strlen(*env_it);
 
-	gnuish_init_env(sh->env, envp);
+	env_info->pathvar = envz_get(*environ, env_info->env_len, "PATH");
 
+	env_info->homevar = envz_get(*environ, env_info->env_len, "HOME");
+	env_info->home_len = strlen(env_info->homevar);
+}
+
+static void gnuish_init_wd(struct gnuish_workdir* wd)
+{
 	// Get working dir and its max path length.
 	sh->workdir->cwd =
 	    malloc((size_t)(sh->workdir->max_path = _POSIX_PATH_MAX));

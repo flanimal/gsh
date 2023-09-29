@@ -4,10 +4,10 @@
 #include "gnuish.h"
 
 int main(__attribute_maybe_unused__ int argc,
-	 __attribute_maybe_unused__ char *argv[], char *envp[])
+	 __attribute_maybe_unused__ char *argv[])
 {
 	struct gnuish_state sh_state;
-	gnuish_init(&sh_state, envp);
+	gnuish_init(&sh_state);
 	
 	/* Main loop. */
 	char *line = malloc(gnuish_max_input(&sh_state));
