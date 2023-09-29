@@ -183,6 +183,10 @@ static int gnuish_parse_line(struct gnuish_env *env_info,
 static void gnuish_add_hist(struct gnuish_cmd_hist *sh_hist, size_t len,
 			    const char *line)
 {
+	// Recall `r` should NOT be added to history.
+	if (line[0] != 'r' || (line[1] != '\0' && !isspace(line[1])))
+		return;
+
 	struct gnuish_hist_ent *last_cmd = malloc(sizeof(*last_cmd));
 
 	insque(last_cmd, sh_hist->cmd_history);
@@ -398,14 +402,19 @@ static void gnuish_exec(const struct gnuish_state *sh, const char *pathname)
 	exit(EXIT_FAILURE);
 }
 
+static void gnuish_free_parsed(struct gnuish_parsed *parsed)
+{
+	// Delete any token substitution buffers.
+	while (parsed->alloc_n > 0)
+		free((char *)parsed->alloc[parsed->alloc_n--]);
+}
+
 void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
 {
 	if (len == 0)
 		return;
 
-	// Recall `r` should NOT be added to history.
-	if (line[0] != 'r' || (line[1] != '\0' && !isspace(line[1])))
-		gnuish_add_hist(sh->hist, len, line);
+	gnuish_add_hist(sh->hist, len, line);
 
 	const char *pathname;
 	gnuish_parse_line(sh->env_info, sh->parsed, &pathname, line);
@@ -434,7 +443,5 @@ void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
 	else
 		gnuish_exec(sh, pathname);
 
-	// Delete any token substitution buffers.
-	while (sh->parsed->alloc_n > 0)
-		free((char *)sh->parsed->alloc[sh->parsed->alloc_n--]);
+        gnuish_free_parsed(sh->parsed);
 }
