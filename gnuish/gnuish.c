@@ -21,7 +21,7 @@ extern char **environ;
 #define GNUISH_MAX_ARGS 64
 
 #ifndef NDEBUG
-bool g_gnuish_initialized = false;
+static bool g_gnuish_initialized = false;
 #endif
 
 struct gnuish_workdir {
