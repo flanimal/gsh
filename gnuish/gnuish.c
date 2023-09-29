@@ -318,14 +318,14 @@ void gnuish_init(struct gnuish_state *sh)
 #endif
 }
 
-size_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line)
+ssize_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line)
 {
 	gnuish_put_prompt(sh->env_info, sh->wd->cwd);
 
 	ssize_t len = getline(out_line, (size_t *)&sh->wd->max_input, stdin);
 
 	(*out_line)[len - 1] = '\0';	// Remove newline.
-	return (size_t)(len - 1);
+	return len - 1;
 }
 
 static void gnuish_echo(char *const *args)

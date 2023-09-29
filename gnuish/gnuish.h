@@ -28,7 +28,7 @@ size_t gnuish_max_input(const struct gnuish_state *sh);
 
 /* Get a null-terminated line of input from the terminal,
  * including the newline. */
-size_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line);
+ssize_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line);
 
 /* Execute a null-terminated line of input.
  * The line will be modified by calls to `strtok`. */

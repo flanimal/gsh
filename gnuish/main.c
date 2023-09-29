@@ -15,8 +15,8 @@ int main(__attribute_maybe_unused__ int argc,
 	/* Main loop. */
 	char *line = malloc(gnuish_max_input(&sh_state));
 
-	for (size_t len; (len = gnuish_read_line(&sh_state, &line)) != -1; )
-		gnuish_run_cmd(&sh_state, len, line);
+	for (ssize_t len; (len = gnuish_read_line(&sh_state, &line)) != -1; )
+		gnuish_run_cmd(&sh_state, (size_t)len, line);
 
 	printf("%s\n", strerror(errno));
 	exit(EXIT_FAILURE);
