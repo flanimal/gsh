@@ -4,38 +4,95 @@
 #include <envz.h>
 #include <sys/wait.h>
 
-#include <string.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <errno.h>
+#include <string.h>
 #include <ctype.h>
+#include <errno.h>
 
 #include "gnuish.h"
 
+/* The maximum number of arguments that can be passed on the command line. */
+#define GNUISH_MAX_ARGS 64
+
+struct gnuish_workdir {
+	/* Current working directory of the shell process. */
+	char *cwd;
+
+	/*
+	 *      Runtime constants.
+	 */
+	/* Maximum length of newline-terminated input line on terminal. */
+	long max_input;
+
+	/* Maximum length of pathnames, including null character. */
+	long max_path;
+};
+
+struct gnuish_hist_ent {
+	struct gnuish_hist_ent *back, *forw;
+
+	char *line;
+	size_t len;
+};
+
+struct gnuish_cmd_hist {
+	/* Tail and head of command history queue. */
+	struct gnuish_hist_ent *cmd_history, *oldest_cmd;
+
+	/* Number of commands in history (maximum 10). */
+	int hist_n;
+};
+
+struct gnuish_arg_buf {
+	/* Argument buffer. */
+	char **args;
+
+	/* Dynamically allocated arguments in argument buffer. */
+	char **args_alloc;
+	size_t args_alloc_n;
+};
+
+struct gnuish_env {
+	/* Null-terminated value of PATH. */
+	char *pathvar;
+
+	/* Null-terminated value of HOME. */
+	char *homevar;
+	size_t home_len;
+
+	/* Rest of environment passed to `main`, null-terminated. */
+	char *const *envz;
+	size_t env_len;
+};
+
 #define GNUISH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
 
-static void gnuish_put_prompt(const struct gnuish_state *sh_state)
+static void gnuish_put_prompt(const struct gnuish_workdir *sh_wd,
+			      const struct gnuish_env *sh_env)
 {
-	if (strncmp(sh_state->cwd, sh_state->homevar, sh_state->home_len) == 0)
-		printf(GNUISH_PROMPT("~%s"), sh_state->cwd + sh_state->home_len);
+	if (strncmp(sh_wd->cwd, sh_env->homevar, sh_env->home_len) == 0)
+		printf(GNUISH_PROMPT("~%s"), sh_wd->cwd + sh_env->home_len);
 	else
-		printf(GNUISH_PROMPT("%s"), sh_state->cwd);
+		printf(GNUISH_PROMPT("%s"), sh_wd->cwd);
 }
 
-static void gnuish_parse_arg(struct gnuish_state *sh_state, char **const arg)
+static void gnuish_parse_tok(struct gnuish_arg_buf *sh_args,
+			     const struct gnuish_env *sh_env, char **const arg)
 {
 	// TODO: globbing, piping
 	switch (**arg) {
 	case '$':
-		*arg = envz_get(*sh_state->env, sh_state->env_len, *arg + 1);
+		*arg = envz_get(*sh_env->envz, sh_env->env_len, *arg + 1);
 		return;
 	case '~':
-		char *arg_subst = malloc(strlen(*arg) + sh_state->home_len + 1);
+		char *arg_subst = malloc(strlen(*arg) + sh_env->home_len + 1);
 
-		strcpy(stpcpy(arg_subst, sh_state->homevar), *arg + 1);
+		strcpy(stpcpy(arg_subst, sh_env->homevar), *arg + 1);
 		*arg = arg_subst;
 
-		sh_state->args_alloc[sh_state->args_alloc_n++] = *arg;
+		sh_args->args_alloc[sh_args->args_alloc_n++] = *arg;
 
 		return;
 	default:
@@ -46,9 +103,9 @@ static void gnuish_parse_arg(struct gnuish_state *sh_state, char **const arg)
 /*	Returns argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
-static int gnuish_parse_line(struct gnuish_state *sh_state,
-			     char *const line, char **const out_pathname,
-			     char **const out_args)
+static int gnuish_parse_line(struct gnuish_arg_buf *sh_args,
+			     struct gnuish_env *sh_env, char *const line,
+			     char **const out_pathname, char **const out_args)
 {
 	if (!(out_args[0] = strtok(line, " \n")))
 		return -1;	// Make sure line isn't empty.
@@ -60,7 +117,7 @@ static int gnuish_parse_line(struct gnuish_state *sh_state,
 		if (last_slash) {
 			*out_pathname = out_args[0];
 			// Parse pathname.
-			gnuish_parse_arg(sh_state, out_pathname);
+			gnuish_parse_tok(sh_args, sh_env, out_pathname);
 
 			out_args[0] = last_slash + 1;
 		} else {
@@ -68,7 +125,7 @@ static int gnuish_parse_line(struct gnuish_state *sh_state,
 		}
 
 		// Parse filename.
-		gnuish_parse_arg(sh_state, &out_args[0]);
+		gnuish_parse_tok(sh_args, sh_env, &out_args[0]);
 	}
 
 	// Get arguments.
@@ -76,26 +133,26 @@ static int gnuish_parse_line(struct gnuish_state *sh_state,
 
 	for (arg_n = 1; (out_args[arg_n] = strtok(NULL, " \n")) &&
 	     arg_n <= GNUISH_MAX_ARGS; ++arg_n)
-		gnuish_parse_arg(sh_state, &out_args[arg_n]);
+		gnuish_parse_tok(sh_args, sh_env, &out_args[arg_n]);
 
 	return arg_n + 1;
 }
 
-static void gnuish_add_hist(struct gnuish_state *sh_state, size_t len,
+static void gnuish_add_hist(struct gnuish_cmd_hist *sh_hist, size_t len,
 			    const char *line)
 {
 	struct gnuish_hist_ent *last_cmd = malloc(sizeof(*last_cmd));
 
-	insque(last_cmd, sh_state->cmd_history);
-	sh_state->cmd_history = last_cmd;
+	insque(last_cmd, sh_hist->cmd_history);
+	sh_hist->cmd_history = last_cmd;
 
 	// Take care to include null character.
 	strcpy((last_cmd->line = malloc(len)), line);
 	last_cmd->len = len;
 
-	if (sh_state->hist_n == 10) {
-		struct gnuish_hist_ent *popped_ent = sh_state->oldest_cmd;
-		sh_state->oldest_cmd = popped_ent->back;
+	if (sh_hist->hist_n == 10) {
+		struct gnuish_hist_ent *popped_ent = sh_hist->oldest_cmd;
+		sh_hist->oldest_cmd = popped_ent->back;
 
 		remque(popped_ent);
 
@@ -105,18 +162,18 @@ static void gnuish_add_hist(struct gnuish_state *sh_state, size_t len,
 		return;
 	}
 
-	if (sh_state->hist_n == 0)
-		sh_state->oldest_cmd = last_cmd;
+	if (sh_hist->hist_n == 0)
+		sh_hist->oldest_cmd = last_cmd;
 
-	++sh_state->hist_n;
+	++sh_hist->hist_n;
 }
 
-static void gnuish_list_hist(const struct gnuish_state *sh_state)
+static void gnuish_list_hist(const struct gnuish_cmd_hist *sh_hist)
 {
 	// It is not possible for `cmd_history` to be NULL here,
 	// as it will contain at least the `hist` invocation.
 	int cmd_n = 1;
-	struct gnuish_hist_ent *cmd_it = sh_state->cmd_history;
+	struct gnuish_hist_ent *cmd_it = sh_hist->cmd_history;
 
 	for (; cmd_it; cmd_it = cmd_it->forw)
 		printf("%i: %s\n", cmd_n++, cmd_it->line);
@@ -131,13 +188,13 @@ static void gnuish_bad_cmd(int err)
 }
 
 /* Re-run the n-th previous line of input. */
-static void gnuish_recall(struct gnuish_state *sh_state)
+static void gnuish_recall(struct gnuish_state *sh)
 {
-	struct gnuish_hist_ent *cmd_it = sh_state->cmd_history;
+	struct gnuish_hist_ent *cmd_it = sh->hist->cmd_history;
 
-	int n_arg = (sh_state->args[1] ? atoi(sh_state->args[1]) : 1);
+	int n_arg = (sh->arg_buf->args[1] ? atoi(sh->arg_buf->args[1]) : 1);
 
-	if (0 >= n_arg || sh_state->hist_n < n_arg) {
+	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
 		gnuish_bad_cmd(0);
 		return;
 	}
@@ -146,62 +203,73 @@ static void gnuish_recall(struct gnuish_state *sh_state)
 		cmd_it = cmd_it->forw;
 
 	printf("%s\n", cmd_it->line);
-	gnuish_run_cmd(sh_state, cmd_it->len, cmd_it->line);
+	gnuish_run_cmd(sh, cmd_it->len, cmd_it->line);
 }
 
-static void gnuish_getcwd(struct gnuish_state *sh_state)
+static void gnuish_getcwd(struct gnuish_workdir *sh_wd)
 {
-	if (getcwd(sh_state->cwd, (size_t)sh_state->max_path))
+	if (getcwd(sh_wd->cwd, (size_t)sh_wd->max_path))
 		return;
 
 	/* Current working path longer than max_path chars. */
-	free(sh_state->cwd);
+	free(sh_wd->cwd);
 
 	// We will use the buffer allocated by `getcwd`
 	// to store the working directory from now on.
-	sh_state->cwd = getcwd(NULL, 0);
-	sh_state->max_path = pathconf(sh_state->cwd, _PC_PATH_MAX);
+	sh_wd->cwd = getcwd(NULL, 0);
+	sh_wd->max_path = pathconf(sh_wd->cwd, _PC_PATH_MAX);
 }
 
-static void gnuish_init_env(struct gnuish_state *sh_state, char **envp)
+static void gnuish_init_env(struct gnuish_env *sh_env, char **envp)
 {
-	sh_state->env = envp;
-	sh_state->env_len = 0;
+	sh_env->envz = envp;
+	sh_env->env_len = 0;
 
 	for (; *envp; ++envp)
-		sh_state->env_len += strlen(*envp);
+		sh_env->env_len += strlen(*envp);
 
-	sh_state->pathvar = envz_get(*sh_state->env, sh_state->env_len, "PATH");
+	sh_env->pathvar = envz_get(*sh_env->envz, sh_env->env_len, "PATH");
 
-	sh_state->homevar = envz_get(*sh_state->env, sh_state->env_len, "HOME");
-	sh_state->home_len = strlen(sh_state->homevar);
+	sh_env->homevar = envz_get(*sh_env->envz, sh_env->env_len, "HOME");
+	sh_env->home_len = strlen(sh_env->homevar);
 }
 
-void gnuish_init(struct gnuish_state *sh_state, char **const envp)
+size_t gnuish_max_input(const struct gnuish_state *sh_state)
 {
-	gnuish_init_env(sh_state, envp);
+	return (size_t)sh_state->workdir->max_input;
+}
+
+void gnuish_init(struct gnuish_state *sh, char **const envp)
+{
+	sh->arg_buf = malloc(sizeof(*sh->arg_buf));
+	sh->env = malloc(sizeof(*sh->env));
+	sh->hist = malloc(sizeof(*sh->hist));
+	sh->workdir = malloc(sizeof(*sh->workdir));
+
+	gnuish_init_env(sh->env, envp);
 
 	// Get working dir and its max path length.
-	sh_state->cwd = malloc((size_t)(sh_state->max_path = _POSIX_PATH_MAX));
-	gnuish_getcwd(sh_state);
+	sh->workdir->cwd =
+	    malloc((size_t)(sh->workdir->max_path = _POSIX_PATH_MAX));
+	gnuish_getcwd(sh->workdir);
 
 	// Get maximum length of terminal input line.
-	sh_state->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
+	sh->workdir->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
 
-	sh_state->cmd_history = sh_state->oldest_cmd = NULL;
-	sh_state->hist_n = 0;
+	sh->hist->cmd_history = sh->hist->oldest_cmd = NULL;
+	sh->hist->hist_n = 0;
 
-	sh_state->args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
-	sh_state->args_alloc = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
-	sh_state->args_alloc_n = 0;
+	sh->arg_buf->args = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
+	sh->arg_buf->args_alloc = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
+	sh->arg_buf->args_alloc_n = 0;
 }
 
-size_t gnuish_read_line(const struct gnuish_state *sh_state,
-			char **const out_line)
+size_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line)
 {
-	gnuish_put_prompt(sh_state);
+	gnuish_put_prompt(sh->workdir, sh->env);
 
-	ssize_t len = getline(out_line, (size_t *)&sh_state->max_input, stdin);
+	ssize_t len =
+	    getline(out_line, (size_t *)&sh->workdir->max_input, stdin);
 
 	if (len == -1) {
 		printf("%s\n", strerror(errno));
@@ -213,45 +281,46 @@ size_t gnuish_read_line(const struct gnuish_state *sh_state,
 	return (size_t)len;
 }
 
-void gnuish_run_cmd(struct gnuish_state *sh_state, size_t len, char *line)
+void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
 {
 	char *pathname;
 
 	// Recall `r` should NOT be added to history.
 	if (!(line[0] == 'r' && (line[1] == '\0' || isspace(line[1]))))
-		gnuish_add_hist(sh_state, len, line);
+		gnuish_add_hist(sh->hist, len, line);
 
-	if (-1 == gnuish_parse_line(sh_state, line, &pathname, sh_state->args))
+	if (-1 == gnuish_parse_line(sh->arg_buf, sh->env, line,
+				    &pathname, sh->arg_buf->args))
 		// The line is empty.
 		return;
 
-	const char *const filename = sh_state->args[0];
+	const char *const filename = sh->arg_buf->args[0];
 
 	// TODO: hash table or something
 	if (strcmp(filename, "cd") == 0)
-		gnuish_chdir(sh_state);
+		gnuish_chdir(sh);
 
 	else if (strcmp(filename, "r") == 0)
-		gnuish_recall(sh_state);
+		gnuish_recall(sh);
 
 	else if (strcmp(filename, "exit") == 0)
 		exit(EXIT_SUCCESS);
 
 	else if (strcmp(filename, "hist") == 0)
-		gnuish_list_hist(sh_state);
+		gnuish_list_hist(sh->hist);
 
 	else if (strcmp(filename, "echo") == 0)
-		gnuish_echo(sh_state);
+		gnuish_echo(sh);
 
 	else if (strcmp(filename, "help") == 0)
 		gnuish_usage();
 
 	else
-		gnuish_exec(sh_state, pathname);
+		gnuish_exec(sh, pathname);
 
 	// Delete dynamically allocated arguments.
-	while (sh_state->args_alloc_n > 0)
-		free(sh_state->args_alloc[sh_state->args_alloc_n--]);
+	while (sh->arg_buf->args_alloc_n > 0)
+		free(sh->arg_buf->args_alloc[sh->arg_buf->args_alloc_n--]);
 }
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
@@ -274,19 +343,21 @@ static void gnuish_copy_path(char **const exec_it, char **const path_it)
 	}
 }
 
-static int gnuish_exec_path(const struct gnuish_state *sh_state)
+static int gnuish_exec_path(const struct gnuish_workdir *sh_wd,
+			    const struct gnuish_arg_buf *sh_args,
+			    const struct gnuish_env *sh_env)
 {
 	int code = -1;
-	char *const exec_buf = malloc((size_t)sh_state->max_path);
+	char *const exec_buf = malloc((size_t)sh_wd->max_path);
 
-	for (char *path_it = sh_state->pathvar; *path_it;) {
+	for (char *path_it = sh_env->pathvar; *path_it;) {
 		char *exec_pathname = exec_buf;
 
 		gnuish_copy_path(&exec_pathname, &path_it);
-		sprintf(exec_pathname, "/%s", sh_state->args[0]);
-		
+		sprintf(exec_pathname, "/%s", sh_args->args[0]);
+
 		if (-1 !=
-		    (code = execve(exec_buf, sh_state->args, sh_state->env)))
+		    (code = execve(exec_buf, sh_args->args, sh_env->envz)))
 			break;
 	}
 
@@ -295,7 +366,7 @@ static int gnuish_exec_path(const struct gnuish_state *sh_state)
 	return code;
 }
 
-void gnuish_exec(const struct gnuish_state *sh_state, const char *pathname)
+void gnuish_exec(const struct gnuish_state *sh, const char *pathname)
 {
 	pid_t cmd_pid = fork();
 
@@ -304,16 +375,17 @@ void gnuish_exec(const struct gnuish_state *sh_state, const char *pathname)
 		return;
 	}
 
-	if (-1 == (pathname ? execve(pathname, sh_state->args, sh_state->env) :
-		   gnuish_exec_path(sh_state))) {
+	if (-1 ==
+	    (pathname ? execve(pathname, sh->arg_buf->args, sh->env->envz) :
+	     gnuish_exec_path(sh->workdir, sh->arg_buf, sh->env))) {
 		gnuish_bad_cmd(errno);
 		exit(EXIT_FAILURE);
 	}
 }
 
-void gnuish_echo(const struct gnuish_state *sh_state)
+void gnuish_echo(const struct gnuish_state *sh)
 {
-	char *const *args = sh_state->args;
+	char *const *args = sh->arg_buf->args;
 
 	// Increment at start to skip name of builtin.
 	for (++args; *args; ++args)
@@ -322,14 +394,14 @@ void gnuish_echo(const struct gnuish_state *sh_state)
 	putchar('\n');
 }
 
-void gnuish_chdir(struct gnuish_state *sh_state)
+void gnuish_chdir(struct gnuish_state *sh)
 {
-	const char *const pathname = sh_state->args[1];
+	const char *const pathname = sh->arg_buf->args[1];
 
 	if (chdir(pathname) == -1)
 		printf("%s\n", strerror(errno));
 
-	gnuish_getcwd(sh_state);
+	gnuish_getcwd(sh->workdir);
 }
 
 void gnuish_usage()
