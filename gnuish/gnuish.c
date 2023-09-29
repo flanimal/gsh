@@ -55,10 +55,10 @@ struct gnuish_cmd_hist {
 
 struct gnuish_parsed {
 	/* List of tokens from previous input line. */
-	char **tokens;
+	const char **tokens;
 
 	/* Any dynamically allocated tokens. */
-	char **alloc;
+	const char **alloc;
 	size_t alloc_n;
 };
 
@@ -113,7 +113,7 @@ static void gnuish_puthelp()
 
 static void
 gnuish_parse_tok(const struct gnuish_env *env_info,
-		 struct gnuish_parsed *tokens, char **const tok)
+		 struct gnuish_parsed *tokens, const char **const tok)
 {
 	// TODO: globbing, piping
 	switch (**tok) {
@@ -136,9 +136,9 @@ gnuish_parse_tok(const struct gnuish_env *env_info,
 
 static void gnuish_parse_pathname(struct gnuish_env *env_info,
 				  struct gnuish_parsed *parsed,
-				  char **const out_pathname)
+				  const char **const out_pathname)
 {
-	char **const out_tokens = parsed->tokens;
+	const char **const out_tokens = parsed->tokens;
 
 	// Get the pathname, whether relative or absolute, if one
 	// preceded the filename.
@@ -163,9 +163,9 @@ static void gnuish_parse_pathname(struct gnuish_env *env_info,
  */
 static int gnuish_parse_line(struct gnuish_env *env_info,
 			     struct gnuish_parsed *parsed,
-			     char **const out_pathname, char *const line)
+			     const char **const out_pathname, char *const line)
 {
-	char **const out_tokens = parsed->tokens;
+	const char **const out_tokens = parsed->tokens;
 
 	out_tokens[0] = strtok(line, " \n");
 	gnuish_parse_pathname(env_info, parsed, out_pathname);
@@ -234,7 +234,7 @@ static void gnuish_recall(struct gnuish_state *sh)
 {
 	struct gnuish_hist_ent *cmd_it = sh->hist->cmd_history;
 
-	char *const recall_arg = sh->parsed->tokens[1];
+	const char *const recall_arg = sh->parsed->tokens[1];
 	int n_arg = (recall_arg ? atoi(recall_arg) : 1);
 
 	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
@@ -328,7 +328,7 @@ ssize_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line)
 	return len - 1;
 }
 
-static void gnuish_echo(char *const *args)
+static void gnuish_echo(const char *const *args)
 {
 	for (; *args; putchar(' '), ++args)
 		fputs(*args, stdout);
@@ -356,7 +356,7 @@ static void copy_path_ent(char **const dest_it, const char **const src_it)
 }
 
 static int gnuish_exec_path(const char *pathvar,
-			    const struct gnuish_workdir *wd, char **args)
+			    const struct gnuish_workdir *wd, const char **args)
 {
 	int code = -1;
 	char *const exec_buf = malloc((size_t)wd->max_path);
@@ -368,7 +368,7 @@ static int gnuish_exec_path(const char *pathvar,
 		copy_path_ent(&exec_pathname, &path_it);
 		sprintf(exec_pathname, "/%s", args[0]);
 
-		if (-1 != (code = execve(exec_buf, args, environ)))
+		if (-1 != (code = execve(exec_buf, (char *const *)args, environ)))
 			break;
 	}
 
@@ -389,7 +389,7 @@ static void gnuish_exec(const struct gnuish_state *sh, const char *pathname)
 		return;
 	}
 
-	int code = pathname ? execve(pathname, sh->parsed->tokens, environ) :
+	int code = pathname ? execve(pathname, (char *const *)sh->parsed->tokens, environ) :
 	    gnuish_exec_path(sh->env_info->pathvar, sh->wd,
 			     sh->parsed->tokens);
 
@@ -409,10 +409,10 @@ void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
 	if (line[0] != 'r' || (line[1] != '\0' && !isspace(line[1])))
 		gnuish_add_hist(sh->hist, len, line);
 
-	char *pathname;
+	const char *pathname;
 	gnuish_parse_line(sh->env_info, sh->parsed, &pathname, line);
 
-	char **const args = sh->parsed->tokens;
+	const char **args = sh->parsed->tokens;
 
 	// TODO: hash table or something
 	if (strcmp(args[0], "cd") == 0)
@@ -438,5 +438,5 @@ void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
 
 	// Delete dynamically allocated arguments.
 	while (sh->parsed->alloc_n > 0)
-		free(sh->parsed->alloc[sh->parsed->alloc_n--]);
+		free((char*)sh->parsed->alloc[sh->parsed->alloc_n--]);
 }
