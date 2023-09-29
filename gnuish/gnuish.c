@@ -151,8 +151,7 @@ static void gnuish_add_hist(struct gnuish_cmd_hist *sh_hist, size_t len,
 	insque(last_cmd, sh_hist->cmd_history);
 	sh_hist->cmd_history = last_cmd;
 
-	// Take care to include null character.
-	strcpy((last_cmd->line = malloc(len)), line);
+	strcpy((last_cmd->line = malloc(len + 1)), line);
 	last_cmd->len = len;
 
 	if (sh_hist->hist_n == 10) {
@@ -290,8 +289,7 @@ size_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line)
 	}
 
 	(*out_line)[len - 1] = '\0';	// Remove newline.
-
-	return (size_t)len;
+	return (size_t)(len - 1);
 }
 
 void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
