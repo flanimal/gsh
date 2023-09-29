@@ -105,34 +105,35 @@ static void gnuish_puthelp()
 	}
 }
 
-/*	Returns argument list terminated with NULL, and pathname.
- *	A NULL pathname means the PATH environment variable must be used.
- */
-static int gnuish_parse_line(struct gnuish_arg_buf *sh_args,
-			     struct gnuish_env *sh_env, char *const line,
-			     char **const out_pathname, char **const out_args)
+static void gnuish_parse_pathname(struct gnuish_env *env_info,
+				  struct gnuish_parsed *parsed,
+				  char **const out_pathname)
 {
-	if (!(out_args[0] = strtok(line, " \n")))
-		return -1;	// Make sure line isn't empty.
+	char **const out_tokens = parsed->tokens;
 
-	{
 		// Get the pathname, whether relative or absolute, if one
 		// preceded the filename.
-		char *last_slash = strrchr(out_args[0], '/');
+	char *last_slash = strrchr(out_tokens[0], '/');
 		if (last_slash) {
-			*out_pathname = out_args[0];
-			// Parse pathname.
-			gnuish_parse_tok(sh_args, sh_env, out_pathname);
+		*out_pathname = out_tokens[0];
 
-			out_args[0] = last_slash + 1;
+			// Parse pathname.
+		gnuish_parse_tok(env_info, parsed, out_pathname);
+
+		out_tokens[0] = last_slash + 1;
 		} else {
-			*out_pathname = NULL;
+		*out_pathname = NULL;	// TODO: Just use zero-length string instead of NULL?
+	}
+	// TODO: Do we need to pass both parsed and an out_tokens tok to
+	// parse_tok? Parse filename.
+	gnuish_parse_tok(env_info, parsed, &out_tokens[0]);
 		}
 
 		// Parse filename.
 		gnuish_parse_tok(sh_args, sh_env, &out_args[0]);
 	}
 
+	gnuish_parse_pathname(env_info, parsed, out_pathname);
 	// Get arguments.
 	int arg_n;
 
