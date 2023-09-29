@@ -1,5 +1,8 @@
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include <stddef.h>
+#include <errno.h>
 
 #include "gnuish.h"
 
@@ -12,8 +15,9 @@ int main(__attribute_maybe_unused__ int argc,
 	/* Main loop. */
 	char *line = malloc(gnuish_max_input(&sh_state));
 
-	for (size_t len; (len = gnuish_read_line(&sh_state, &line));)
+	for (size_t len; (len = gnuish_read_line(&sh_state, &line)) != -1; )
 		gnuish_run_cmd(&sh_state, len, line);
 
-	return 0;
+	printf("%s\n", strerror(errno));
+	exit(EXIT_FAILURE);
 }

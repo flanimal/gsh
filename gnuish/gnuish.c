@@ -283,10 +283,7 @@ size_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line)
 	ssize_t len =
 	    getline(out_line, (size_t *)&sh->workdir->max_input, stdin);
 
-	if (len == -1) {
-		printf("%s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
+	ssize_t len = getline(out_line, (size_t *)&sh->wd->max_input, stdin);
 
 	(*out_line)[len - 1] = '\0';	// Remove newline.
 	return (size_t)(len - 1);
