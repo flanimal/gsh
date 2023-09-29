@@ -396,14 +396,12 @@ static void gnuish_exec(const struct gnuish_state *sh, const char *pathname)
 
 void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
 {
-	char *const *args = sh->arg_buf->args;
+	if (len == 0)
+		return;
 
-	// Increment at start to skip name of builtin.
-	for (++args; *args; ++args)
-		printf("%s ", *args);
-
-	putchar('\n');
-}
+	// Recall `r` should NOT be added to history.
+	if (line[0] != 'r' || (line[1] != '\0' && !isspace(line[1])))
+		gnuish_add_hist(sh->hist, len, line);
 
 	char *pathname;
 	gnuish_parse_line(sh->env_info, sh->parsed, &pathname, line);
