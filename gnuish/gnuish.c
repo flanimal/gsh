@@ -183,12 +183,12 @@ static void gnuish_list_hist(const struct gnuish_cmd_hist *sh_hist)
 		printf("%i: %s\n", cmd_n++, cmd_it->line);
 }
 
-static void gnuish_bad_cmd(int err)
+static void gnuish_bad_cmd(const char *msg, int err)
 {
-	if (err)
-		printf("not a command: %s\n", strerror(err));
-	else
-		printf("not a command\n");
+	printf("not a command%s %s %s%s%s\n",
+	       (msg ? ":" : ""),
+	       (msg ? msg : ""),
+	       (err ? "(" : ""), (err ? strerror(err) : ""), (err ? ")" : ""));
 }
 
 /* Re-run the n-th previous line of input. */
@@ -199,7 +199,7 @@ static void gnuish_recall(struct gnuish_state *sh)
 	int n_arg = (sh->arg_buf->args[1] ? atoi(sh->arg_buf->args[1]) : 1);
 
 	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
-		gnuish_bad_cmd(0);
+		gnuish_bad_cmd("no history", 0);
 		return;
 	}
 
@@ -387,6 +387,8 @@ void gnuish_exec(const struct gnuish_state *sh, const char *pathname)
 	    (pathname ? execve(pathname, sh->arg_buf->args, sh->env->envz) :
 	     gnuish_exec_path(sh->workdir, sh->arg_buf, sh->env))) {
 		gnuish_bad_cmd(errno);
+		gnuish_bad_cmd((pathname ? pathname : sh->parsed->tokens[0]),
+			       errno);
 		exit(EXIT_FAILURE);
 	}
 }
