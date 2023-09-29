@@ -331,19 +331,18 @@ void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
  * null terminator is encountered. */
-static void gnuish_copy_path(char **const exec_it, char **const path_it)
+static void copy_path_ent(char **const dest_it, const char **const src_it)
 {
-	for (;; ++(*exec_it), ++(*path_it)) {
-		switch (**path_it) {
+	for (;; ++(*dest_it), ++(*src_it)) {
+		switch (**src_it) {
 		case ':':
-			++(*path_it);	// Move to next path following the colon.
-
+			++(*src_it);	// Move to next path following the colon.
 			/* fall through */
 		case '\0':
-			**exec_it = '\0';
+			**dest_it = '\0';
 			return;
 		default:
-			**exec_it = **path_it;
+			**dest_it = **src_it;
 			continue;
 		}
 	}
@@ -353,16 +352,16 @@ static int gnuish_exec_path(const char *pathvar,
 			    const struct gnuish_workdir *wd, char **args)
 {
 	int code = -1;
-	char *const exec_buf = malloc((size_t)sh_wd->max_path);
+	char *const exec_buf = malloc((size_t)wd->max_path);
+	char *exec_pathname;
 
-	for (char *path_it = sh_env->pathvar; *path_it;) {
-		char *exec_pathname = exec_buf;
+	for (const char *path_it = pathvar; *path_it;) {
+		exec_pathname = exec_buf;
 
-		gnuish_copy_path(&exec_pathname, &path_it);
-		sprintf(exec_pathname, "/%s", sh_args->args[0]);
+		copy_path_ent(&exec_pathname, &path_it);
+		sprintf(exec_pathname, "/%s", args[0]);
 
-		if (-1 !=
-		    (code = execve(exec_buf, sh_args->args, sh_env->envz)))
+		if (-1 != (code = execve(exec_buf, args, environ)))
 			break;
 	}
 
