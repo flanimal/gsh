@@ -277,7 +277,7 @@ size_t gnuish_max_input(const struct gnuish_state *sh)
 	return (size_t)sh->wd->max_input;
 }
 
-void gnuish_init(struct gnuish_state *sh, char **const envp)
+static void gnuish_init_env(struct gnuish_env *env_info)
 {
 	env_info->env_len = 0;
 	for (char **env_it = environ; *env_it; ++env_it)
@@ -289,16 +289,22 @@ void gnuish_init(struct gnuish_state *sh, char **const envp)
 	env_info->home_len = strlen(env_info->homevar);
 }
 
-static void gnuish_init_wd(struct gnuish_workdir* wd)
+static void gnuish_init_wd(struct gnuish_workdir *wd)
 {
 	// Get working dir and its max path length.
-	sh->workdir->cwd =
-	    malloc((size_t)(sh->workdir->max_path = _POSIX_PATH_MAX));
-	gnuish_getcwd(sh->workdir);
+	wd->cwd = malloc((size_t)(wd->max_path = _POSIX_PATH_MAX));
+	gnuish_getcwd(wd);
 
 	// Get maximum length of terminal input line.
-	sh->workdir->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
+	wd->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
+}
 
+void gnuish_init(struct gnuish_state *sh)
+{
+	gnuish_init_env((sh->env_info = malloc(sizeof(*sh->env_info))));
+	gnuish_init_wd((sh->wd = malloc(sizeof(*sh->wd))));
+
+	sh->hist = malloc(sizeof(*sh->hist));
 	sh->hist->cmd_history = sh->hist->oldest_cmd = NULL;
 	sh->hist->hist_n = 0;
 
