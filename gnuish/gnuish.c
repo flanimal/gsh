@@ -358,7 +358,6 @@ static void copy_path_ent(char **const dest_it, const char **const src_it)
 static int gnuish_exec_path(const char *pathvar,
 			    const struct gnuish_workdir *wd, const char **args)
 {
-	int code = -1;
 	char *const exec_buf = malloc((size_t)wd->max_path);
 	char *exec_pathname;
 
@@ -368,13 +367,12 @@ static int gnuish_exec_path(const char *pathvar,
 		copy_path_ent(&exec_pathname, &path_it);
 		sprintf(exec_pathname, "/%s", args[0]);
 
-		if (-1 != (code = execve(exec_buf, (char *const *)args, environ)))
-			break;
+		execve(exec_buf, (char *const *)args, environ);
 	}
 
 	free(exec_buf);
 
-	return code;
+	return -1;
 }
 
 // TODO: Call the functions for path and for no path directly in run_cmd above?
@@ -389,15 +387,15 @@ static void gnuish_exec(const struct gnuish_state *sh, const char *pathname)
 		return;
 	}
 
-	int code = pathname ? execve(pathname, (char *const *)sh->parsed->tokens, environ) :
-	    gnuish_exec_path(sh->env_info->pathvar, sh->wd,
-			     sh->parsed->tokens);
+	if (pathname)
+		execve(pathname, (char *const *)sh->parsed->tokens, environ);
+	else
+		gnuish_exec_path(sh->env_info->pathvar, sh->wd,
+				 sh->parsed->tokens);
 
-	if (code == -1) {
-		gnuish_bad_cmd((pathname ? pathname : sh->parsed->tokens[0]),
-			       errno);
-		exit(EXIT_FAILURE);
-	}
+	// Named program couldn't be executed.
+	gnuish_bad_cmd((pathname ? pathname : sh->parsed->tokens[0]), errno);
+	exit(EXIT_FAILURE);
 }
 
 void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
@@ -436,7 +434,7 @@ void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
 	else
 		gnuish_exec(sh, pathname);
 
-	// Delete dynamically allocated arguments.
+	// Delete any token substitution buffers.
 	while (sh->parsed->alloc_n > 0)
-		free((char*)sh->parsed->alloc[sh->parsed->alloc_n--]);
+		free((char *)sh->parsed->alloc[sh->parsed->alloc_n--]);
 }
