@@ -19,6 +19,8 @@ struct gnuish_state {
 	struct gnuish_cmd_hist *hist;
 	struct gnuish_parsed *parsed;
 	struct gnuish_env *env_info;
+
+        int last_status;
 };
 
 /* Set initial values and resources for the shell. */

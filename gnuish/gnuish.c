@@ -20,6 +20,8 @@ extern char **environ;
 /* The maximum number of arguments that can be passed on the command line. */
 #define GNUISH_MAX_ARGS 64
 
+#define GNUISH_CMD_NOT_FOUND 127
+
 #ifndef NDEBUG
 static bool g_gnuish_initialized = false;
 #endif
@@ -75,16 +77,19 @@ struct gnuish_env {
 
 #define GNUISH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
 
-static void gnuish_put_prompt(const struct gnuish_env *env_info,
+static void gnuish_put_prompt(int last_status, const struct gnuish_env *env_info,
 			      const char *cwd)
 {
-	if (strncmp(cwd, env_info->homevar, env_info->home_len) == 0)
-		printf(GNUISH_PROMPT("~%s"), cwd + env_info->home_len);
-	else
-		printf(GNUISH_PROMPT("%s"), cwd);
+	const bool in_home =
+		strncmp(cwd, env_info->homevar, env_info->home_len) == 0;
+
+	printf((in_home ? "<%d>" GNUISH_PROMPT("~%s") :
+			  "<%d>" GNUISH_PROMPT("%s")),
+	       (WIFEXITED(last_status) ? WEXITSTATUS(last_status) : 255),
+	       cwd + (in_home ? env_info->home_len : 0));
 }
 
-static void gnuish_puthelp()
+static int gnuish_puthelp()
 {
 	puts("\ngnuish - GNU island shell");
 	puts("\ngnuish displays the current working directory in the shell prompt :");
@@ -109,6 +114,8 @@ static void gnuish_puthelp()
 	puts("\thelp\tDisplay this help page.");
 
 	putchar('\n');
+
+        return 0;
 }
 
 static void
@@ -209,7 +216,7 @@ static void gnuish_add_hist(struct gnuish_cmd_hist *sh_hist, size_t len,
 	++sh_hist->hist_n;
 }
 
-static void gnuish_list_hist(const struct gnuish_hist_ent *cmd_it)
+static int gnuish_list_hist(const struct gnuish_hist_ent *cmd_it)
 {
 	// It is not possible for `cmd_history` to be NULL here,
 	// as it will contain at least the `hist` invocation.
@@ -217,6 +224,8 @@ static void gnuish_list_hist(const struct gnuish_hist_ent *cmd_it)
 
 	for (; cmd_it; cmd_it = cmd_it->forw)
 		printf("%i: %s\n", cmd_n++, cmd_it->line);
+
+        return 0;
 }
 
 static void gnuish_bad_cmd(const char *msg, int err)
@@ -230,16 +239,15 @@ static void gnuish_bad_cmd(const char *msg, int err)
 // TODO: Possibly have a "prev_cmd" struct or something to pass to this,
 // instead of the entire shell state.
 /* Re-run the n-th previous line of input. */
-static void gnuish_recall(struct gnuish_state *sh)
+static int gnuish_recall(struct gnuish_state *sh)
 {
 	struct gnuish_hist_ent *cmd_it = sh->hist->cmd_history;
 
-	const char *const recall_arg = sh->parsed->tokens[1];
-	int n_arg = (recall_arg ? atoi(recall_arg) : 1);
+	int n_arg = (sh->parsed->tokens[1] ? atoi(sh->parsed->tokens[1]) : 1);
 
 	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
 		gnuish_bad_cmd("no history", 0);
-		return;
+		return -1;
 	}
 
 	while (cmd_it && n_arg-- > 1)
@@ -247,6 +255,7 @@ static void gnuish_recall(struct gnuish_state *sh)
 
 	printf("%s\n", cmd_it->line);
 	gnuish_run_cmd(sh, cmd_it->len, cmd_it->line);
+	return sh->last_status;
 }
 
 static void gnuish_getcwd(struct gnuish_workdir *wd)
@@ -263,12 +272,16 @@ static void gnuish_getcwd(struct gnuish_workdir *wd)
 	wd->max_path = pathconf(wd->cwd, _PC_PATH_MAX);
 }
 
-static void gnuish_chdir(struct gnuish_workdir *wd, const char *pathname)
+static int gnuish_chdir(struct gnuish_workdir *wd, const char *pathname)
 {
-	if (chdir(pathname) == -1)
+	if (chdir(pathname) == -1) {
 		printf("%s\n", strerror(errno));
+		return -1;	
+        }
 
 	gnuish_getcwd(wd);
+
+        return 0;
 }
 
 size_t gnuish_max_input(const struct gnuish_state *sh)
@@ -313,6 +326,8 @@ void gnuish_init(struct gnuish_state *sh)
 	sh->parsed->alloc = malloc(sizeof(char *) * GNUISH_MAX_ARGS);
 	sh->parsed->alloc_n = 0;
 
+        sh->last_status = 0;
+
 #ifndef NDEBUG
 	g_gnuish_initialized = true;
 #endif
@@ -320,7 +335,7 @@ void gnuish_init(struct gnuish_state *sh)
 
 ssize_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line)
 {
-	gnuish_put_prompt(sh->env_info, sh->wd->cwd);
+	gnuish_put_prompt(sh->last_status, sh->env_info, sh->wd->cwd);
 
 	ssize_t len = getline(out_line, (size_t *)&sh->wd->max_input, stdin);
 
@@ -328,12 +343,15 @@ ssize_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line)
 	return len - 1;
 }
 
-static void gnuish_echo(const char *const *args)
+static int gnuish_echo(const char *const *args)
 {
 	for (; *args; putchar(' '), ++args)
-		fputs(*args, stdout);
-
+		if (fputs(*args, stdout) == EOF)
+			return -1;
+        
 	putchar('\n');
+
+        return 0;
 }
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
@@ -378,13 +396,13 @@ static int gnuish_exec_path(const char *pathvar,
 // TODO: Call the functions for path and for no path directly in run_cmd above?
 // Also pass sub-structs directly.
 /* Fork and exec a program. */
-static void gnuish_exec(const struct gnuish_state *sh, const char *pathname)
+static int gnuish_exec(struct gnuish_state *sh, const char *pathname)
 {
 	pid_t cmd_pid = fork();
 
 	if (cmd_pid != 0) {
-		waitpid(cmd_pid, NULL, 0);
-		return;
+		waitpid(cmd_pid, &sh->last_status, 0);
+		return sh->last_status;
 	}
 
 	if (pathname)
@@ -395,7 +413,7 @@ static void gnuish_exec(const struct gnuish_state *sh, const char *pathname)
 
 	// Named program couldn't be executed.
 	gnuish_bad_cmd((pathname ? pathname : sh->parsed->tokens[0]), errno);
-	exit(EXIT_FAILURE);
+	exit(GNUISH_CMD_NOT_FOUND);
 }
 
 static void gnuish_free_parsed(struct gnuish_parsed *parsed)
@@ -403,6 +421,31 @@ static void gnuish_free_parsed(struct gnuish_parsed *parsed)
 	// Delete any token substitution buffers.
 	while (parsed->alloc_n > 0)
 		free((char *)parsed->alloc[parsed->alloc_n--]);
+}
+
+static int gnuish_switch(struct gnuish_state *sh, const char *pathname, const char **args)
+{
+	// TODO: hash table or something
+	if (strcmp(args[0], "cd") == 0)
+		return gnuish_chdir(sh->wd, args[1]);
+
+	else if (strcmp(args[0], "r") == 0)
+		return gnuish_recall(sh);
+
+	else if (strcmp(args[0], "hist") == 0)
+		return gnuish_list_hist(sh->hist->cmd_history);
+
+	else if (strcmp(args[0], "echo") == 0)
+		return gnuish_echo(args + 1);
+
+	else if (strcmp(args[0], "help") == 0)
+		return gnuish_puthelp();
+
+	else if (strcmp(args[0], "exit") == 0)
+		exit(EXIT_SUCCESS);
+
+	else
+		return gnuish_exec(sh, pathname);
 }
 
 void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
@@ -415,29 +458,7 @@ void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line)
 	const char *pathname;
 	gnuish_parse_line(sh->env_info, sh->parsed, &pathname, line);
 
-	const char **args = sh->parsed->tokens;
-
-	// TODO: hash table or something
-	if (strcmp(args[0], "cd") == 0)
-		gnuish_chdir(sh->wd, args[1]);
-
-	else if (strcmp(args[0], "r") == 0)
-		gnuish_recall(sh);
-
-	else if (strcmp(args[0], "exit") == 0)
-		exit(EXIT_SUCCESS);
-
-	else if (strcmp(args[0], "hist") == 0)
-		gnuish_list_hist(sh->hist->cmd_history);
-
-	else if (strcmp(args[0], "echo") == 0)
-		gnuish_echo(args + 1);
-
-	else if (strcmp(args[0], "help") == 0)
-		gnuish_puthelp();
-
-	else
-		gnuish_exec(sh, pathname);
+        sh->last_status = gnuish_switch(sh, pathname, sh->parsed->tokens);
 
         gnuish_free_parsed(sh->parsed);
 }
