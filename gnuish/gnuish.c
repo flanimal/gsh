@@ -161,7 +161,7 @@ static void gnuish_parse_pathname(struct gnuish_env *env_info,
 /*	Returns argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
-static int gnuish_parse_line(struct gnuish_env *env_info,
+static void gnuish_parse_line(struct gnuish_env *env_info,
 			     struct gnuish_parsed *parsed,
 			     const char **const out_pathname, char *const line)
 {
@@ -171,13 +171,9 @@ static int gnuish_parse_line(struct gnuish_env *env_info,
 	gnuish_parse_pathname(env_info, parsed, out_pathname);
 
 	// Get arguments.
-	int arg_n;
-
-	for (arg_n = 1; (out_tokens[arg_n] = strtok(NULL, " \n")) &&
+	for (int arg_n = 1; (out_tokens[arg_n] = strtok(NULL, " \n")) &&
 	     arg_n <= GNUISH_MAX_ARGS; ++arg_n)
 		gnuish_parse_tok(env_info, parsed, &out_tokens[arg_n]);
-
-	return arg_n + 1;
 }
 
 static void gnuish_add_hist(struct gnuish_cmd_hist *sh_hist, size_t len,
