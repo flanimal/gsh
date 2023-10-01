@@ -83,20 +83,20 @@
     <RemotePreBuildEventUseInBuild>false</RemotePreBuildEventUseInBuild>
   </PropertyGroup>
   <ItemGroup>
-    <ClCompile Include="builtin.c" />
-    <ClCompile Include="gnuish.c" />
-    <ClCompile Include="history.c" />
-    <ClCompile Include="main.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="builtin.h" />
-    <ClInclude Include="gnuish.h" />
-    <ClInclude Include="history.h" />
-    <ClInclude Include="system.h" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="Makefile" />
     <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\builtin.c" />
+    <ClCompile Include="src\gnuish.c" />
+    <ClCompile Include="src\history.c" />
+    <ClCompile Include="src\main.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\builtin.h" />
+    <ClInclude Include="src\gnuish.h" />
+    <ClInclude Include="src\history.h" />
+    <ClInclude Include="src\system.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile />

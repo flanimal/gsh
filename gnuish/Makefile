@@ -1,3 +1,4 @@
+VPATH = src
 SHELL = /bin/bash
 
 objects = main.o gnuish.o builtin.o history.o
@@ -5,12 +6,10 @@ objects = main.o gnuish.o builtin.o history.o
 CFLAGS = -O0 -Werror -Wall -Wextra -fno-omit-frame-pointer -std=gnu11
 
 gnuish : $(objects)
-	gcc -o gnuish $(objects)
+	gcc -o gnuish $(addprefix obj/, $(objects))
 
-main.o          : main.c gnuish.h
-gnuish.o        : gnuish.c gnuish.h builtin.h history.h system.h
-builtin.o       : builtin.c builtin.h system.h
-history.o       : history.h gnuish.h
+$(objects): %.o: %.c
+	$(CC) $(CFLAGS) -c $< -o obj/$@ 
 
 .PHONY : clean
 clean :

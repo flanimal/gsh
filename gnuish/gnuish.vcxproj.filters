@@ -1,43 +1,43 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="builtin.c">
-      <Filter>Private</Filter>
-    </ClCompile>
-    <ClCompile Include="gnuish.c">
-      <Filter>Private</Filter>
-    </ClCompile>
-    <ClCompile Include="history.c">
-      <Filter>Private</Filter>
-    </ClCompile>
-    <ClCompile Include="main.c">
-      <Filter>Private</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="builtin.h">
-      <Filter>Public</Filter>
-    </ClInclude>
-    <ClInclude Include="gnuish.h">
-      <Filter>Public</Filter>
-    </ClInclude>
-    <ClInclude Include="history.h">
-      <Filter>Public</Filter>
-    </ClInclude>
-    <ClInclude Include="system.h">
-      <Filter>Public</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="Makefile" />
     <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Public">
-      <UniqueIdentifier>{12eb92a1-ec55-4d88-a926-11f186a9f78e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Private">
-      <UniqueIdentifier>{bb595c02-2180-4126-831d-e576da3bf10e}</UniqueIdentifier>
+      <UniqueIdentifier>{174a83dc-20ab-43e1-beb0-493767220515}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Public">
+      <UniqueIdentifier>{5d1de652-8f3a-4bca-ae7a-99b561985095}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\builtin.c">
+      <Filter>Private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\gnuish.c">
+      <Filter>Private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\history.c">
+      <Filter>Private</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main.c">
+      <Filter>Private</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\builtin.h">
+      <Filter>Public</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gnuish.h">
+      <Filter>Public</Filter>
+    </ClInclude>
+    <ClInclude Include="src\history.h">
+      <Filter>Public</Filter>
+    </ClInclude>
+    <ClInclude Include="src\system.h">
+      <Filter>Public</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
