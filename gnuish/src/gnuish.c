@@ -59,11 +59,17 @@ void gsh_bad_cmd(const char *msg, int err)
 	       (err ? ")" : ""));
 }
 
+/*      Substitute a parameter with its value.
+ *
+ *      If an allocation was performed, returns the address of the buffer.
+ *      Otherwise, returns NULL.
+ */
 static const char *gsh_fmt_param(struct gsh_params *params,
 				 const char **const var)
 {
 	switch ((*var)[1]) {
-	case '?':{
+	case '?':
+		{
 			char *subst_buf;
 			asprintf(&subst_buf, "%d", params->last_status);
 
@@ -75,6 +81,11 @@ static const char *gsh_fmt_param(struct gsh_params *params,
 	}
 }
 
+/*      Expand tokens.
+ *
+ *      If an allocation was performed, returns the address of the buffer.
+ *      Otherwise, returns NULL.
+ */
 static const char *gsh_parse_tok(struct gsh_params *params,
 				 const char **const tok)
 {
@@ -82,7 +93,8 @@ static const char *gsh_parse_tok(struct gsh_params *params,
 	switch ((*tok)[0]) {
 	case '$':
 		return gsh_fmt_param(params, tok);
-	case '~':{
+	case '~':
+		{
 			char *subst_buf =
 			    malloc(strlen(*tok) + params->home_len + 1);
 			strcpy(stpcpy(subst_buf, params->homevar), *tok + 1);
@@ -94,7 +106,11 @@ static const char *gsh_parse_tok(struct gsh_params *params,
 	}
 }
 
-/*  */
+/*      Retrieve the filename within the pathname, outputting both.
+* 
+*       If an allocation was performed, returns the address of the buffer.
+*       Otherwise, returns NULL.
+*/
 static const char *gsh_parse_filename(struct gsh_params *params,
 				      const char **const out_pathname,
 				      const char **const filename)
@@ -110,13 +126,13 @@ static const char *gsh_parse_filename(struct gsh_params *params,
 		*out_pathname = *filename;
 		*filename = last_slash + 1;
 	} else {
-		*out_pathname = NULL;	// TODO: Just use zero-length string instead of NULL?
+		*out_pathname = NULL;
 	}
 
 	return tok_buf;
 }
 
-/*	Returns argument list terminated with NULL, and pathname.
+/*	Return argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
 static void gsh_parse_line(struct gsh_params *params,
@@ -134,6 +150,7 @@ static void gsh_parse_line(struct gsh_params *params,
 	// Get arguments.
 	for (int arg_n = 1; (parsed->tokens[arg_n] = strtok(NULL, " \n")) &&
 	     arg_n <= GSH_MAX_ARGS; ++arg_n) {
+
 		if ((allocated = gsh_parse_tok(params, &parsed->tokens[arg_n])))
 			parsed->alloc[parsed->alloc_n++] = allocated;
 	}

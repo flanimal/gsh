@@ -67,8 +67,6 @@ int gsh_list_hist(const struct gsh_hist_ent *cmd_it)
 	return 0;
 }
 
-// TODO: Possibly have a "prev_cmd" struct or something to pass to this,
-// instead of the entire shell state.
 /* Re-run the n-th previous line of input. */
 int gsh_recall(struct gsh_state *sh, const char *recall_arg)
 {
