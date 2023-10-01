@@ -42,6 +42,7 @@ struct gsh_workdir {
 	long max_path;
 };
 
+/* Line history entry. */
 struct gsh_hist_ent {
 	struct gsh_hist_ent *back, *forw;
 
@@ -142,8 +143,8 @@ static const char *gsh_parse_tok(struct gsh_params *params,
 }
 
 static const char *gsh_parse_filename(struct gsh_params *params,
-			       const char **const out_pathname,
-			       const char **const filename)
+				      const char **const out_pathname,
+				      const char **const filename)
 {
 	// Perform any substitutions.
 	const char *alloc = gsh_parse_tok(params, filename);
@@ -159,7 +160,7 @@ static const char *gsh_parse_filename(struct gsh_params *params,
 		*out_pathname = NULL;	// TODO: Just use zero-length string instead of NULL?
 	}
 
-        return alloc;
+	return alloc;
 }
 
 /*	Returns argument list terminated with NULL, and pathname.
@@ -171,8 +172,8 @@ static void gsh_parse_line(struct gsh_params *params,
 {
 	parsed->tokens[0] = strtok(line, " \n");
 	const char *filename_alloc;
-        
-        if ((filename_alloc = gsh_parse_filename(params, out_pathname,
+
+	if ((filename_alloc = gsh_parse_filename(params, out_pathname,
 						 &parsed->tokens[0])))
 		parsed->alloc[parsed->alloc_n++] = filename_alloc;
 
@@ -198,13 +199,9 @@ gsh_drop_hist(struct gsh_cmd_hist *sh_hist, struct gsh_hist_ent *dropped_ent)
 	free(dropped_ent);
 }
 
-static void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len,
-			 const char *line)
+static struct gsh_hist_ent *new_hist_ent(struct gsh_cmd_hist *sh_hist,
+					 size_t len, const char *line)
 {
-	// Recall `r` should NOT be added to history.
-	if (line[0] == 'r' && (!line[1] || isspace(line[1])))
-		return;
-
 	struct gsh_hist_ent *last_cmd = malloc(sizeof(*last_cmd));
 
 	insque(last_cmd, sh_hist->cmd_history);
@@ -212,6 +209,18 @@ static void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len,
 
 	strcpy((last_cmd->line = malloc(len + 1)), line);
 	last_cmd->len = len;
+
+	return last_cmd;
+}
+
+static void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len,
+			 const char *line)
+{
+	// Recall `r` should NOT be added to history.
+	if (line[0] == 'r' && (!line[1] || isspace(line[1])))
+		return;
+
+	struct gsh_hist_ent *last_cmd = new_hist_ent(sh_hist, len, line);
 
 	if (sh_hist->hist_n == 10) {
 		gsh_drop_hist(sh_hist, sh_hist->oldest_cmd);

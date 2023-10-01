@@ -1,6 +1,5 @@
 #pragma once
 
-// TODO: Split these sections into three structs? Separate the concerns.
 // TODO: Possibly move the "internal" structs to their own header file.
 
 // Working directory struct?
