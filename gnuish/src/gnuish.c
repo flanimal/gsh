@@ -63,11 +63,12 @@ static const char *gsh_fmt_param(struct gsh_params *params,
 				 const char **const var)
 {
 	switch ((*var)[1]) {
-	case '?':
+	case '?': {
 		char *tok_subst;
 		asprintf(&tok_subst, "%d", params->last_status);
 
 		return (*var = tok_subst);
+	}
 	default:		// Non-special.
 		*var = envz_get(*environ, params->env_len, &(*var)[1]);
 		return NULL;
@@ -81,11 +82,12 @@ static const char *gsh_parse_tok(struct gsh_params *params,
 	switch ((*tok)[0]) {
 	case '$':
 		return gsh_fmt_param(params, tok);
-	case '~':
+	case '~': {
 		char *tok_subst = malloc(strlen(*tok) + params->home_len + 1);
 		strcpy(stpcpy(tok_subst, params->homevar), *tok + 1);
 
 		return (*tok = tok_subst);
+	}
 	default:
 		return NULL;
 	}
