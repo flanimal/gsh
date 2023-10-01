@@ -9,14 +9,14 @@
 int main(__attribute_maybe_unused__ int argc,
 	 __attribute_maybe_unused__ char *argv[])
 {
-	struct gnuish_state sh_state;
-	gnuish_init(&sh_state);
+	struct gsh_state sh_state;
+	gsh_init(&sh_state);
 	
 	/* Main loop. */
-	char *line = malloc(gnuish_max_input(&sh_state));
+	char *line = malloc(gsh_max_input(&sh_state));
 
-	for (ssize_t len; (len = gnuish_read_line(&sh_state, &line)) != -1; )
-		gnuish_run_cmd(&sh_state, (size_t)len, line);
+	for (ssize_t len; (len = gsh_read_line(&sh_state, &line)) != -1; )
+		gsh_run_cmd(&sh_state, (size_t)len, line);
 
 	printf("%s\n", strerror(errno));
 	exit(EXIT_FAILURE);

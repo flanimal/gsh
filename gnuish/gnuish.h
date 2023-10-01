@@ -14,24 +14,24 @@
 // A benefit of this current revision is that the sub-structs members cannot be accessed directly, 
 // even though we have references to the structs.
 
-struct gnuish_state {
-	struct gnuish_workdir *wd;
-	struct gnuish_cmd_hist *hist;
-	struct gnuish_parsed *parsed;
-	struct gnuish_env *env_info;
+struct gsh_state {
+	struct gsh_workdir *wd;
+	struct gsh_cmd_hist *hist;
+	struct gsh_parsed *parsed;
+	struct gsh_env *env_info;
 
         int last_status;
 };
 
 /* Set initial values and resources for the shell. */
-void gnuish_init(struct gnuish_state *sh);
+void gsh_init(struct gsh_state *sh);
 
-size_t gnuish_max_input(const struct gnuish_state *sh);
+size_t gsh_max_input(const struct gsh_state *sh);
 
 /* Get a null-terminated line of input from the terminal,
  * including the newline. */
-ssize_t gnuish_read_line(const struct gnuish_state *sh, char **const out_line);
+ssize_t gsh_read_line(const struct gsh_state *sh, char **const out_line);
 
 /* Execute a null-terminated line of input.
  * The line will be modified by calls to `strtok`. */
-void gnuish_run_cmd(struct gnuish_state *sh, size_t len, char *line);
+void gsh_run_cmd(struct gsh_state *sh, size_t len, char *line);
