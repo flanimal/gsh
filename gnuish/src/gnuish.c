@@ -64,10 +64,10 @@ static const char *gsh_fmt_param(struct gsh_params *params,
 {
 	switch ((*var)[1]) {
 	case '?': {
-		char *tok_subst;
-		asprintf(&tok_subst, "%d", params->last_status);
+		char *subst_buf;
+		asprintf(&subst_buf, "%d", params->last_status);
 
-		return (*var = tok_subst);
+		return (*var = subst_buf);
 	}
 	default:		// Non-special.
 		*var = envz_get(*environ, params->env_len, &(*var)[1]);
@@ -83,22 +83,23 @@ static const char *gsh_parse_tok(struct gsh_params *params,
 	case '$':
 		return gsh_fmt_param(params, tok);
 	case '~': {
-		char *tok_subst = malloc(strlen(*tok) + params->home_len + 1);
-		strcpy(stpcpy(tok_subst, params->homevar), *tok + 1);
+		char *subst_buf = malloc(strlen(*tok) + params->home_len + 1);
+		strcpy(stpcpy(subst_buf, params->homevar), *tok + 1);
 
-		return (*tok = tok_subst);
+		return (*tok = subst_buf);
 	}
 	default:
 		return NULL;
 	}
 }
 
+/*  */
 static const char *gsh_parse_filename(struct gsh_params *params,
 				      const char **const out_pathname,
 				      const char **const filename)
 {
 	// Perform any substitutions.
-	const char *alloc = gsh_parse_tok(params, filename);
+	const char *tok_buf = gsh_parse_tok(params, filename);
 
 	// Get the pathname, whether relative or absolute, if one
 	// preceded the filename.
@@ -111,7 +112,7 @@ static const char *gsh_parse_filename(struct gsh_params *params,
 		*out_pathname = NULL;	// TODO: Just use zero-length string instead of NULL?
 	}
 
-	return alloc;
+	return tok_buf;
 }
 
 /*	Returns argument list terminated with NULL, and pathname.
@@ -122,20 +123,21 @@ static void gsh_parse_line(struct gsh_params *params,
 			   const char **const out_pathname, char *const line)
 {
 	parsed->tokens[0] = strtok(line, " \n");
-	const char *filename_alloc;
 
-	if ((filename_alloc = gsh_parse_filename(params, out_pathname,
+	const char *filename_buf;
+
+	if ((filename_buf = gsh_parse_filename(params, out_pathname,
 						 &parsed->tokens[0])))
-		parsed->alloc[parsed->alloc_n++] = filename_alloc;
+		parsed->alloc[parsed->alloc_n++] = filename_buf;
 
 	// Get arguments.
 	for (int arg_n = 1; (parsed->tokens[arg_n] = strtok(NULL, " \n")) &&
 	     arg_n <= GSH_MAX_ARGS; ++arg_n) {
 
-		const char *alloc;
+		const char *tok_buf;
 
-		if ((alloc = gsh_parse_tok(params, &parsed->tokens[arg_n])))
-			parsed->alloc[parsed->alloc_n++] = alloc;
+		if ((tok_buf = gsh_parse_tok(params, &parsed->tokens[arg_n])))
+			parsed->alloc[parsed->alloc_n++] = tok_buf;
 	}
 }
 
