@@ -15,11 +15,17 @@
 // even though we have references to the structs.
 
 struct gsh_state {
-	struct gsh_workdir *wd;
+	/* Line history. */
 	struct gsh_cmd_hist *hist;
-	struct gsh_parsed *parsed;
+
+        struct gsh_parsed *parsed;
+
+        // IDEA: Execution context?
+	struct gsh_workdir *wd;
+
 	struct gsh_env *env_info;
 
+        /* Parameters. */
         int last_status;
 };
 

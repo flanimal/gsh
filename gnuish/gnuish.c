@@ -118,14 +118,23 @@ static int gsh_puthelp()
 	return 0;
 }
 
+//static const char* gsh_get_var(const struct gsh_env* env_info, const char* var)
+//{
+//	switch (var[0]) {
+//	case '?':
+//                return 
+//        }
+//}
+
 static void
 gsh_parse_tok(const struct gsh_env *env_info,
 	      struct gsh_parsed *tokens, const char **const tok)
 {
 	// TODO: globbing, piping
-	switch (**tok) {
+	switch ((*tok)[0]) {
 	case '$':
 		*tok = envz_get(*environ, env_info->env_len, *tok + 1);
+		//*tok = gsh_get_var(env_info, *tok + 1);
 		return;
 	case '~':
 		char *tok_subst = malloc(strlen(*tok) + env_info->home_len + 1);
@@ -239,11 +248,11 @@ static void gsh_bad_cmd(const char *msg, int err)
 // TODO: Possibly have a "prev_cmd" struct or something to pass to this,
 // instead of the entire shell state.
 /* Re-run the n-th previous line of input. */
-static int gsh_recall(struct gsh_state *sh)
+static int gsh_recall(struct gsh_state *sh, const char *recall_arg)
 {
 	struct gsh_hist_ent *cmd_it = sh->hist->cmd_history;
 
-	int n_arg = (sh->parsed->tokens[1] ? atoi(sh->parsed->tokens[1]) : 1);
+	int n_arg = (recall_arg ? atoi(recall_arg) : 1);
 
 	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
 		gsh_bad_cmd("no history", 0);
@@ -317,14 +326,14 @@ void gsh_init(struct gsh_state *sh)
 	gsh_init_env((sh->env_info = malloc(sizeof(*sh->env_info))));
 	gsh_init_wd((sh->wd = malloc(sizeof(*sh->wd))));
 
-	sh->hist = malloc(sizeof(*sh->hist));
-	sh->hist->cmd_history = sh->hist->oldest_cmd = NULL;
-	sh->hist->hist_n = 0;
-
-	sh->parsed = malloc(sizeof(*sh->parsed));
+        sh->parsed = malloc(sizeof(*sh->parsed));
 	sh->parsed->tokens = malloc(sizeof(char *) * GSH_MAX_ARGS);
 	sh->parsed->alloc = malloc(sizeof(char *) * GSH_MAX_ARGS);
 	sh->parsed->alloc_n = 0;
+
+	sh->hist = malloc(sizeof(*sh->hist));
+	sh->hist->cmd_history = sh->hist->oldest_cmd = NULL;
+	sh->hist->hist_n = 0;
 
 	sh->last_status = 0;
 
@@ -396,7 +405,7 @@ static int gsh_exec_path(const char *pathvar,
 // TODO: Call the functions for path and for no path directly in run_cmd above?
 // Also pass sub-structs directly.
 /* Fork and exec a program. */
-static int gsh_exec(struct gsh_state *sh, const char *pathname)
+static int gsh_exec(struct gsh_state *sh, const char *pathname, const char **args)
 {
 	pid_t cmd_pid = fork();
 
@@ -406,21 +415,14 @@ static int gsh_exec(struct gsh_state *sh, const char *pathname)
 	}
 
 	if (pathname)
-		execve(pathname, (char *const *)sh->parsed->tokens, environ);
+		execve(pathname, (char *const *)args, environ);
 	else
 		gsh_exec_path(sh->env_info->pathvar, sh->wd,
-			      sh->parsed->tokens);
+			      args);
 
 	// Named program couldn't be executed.
-	gsh_bad_cmd((pathname ? pathname : sh->parsed->tokens[0]), errno);
+	gsh_bad_cmd((pathname ? pathname : args[0]), errno);
 	exit(GSH_CMD_NOT_FOUND);
-}
-
-static void gsh_free_parsed(struct gsh_parsed *parsed)
-{
-	// Delete any token substitution buffers.
-	while (parsed->alloc_n > 0)
-		free((char *)parsed->alloc[parsed->alloc_n--]);
 }
 
 static int gsh_switch(struct gsh_state *sh, const char *pathname,
@@ -431,7 +433,7 @@ static int gsh_switch(struct gsh_state *sh, const char *pathname,
 		return gsh_chdir(sh->wd, args[1]);
 
 	else if (strcmp(args[0], "r") == 0)
-		return gsh_recall(sh);
+		return gsh_recall(sh, args[1]);
 
 	else if (strcmp(args[0], "hist") == 0)
 		return gsh_list_hist(sh->hist->cmd_history);
@@ -446,7 +448,14 @@ static int gsh_switch(struct gsh_state *sh, const char *pathname,
 		exit(EXIT_SUCCESS);
 
 	else
-		return gsh_exec(sh, pathname);
+		return gsh_exec(sh, pathname, args);
+}
+
+static void gsh_free_parsed(struct gsh_parsed *parsed)
+{
+	// Delete any token substitution buffers.
+	while (parsed->alloc_n > 0)
+		free((char *)parsed->alloc[parsed->alloc_n--]);
 }
 
 void gsh_run_cmd(struct gsh_state *sh, size_t len, char *line)
