@@ -63,12 +63,12 @@ static const char *gsh_fmt_param(struct gsh_params *params,
 				 const char **const var)
 {
 	switch ((*var)[1]) {
-	case '?': {
-		char *subst_buf;
-		asprintf(&subst_buf, "%d", params->last_status);
+	case '?':{
+			char *subst_buf;
+			asprintf(&subst_buf, "%d", params->last_status);
 
-		return (*var = subst_buf);
-	}
+			return (*var = subst_buf);
+		}
 	default:		// Non-special.
 		*var = envz_get(*environ, params->env_len, &(*var)[1]);
 		return NULL;
@@ -82,12 +82,13 @@ static const char *gsh_parse_tok(struct gsh_params *params,
 	switch ((*tok)[0]) {
 	case '$':
 		return gsh_fmt_param(params, tok);
-	case '~': {
-		char *subst_buf = malloc(strlen(*tok) + params->home_len + 1);
-		strcpy(stpcpy(subst_buf, params->homevar), *tok + 1);
+	case '~':{
+			char *subst_buf =
+			    malloc(strlen(*tok) + params->home_len + 1);
+			strcpy(stpcpy(subst_buf, params->homevar), *tok + 1);
 
-		return (*tok = subst_buf);
-	}
+			return (*tok = subst_buf);
+		}
 	default:
 		return NULL;
 	}
@@ -124,20 +125,17 @@ static void gsh_parse_line(struct gsh_params *params,
 {
 	parsed->tokens[0] = strtok(line, " \n");
 
-	const char *filename_buf;
+	const char *allocated;
 
-	if ((filename_buf = gsh_parse_filename(params, out_pathname,
-						 &parsed->tokens[0])))
-		parsed->alloc[parsed->alloc_n++] = filename_buf;
+	if ((allocated = gsh_parse_filename(params, out_pathname,
+					    &parsed->tokens[0])))
+		parsed->alloc[parsed->alloc_n++] = allocated;
 
 	// Get arguments.
 	for (int arg_n = 1; (parsed->tokens[arg_n] = strtok(NULL, " \n")) &&
 	     arg_n <= GSH_MAX_ARGS; ++arg_n) {
-
-		const char *tok_buf;
-
-		if ((tok_buf = gsh_parse_tok(params, &parsed->tokens[arg_n])))
-			parsed->alloc[parsed->alloc_n++] = tok_buf;
+		if ((allocated = gsh_parse_tok(params, &parsed->tokens[arg_n])))
+			parsed->alloc[parsed->alloc_n++] = allocated;
 	}
 }
 
