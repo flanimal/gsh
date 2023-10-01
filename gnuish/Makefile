@@ -13,4 +13,4 @@ $(objects): %.o: %.c
 
 .PHONY : clean
 clean :
-	rm -f *.{o,h,c}
+	rm -f obj/*.o src/*.{h,c} 

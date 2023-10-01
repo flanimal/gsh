@@ -96,7 +96,7 @@ static const char *gsh_parse_tok(struct gsh_params *params,
 	case '$':
 		return gsh_fmt_param(params, tok);
 	case '~':
-		*subst_buf = malloc(strlen(*tok) + params->home_len + 1);
+		subst_buf = malloc(strlen(*tok) + params->home_len + 1);
 		strcpy(stpcpy(subst_buf, params->homevar), *tok + 1);
 
 		return (*tok = subst_buf);
