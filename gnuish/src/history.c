@@ -20,7 +20,7 @@ static void new_hist_ent(struct gsh_cmd_hist *sh_hist,
 	insque(last_cmd, sh_hist->cmd_history);
 	sh_hist->cmd_history = last_cmd;
 
-	strcpy((last_cmd->line = malloc(len + 1)), line);
+	last_cmd->line = strcpy(malloc(len + 1), line);
 	last_cmd->len = len;
 
         if (sh_hist->hist_n == 0)
@@ -86,8 +86,8 @@ int gsh_recall(struct gsh_state *sh, const char *recall_arg)
 
         // Make a copy so we don't lose it if the history entry
         // gets deleted.
-        char *ent_line_cpy = strcpy(malloc(cmd_it->len), cmd_it->line);
-        
+        char *ent_line_cpy = strcpy(malloc(cmd_it->len + 1), cmd_it->line);
+
         gsh_run_cmd(sh, cmd_it->len, ent_line_cpy);
         free(ent_line_cpy);
 
