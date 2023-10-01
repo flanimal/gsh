@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <unistd.h>
 #include <limits.h>
 #include <search.h>
@@ -107,78 +109,82 @@ static int gsh_puthelp()
 	return 0;
 }
 
-//static const char* gsh_get_var(const struct gsh_env* env_info, const char* var)
-//{
-//	switch (var[0]) {
-//	case '?':
-//                return 
-//        }
-//}
+static const char *gsh_fmt_param(struct gsh_params *params,
+				 const char **const var)
+{
+	switch ((*var)[1]) {
+	case '?':
+		char *tok_subst;
+		asprintf(&tok_subst, "%d", params->last_status);
 
-static void
-gsh_parse_tok(const struct gsh_env *env_info,
-	      struct gsh_parsed *tokens, const char **const tok)
+		return (*var = tok_subst);
+	default:		// Non-special.
+		*var = envz_get(*environ, params->env_len, &(*var)[1]);
+		return NULL;
+	}
+}
+
+static const char *gsh_parse_tok(struct gsh_params *params,
+				 const char **const tok)
 {
 	// TODO: globbing, piping
 	switch ((*tok)[0]) {
 	case '$':
-		*tok = envz_get(*environ, env_info->env_len, *tok + 1);
-		//*tok = gsh_get_var(env_info, *tok + 1);
-		return;
+		return gsh_fmt_param(params, tok);
 	case '~':
-		char *tok_subst = malloc(strlen(*tok) + env_info->home_len + 1);
+		char *tok_subst = malloc(strlen(*tok) + params->home_len + 1);
+		strcpy(stpcpy(tok_subst, params->homevar), *tok + 1);
 
-		strcpy(stpcpy(tok_subst, env_info->homevar), *tok + 1);
-		*tok = tok_subst;
-
-		tokens->alloc[tokens->alloc_n++] = *tok;
-
-		return;
+		return (*tok = tok_subst);
 	default:
-		return;
+		return NULL;
 	}
 }
 
-static void gsh_parse_pathname(struct gsh_env *env_info,
-			       struct gsh_parsed *parsed,
-			       const char **const out_pathname)
+static const char *gsh_parse_filename(struct gsh_params *params,
+			       const char **const out_pathname,
+			       const char **const filename)
 {
-	const char **const out_tokens = parsed->tokens;
+	// Perform any substitutions.
+	const char *alloc = gsh_parse_tok(params, filename);
 
 	// Get the pathname, whether relative or absolute, if one
 	// preceded the filename.
-	char *last_slash = strrchr(out_tokens[0], '/');
+	char *last_slash = strrchr(*filename, '/');
+
 	if (last_slash) {
-		*out_pathname = out_tokens[0];
-
-		// Parse pathname.
-		gsh_parse_tok(env_info, parsed, out_pathname);
-
-		out_tokens[0] = last_slash + 1;
+		*out_pathname = *filename;
+		*filename = last_slash + 1;
 	} else {
 		*out_pathname = NULL;	// TODO: Just use zero-length string instead of NULL?
 	}
-	// TODO: Do we need to pass both parsed and an out_tokens tok to
-	// parse_tok? Parse filename.
-	gsh_parse_tok(env_info, parsed, &out_tokens[0]);
+
+        return alloc;
 }
 
 /*	Returns argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
-static void gsh_parse_line(struct gsh_env *env_info,
+static void gsh_parse_line(struct gsh_params *params,
 			   struct gsh_parsed *parsed,
 			   const char **const out_pathname, char *const line)
 {
-	const char **const out_tokens = parsed->tokens;
-
-	out_tokens[0] = strtok(line, " \n");
-	gsh_parse_pathname(env_info, parsed, out_pathname);
+	parsed->tokens[0] = strtok(line, " \n");
+	const char *filename_alloc;
+        
+        if ((filename_alloc = gsh_parse_filename(params, out_pathname,
+						 &parsed->tokens[0])))
+		parsed->alloc[parsed->alloc_n++] = filename_alloc;
 
 	// Get arguments.
-	for (int arg_n = 1; (out_tokens[arg_n] = strtok(NULL, " \n")) &&
-	     arg_n <= GSH_MAX_ARGS; ++arg_n)
-		gsh_parse_tok(env_info, parsed, &out_tokens[arg_n]);
+	for (int arg_n = 1; (parsed->tokens[arg_n] = strtok(NULL, " \n")) &&
+	     arg_n <= GSH_MAX_ARGS; ++arg_n) {
+
+		const char *alloc;
+
+		if ((alloc = gsh_parse_tok(params, &parsed->tokens[arg_n])))
+			parsed->alloc[parsed->alloc_n++] = alloc;
+	}
 }
 
 static void
@@ -319,7 +325,7 @@ void gsh_init(struct gsh_state *sh)
 	gsh_init_env(&sh->params);
 	gsh_init_wd((sh->wd = malloc(sizeof(*sh->wd))));
 
-        sh->parsed = malloc(sizeof(*sh->parsed));
+	sh->parsed = malloc(sizeof(*sh->parsed));
 	sh->parsed->tokens = malloc(sizeof(char *) * GSH_MAX_ARGS);
 	sh->parsed->alloc = malloc(sizeof(char *) * GSH_MAX_ARGS);
 	sh->parsed->alloc_n = 0;
