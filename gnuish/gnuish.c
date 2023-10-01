@@ -192,6 +192,17 @@ static void gsh_parse_line(struct gsh_env *env_info,
 		gsh_parse_tok(env_info, parsed, &out_tokens[arg_n]);
 }
 
+static void
+gsh_drop_hist(struct gsh_cmd_hist *sh_hist, struct gsh_hist_ent *dropped_ent)
+{
+	sh_hist->oldest_cmd = dropped_ent->back;
+
+	remque(dropped_ent);
+
+	free(dropped_ent->line);
+	free(dropped_ent);
+}
+
 static void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len,
 			 const char *line)
 {
@@ -208,14 +219,7 @@ static void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len,
 	last_cmd->len = len;
 
 	if (sh_hist->hist_n == 10) {
-		struct gsh_hist_ent *popped_ent = sh_hist->oldest_cmd;
-		sh_hist->oldest_cmd = popped_ent->back;
-
-		remque(popped_ent);
-
-		free(popped_ent->line);
-		free(popped_ent);
-
+		gsh_drop_hist(sh_hist, sh_hist->oldest_cmd);
 		return;
 	}
 

@@ -18,6 +18,7 @@ struct gsh_state {
 	/* Line history. */
 	struct gsh_cmd_hist *hist;
 
+        /* The buffers used for parsing input lines. */
         struct gsh_parsed *parsed;
 
         // IDEA: Execution context?
