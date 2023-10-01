@@ -17,7 +17,7 @@ int main(__attribute_maybe_unused__ int argc,
 
 	for (ssize_t len; (len = gsh_read_line(&sh_state, &line)) != -1; )
 		gsh_run_cmd(&sh_state, (size_t)len, line);
-
+        
 	printf("%s\n", strerror(errno));
 	exit(EXIT_FAILURE);
 }

@@ -18,16 +18,12 @@
 #include "history.h"
 #include "system.h"
 
-extern char **environ;
-
 /* The maximum number of arguments that can be passed on the command line. */
 #define GSH_MAX_ARGS 64
 
 #define GSH_EXIT_NOTFOUND 127
 
-#ifndef NDEBUG
-static bool g_gsh_initialized = false;
-#endif
+#define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
 
 struct gsh_parsed {
 	/* List of tokens from previous input line. */
@@ -38,7 +34,11 @@ struct gsh_parsed {
 	size_t alloc_n;
 };
 
-#define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
+extern char **environ;
+
+#ifndef NDEBUG
+static bool g_gsh_initialized = false;
+#endif
 
 static void gsh_put_prompt(const struct gsh_params *params, const char *cwd)
 {

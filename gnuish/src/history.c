@@ -8,18 +8,11 @@
 #include "gnuish.h"
 #include "history.h"
 
-static void drop_hist_ent(struct gsh_cmd_hist *sh_hist,
-			  struct gsh_hist_ent *dropped_ent)
-{
-	sh_hist->oldest_cmd = dropped_ent->back;
+#define GSH_MAX_HIST 10
 
-	remque(dropped_ent);
+void gsh_bad_cmd(const char *msg, int err);
 
-	free(dropped_ent->line);
-	free(dropped_ent);
-}
-
-static struct gsh_hist_ent *new_hist_ent(struct gsh_cmd_hist *sh_hist,
+static void new_hist_ent(struct gsh_cmd_hist *sh_hist,
 					 size_t len, const char *line)
 {
 	struct gsh_hist_ent *last_cmd = malloc(sizeof(*last_cmd));
@@ -30,27 +23,36 @@ static struct gsh_hist_ent *new_hist_ent(struct gsh_cmd_hist *sh_hist,
 	strcpy((last_cmd->line = malloc(len + 1)), line);
 	last_cmd->len = len;
 
-	return last_cmd;
+        if (sh_hist->hist_n == 0)
+		sh_hist->oldest_cmd = last_cmd;
+
+	++sh_hist->hist_n;
+}
+
+static void drop_hist_ent(struct gsh_cmd_hist *sh_hist,
+			  struct gsh_hist_ent *dropped_ent)
+{
+	sh_hist->oldest_cmd = dropped_ent->back;
+
+	remque(dropped_ent);
+
+	free(dropped_ent->line);
+	free(dropped_ent);
+
+	--sh_hist->hist_n;
 }
 
 void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len,
 			 const char *line)
 {
-	// Recall `r` should NOT be added to history.
+	// The recall command `r` itself should NOT be added to history.
 	if (line[0] == 'r' && (!line[1] || isspace(line[1])))
 		return;
 
-	struct gsh_hist_ent *last_cmd = new_hist_ent(sh_hist, len, line);
+	new_hist_ent(sh_hist, len, line);
 
-	if (sh_hist->hist_n == 10) {
+	if (sh_hist->hist_n > GSH_MAX_HIST)
 		drop_hist_ent(sh_hist, sh_hist->oldest_cmd);
-		return;
-	}
-
-	if (sh_hist->hist_n == 0)
-		sh_hist->oldest_cmd = last_cmd;
-
-	++sh_hist->hist_n;
 }
 
 int gsh_list_hist(const struct gsh_hist_ent *cmd_it)
@@ -70,19 +72,26 @@ int gsh_list_hist(const struct gsh_hist_ent *cmd_it)
 /* Re-run the n-th previous line of input. */
 int gsh_recall(struct gsh_state *sh, const char *recall_arg)
 {
-	struct gsh_hist_ent *cmd_it = sh->hist->cmd_history;
-
 	int n_arg = (recall_arg ? atoi(recall_arg) : 1);
 
 	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
-		gsh_bad_cmd("no history", 0);
+		gsh_bad_cmd("no matching history entry", 0);
 		return -1;
 	}
 
-	while (cmd_it && n_arg-- > 1)
+	struct gsh_hist_ent *cmd_it = sh->hist->cmd_history;
+
+	while (cmd_it->forw && n_arg-- > 1)
 		cmd_it = cmd_it->forw;
 
 	printf("%s\n", cmd_it->line);
-	gsh_run_cmd(sh, cmd_it->len, cmd_it->line);
+
+        // Make a copy so we don't lose it if the history entry
+        // gets deleted.
+        char *ent_line_cpy = strcpy(malloc(cmd_it->len), cmd_it->line);
+        
+        gsh_run_cmd(sh, cmd_it->len, ent_line_cpy);
+        free(ent_line_cpy);
+
 	return sh->params.last_status;
 }
