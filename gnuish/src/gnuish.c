@@ -42,14 +42,15 @@ static bool g_gsh_initialized = false;
 
 static void gsh_put_prompt(const struct gsh_params *params, const char *cwd)
 {
-	const bool in_home =
-	    strncmp(cwd, params->homevar, params->home_len) == 0;
+	const bool in_home = strncmp(cwd, params->homevar, params->home_len) ==
+			     0;
 
-	printf((in_home ? "<%d>" GSH_PROMPT("~%s") :
-		"<%d>" GSH_PROMPT("%s")),
-	       (WIFEXITED(params->last_status) ?
-		WEXITSTATUS(params->last_status) : 255),
-	       cwd + (in_home ? params->home_len : 0));
+	const int status = WIFEXITED(params->last_status) ?
+				     WEXITSTATUS(params->last_status) :
+				     255;
+
+	printf((in_home ? "<%d>" GSH_PROMPT("~%s") : "<%d>" GSH_PROMPT("%s")),
+	       status, cwd + (in_home ? params->home_len : 0));
 }
 
 void gsh_bad_cmd(const char *msg, int err)
@@ -67,15 +68,14 @@ void gsh_bad_cmd(const char *msg, int err)
 static const char *gsh_fmt_param(struct gsh_params *params,
 				 const char **const var)
 {
+	char *subst_buf;
+
 	switch ((*var)[1]) {
 	case '?':
-		{
-			char *subst_buf;
-			asprintf(&subst_buf, "%d", params->last_status);
+		asprintf(&subst_buf, "%d", params->last_status);
 
-			return (*var = subst_buf);
-		}
-	default:		// Non-special.
+		return (*var = subst_buf);
+	default: // Non-special.
 		*var = envz_get(*environ, params->env_len, &(*var)[1]);
 		return NULL;
 	}
@@ -89,28 +89,27 @@ static const char *gsh_fmt_param(struct gsh_params *params,
 static const char *gsh_parse_tok(struct gsh_params *params,
 				 const char **const tok)
 {
+	char *subst_buf;
+
 	// TODO: globbing, piping
 	switch ((*tok)[0]) {
 	case '$':
 		return gsh_fmt_param(params, tok);
 	case '~':
-		{
-			char *subst_buf =
-			    malloc(strlen(*tok) + params->home_len + 1);
-			strcpy(stpcpy(subst_buf, params->homevar), *tok + 1);
+		*subst_buf = malloc(strlen(*tok) + params->home_len + 1);
+		strcpy(stpcpy(subst_buf, params->homevar), *tok + 1);
 
-			return (*tok = subst_buf);
-		}
+		return (*tok = subst_buf);
 	default:
 		return NULL;
 	}
 }
 
 /*      Retrieve the filename within the pathname, outputting both.
-* 
-*       If an allocation was performed, returns the address of the buffer.
-*       Otherwise, returns NULL.
-*/
+ *
+ *       If an allocation was performed, returns the address of the buffer.
+ *       Otherwise, returns NULL.
+ */
 static const char *gsh_parse_filename(struct gsh_params *params,
 				      const char **const out_pathname,
 				      const char **const filename)
@@ -135,8 +134,7 @@ static const char *gsh_parse_filename(struct gsh_params *params,
 /*	Return argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
-static void gsh_parse_line(struct gsh_params *params,
-			   struct gsh_parsed *parsed,
+static void gsh_parse_line(struct gsh_params *params, struct gsh_parsed *parsed,
 			   const char **const out_pathname, char *const line)
 {
 	parsed->tokens[0] = strtok(line, " \n");
@@ -149,8 +147,8 @@ static void gsh_parse_line(struct gsh_params *params,
 
 	// Get arguments.
 	for (int arg_n = 1; (parsed->tokens[arg_n] = strtok(NULL, " \n")) &&
-	     arg_n <= GSH_MAX_ARGS; ++arg_n) {
-
+			    arg_n <= GSH_MAX_ARGS;
+	     ++arg_n) {
 		if ((allocated = gsh_parse_tok(params, &parsed->tokens[arg_n])))
 			parsed->alloc[parsed->alloc_n++] = allocated;
 	}
@@ -232,7 +230,7 @@ ssize_t gsh_read_line(const struct gsh_state *sh, char **const out_line)
 
 	ssize_t len = getline(out_line, (size_t *)&sh->wd->max_input, stdin);
 
-	(*out_line)[len - 1] = '\0';	// Remove newline.
+	(*out_line)[len - 1] = '\0'; // Remove newline.
 	return len - 1;
 }
 
@@ -243,7 +241,7 @@ static void copy_path_ent(char **const dest_it, const char **const src_it)
 	for (;; ++(*dest_it), ++(*src_it)) {
 		switch (**src_it) {
 		case ':':
-			++(*src_it);	// Move to next path following the colon.
+			++(*src_it); // Move to next path following the colon.
 			/* fall through */
 		case '\0':
 			**dest_it = '\0';
@@ -255,8 +253,8 @@ static void copy_path_ent(char **const dest_it, const char **const src_it)
 	}
 }
 
-static int gsh_exec_path(const char *pathvar,
-			 const struct gsh_workdir *wd, const char **args)
+static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
+			 const char **args)
 {
 	char *const exec_buf = malloc((size_t)wd->max_path);
 	char *exec_pathname;

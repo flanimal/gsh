@@ -22,9 +22,7 @@
     <ClCompile Include="src\history.c">
       <Filter>Private</Filter>
     </ClCompile>
-    <ClCompile Include="src\main.c">
-      <Filter>Private</Filter>
-    </ClCompile>
+    <ClCompile Include="src\main.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\builtin.h">

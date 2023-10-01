@@ -62,7 +62,7 @@ int gsh_list_hist(const struct gsh_hist_ent *cmd_it)
 	int cmd_n = 1;
 
 	for (; cmd_it; cmd_it = cmd_it->forw)
-		printf("%i: %s\n", cmd_n++, cmd_it->line);
+		printf("%d: %s\n", cmd_n++, cmd_it->line);
 
 	return 0;
 }
