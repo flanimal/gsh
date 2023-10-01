@@ -64,29 +64,18 @@ struct gsh_parsed {
 	size_t alloc_n;
 };
 
-struct gsh_env {
-	/* Null-terminated value of PATH. */
-	char *pathvar;
-
-	/* Null-terminated value of HOME. */
-	char *homevar;
-	size_t home_len;
-
-	size_t env_len;
-};
-
 #define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
 
-static void gsh_put_prompt(int last_status, const struct gsh_env *env_info,
-			   const char *cwd)
+static void gsh_put_prompt(const struct gsh_params *params, const char *cwd)
 {
 	const bool in_home =
-	    strncmp(cwd, env_info->homevar, env_info->home_len) == 0;
+	    strncmp(cwd, params->homevar, params->home_len) == 0;
 
 	printf((in_home ? "<%d>" GSH_PROMPT("~%s") :
 		"<%d>" GSH_PROMPT("%s")),
-	       (WIFEXITED(last_status) ? WEXITSTATUS(last_status) : 255),
-	       cwd + (in_home ? env_info->home_len : 0));
+	       (WIFEXITED(params->last_status) ?
+		WEXITSTATUS(params->last_status) : 255),
+	       cwd + (in_home ? params->home_len : 0));
 }
 
 static int gsh_puthelp()
@@ -268,7 +257,7 @@ static int gsh_recall(struct gsh_state *sh, const char *recall_arg)
 
 	printf("%s\n", cmd_it->line);
 	gsh_run_cmd(sh, cmd_it->len, cmd_it->line);
-	return sh->last_status;
+	return sh->params.last_status;
 }
 
 static void gsh_getcwd(struct gsh_workdir *wd)
@@ -303,16 +292,16 @@ size_t gsh_max_input(const struct gsh_state *sh)
 	return (size_t)sh->wd->max_input;
 }
 
-static void gsh_init_env(struct gsh_env *env_info)
+static void gsh_init_env(struct gsh_params *params)
 {
-	env_info->env_len = 0;
+	params->env_len = 0;
 	for (char **env_it = environ; *env_it; ++env_it)
-		env_info->env_len += strlen(*env_it);
+		params->env_len += strlen(*env_it);
 
-	env_info->pathvar = envz_get(*environ, env_info->env_len, "PATH");
+	params->pathvar = envz_get(*environ, params->env_len, "PATH");
 
-	env_info->homevar = envz_get(*environ, env_info->env_len, "HOME");
-	env_info->home_len = strlen(env_info->homevar);
+	params->homevar = envz_get(*environ, params->env_len, "HOME");
+	params->home_len = strlen(params->homevar);
 }
 
 static void gsh_init_wd(struct gsh_workdir *wd)
@@ -327,7 +316,7 @@ static void gsh_init_wd(struct gsh_workdir *wd)
 
 void gsh_init(struct gsh_state *sh)
 {
-	gsh_init_env((sh->env_info = malloc(sizeof(*sh->env_info))));
+	gsh_init_env(&sh->params);
 	gsh_init_wd((sh->wd = malloc(sizeof(*sh->wd))));
 
         sh->parsed = malloc(sizeof(*sh->parsed));
@@ -339,7 +328,7 @@ void gsh_init(struct gsh_state *sh)
 	sh->hist->cmd_history = sh->hist->oldest_cmd = NULL;
 	sh->hist->hist_n = 0;
 
-	sh->last_status = 0;
+	sh->params.last_status = 0;
 
 #ifndef NDEBUG
 	g_gsh_initialized = true;
@@ -348,7 +337,7 @@ void gsh_init(struct gsh_state *sh)
 
 ssize_t gsh_read_line(const struct gsh_state *sh, char **const out_line)
 {
-	gsh_put_prompt(sh->last_status, sh->env_info, sh->wd->cwd);
+	gsh_put_prompt(&sh->params, sh->wd->cwd);
 
 	ssize_t len = getline(out_line, (size_t *)&sh->wd->max_input, stdin);
 
@@ -409,20 +398,20 @@ static int gsh_exec_path(const char *pathvar,
 // TODO: Call the functions for path and for no path directly in run_cmd above?
 // Also pass sub-structs directly.
 /* Fork and exec a program. */
-static int gsh_exec(struct gsh_state *sh, const char *pathname, const char **args)
+static int gsh_exec(struct gsh_state *sh, const char *pathname,
+		    const char **args)
 {
 	pid_t cmd_pid = fork();
 
 	if (cmd_pid != 0) {
-		waitpid(cmd_pid, &sh->last_status, 0);
-		return sh->last_status;
+		waitpid(cmd_pid, &sh->params.last_status, 0);
+		return sh->params.last_status;
 	}
 
 	if (pathname)
 		execve(pathname, (char *const *)args, environ);
 	else
-		gsh_exec_path(sh->env_info->pathvar, sh->wd,
-			      args);
+		gsh_exec_path(sh->params.pathvar, sh->wd, args);
 
 	// Named program couldn't be executed.
 	gsh_bad_cmd((pathname ? pathname : args[0]), errno);
@@ -470,9 +459,9 @@ void gsh_run_cmd(struct gsh_state *sh, size_t len, char *line)
 	gsh_add_hist(sh->hist, len, line);
 
 	const char *pathname;
-	gsh_parse_line(sh->env_info, sh->parsed, &pathname, line);
+	gsh_parse_line(&sh->params, sh->parsed, &pathname, line);
 
-	sh->last_status = gsh_switch(sh, pathname, sh->parsed->tokens);
+	sh->params.last_status = gsh_switch(sh, pathname, sh->parsed->tokens);
 
 	gsh_free_parsed(sh->parsed);
 }

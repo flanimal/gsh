@@ -24,10 +24,19 @@ struct gsh_state {
         // IDEA: Execution context?
 	struct gsh_workdir *wd;
 
-	struct gsh_env *env_info;
-
         /* Parameters. */
-        int last_status;
+	struct gsh_params {
+		size_t env_len;
+
+		/* Null-terminated value of PATH. */
+		char *pathvar;
+
+		/* Null-terminated value of HOME. */
+		char *homevar;
+		size_t home_len;
+
+		int last_status;
+	} params;
 };
 
 /* Set initial values and resources for the shell. */
