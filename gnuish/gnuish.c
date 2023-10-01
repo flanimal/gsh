@@ -22,7 +22,7 @@ extern char **environ;
 /* The maximum number of arguments that can be passed on the command line. */
 #define GSH_MAX_ARGS 64
 
-#define GSH_CMD_NOT_FOUND 127
+#define GSH_EXIT_NOTFOUND 127
 
 #ifndef NDEBUG
 static bool g_gsh_initialized = false;
@@ -283,7 +283,7 @@ static void gsh_getcwd(struct gsh_workdir *wd)
 static int gsh_chdir(struct gsh_workdir *wd, const char *pathname)
 {
 	if (chdir(pathname) == -1) {
-		printf("%s\n", strerror(errno));
+		printf("%s: %s\n", pathname, strerror(errno));
 		return -1;
 	}
 
@@ -421,7 +421,7 @@ static int gsh_exec(struct gsh_state *sh, const char *pathname,
 
 	// Named program couldn't be executed.
 	gsh_bad_cmd((pathname ? pathname : args[0]), errno);
-	exit(GSH_CMD_NOT_FOUND);
+	exit(GSH_EXIT_NOTFOUND);
 }
 
 static int gsh_switch(struct gsh_state *sh, const char *pathname,
