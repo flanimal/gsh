@@ -2,7 +2,6 @@
 
 #include <unistd.h>
 #include <limits.h>
-#include <search.h>
 #include <envz.h>
 #include <sys/wait.h>
 
@@ -11,11 +10,13 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
 #include <errno.h>
 #include <assert.h>
 
 #include "gnuish.h"
+#include "builtin.h"
+#include "history.h"
+#include "system.h"
 
 extern char **environ;
 
@@ -27,36 +28,6 @@ extern char **environ;
 #ifndef NDEBUG
 static bool g_gsh_initialized = false;
 #endif
-
-struct gsh_workdir {
-	/* Current working directory of the shell process. */
-	char *cwd;
-
-	/*
-	 *      Runtime constants.
-	 */
-	/* Maximum length of newline-terminated input line on terminal. */
-	long max_input;
-
-	/* Maximum length of pathnames, including null character. */
-	long max_path;
-};
-
-/* Line history entry. */
-struct gsh_hist_ent {
-	struct gsh_hist_ent *back, *forw;
-
-	char *line;
-	size_t len;
-};
-
-struct gsh_cmd_hist {
-	/* Tail and head of command history queue. */
-	struct gsh_hist_ent *cmd_history, *oldest_cmd;
-
-	/* Number of commands in history (maximum 10). */
-	int hist_n;
-};
 
 struct gsh_parsed {
 	/* List of tokens from previous input line. */
@@ -81,33 +52,11 @@ static void gsh_put_prompt(const struct gsh_params *params, const char *cwd)
 	       cwd + (in_home ? params->home_len : 0));
 }
 
-static int gsh_puthelp()
+void gsh_bad_cmd(const char *msg, int err)
 {
-	puts("\ngsh - GNU island shell");
-	puts("\ngsh displays the current working directory in the shell prompt :");
-	puts("\t~@ /");
-	puts("\tusr/ @");
-	puts("\t/mnt/.../repos @");
-
-	puts("\nCommands");
-	puts("\n\t<command> [<arg>...]\tRun command or program with optional arguments.");
-
-	puts("\n\tr[<n>]\tExecute the nth last line.");
-	puts("\t\tThe line will be placed in history--not the `r` invocation.");
-	puts("\t\tThe line in question will be echoed to the screen before being executed.");
-
-	puts("\nShell builtins");
-	puts("\n\texit\tExit the shell.");
-	puts("\thist\tDisplay up to 10 last lines entered, numbered.");
-
-	puts("\t----");
-
-	puts("\techo\tWrite to standard output.");
-	puts("\thelp\tDisplay this help page.");
-
-	putchar('\n');
-
-	return 0;
+	printf("not a command%s %s %s%s%s\n", (msg ? ":" : ""),
+	       (msg ? msg : ""), (err ? "(" : ""), (err ? strerror(err) : ""),
+	       (err ? ")" : ""));
 }
 
 static const char *gsh_fmt_param(struct gsh_params *params,
@@ -188,94 +137,14 @@ static void gsh_parse_line(struct gsh_params *params,
 	}
 }
 
-static void
-gsh_drop_hist(struct gsh_cmd_hist *sh_hist, struct gsh_hist_ent *dropped_ent)
+static void gsh_free_parsed(struct gsh_parsed *parsed)
 {
-	sh_hist->oldest_cmd = dropped_ent->back;
-
-	remque(dropped_ent);
-
-	free(dropped_ent->line);
-	free(dropped_ent);
+	// Delete any token substitution buffers.
+	while (parsed->alloc_n > 0)
+		free((char *)parsed->alloc[parsed->alloc_n--]);
 }
 
-static struct gsh_hist_ent *new_hist_ent(struct gsh_cmd_hist *sh_hist,
-					 size_t len, const char *line)
-{
-	struct gsh_hist_ent *last_cmd = malloc(sizeof(*last_cmd));
-
-	insque(last_cmd, sh_hist->cmd_history);
-	sh_hist->cmd_history = last_cmd;
-
-	strcpy((last_cmd->line = malloc(len + 1)), line);
-	last_cmd->len = len;
-
-	return last_cmd;
-}
-
-static void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len,
-			 const char *line)
-{
-	// Recall `r` should NOT be added to history.
-	if (line[0] == 'r' && (!line[1] || isspace(line[1])))
-		return;
-
-	struct gsh_hist_ent *last_cmd = new_hist_ent(sh_hist, len, line);
-
-	if (sh_hist->hist_n == 10) {
-		gsh_drop_hist(sh_hist, sh_hist->oldest_cmd);
-		return;
-	}
-
-	if (sh_hist->hist_n == 0)
-		sh_hist->oldest_cmd = last_cmd;
-
-	++sh_hist->hist_n;
-}
-
-static int gsh_list_hist(const struct gsh_hist_ent *cmd_it)
-{
-	// It is not possible for `cmd_history` to be NULL here,
-	// as it will contain at least the `hist` invocation.
-	int cmd_n = 1;
-
-	for (; cmd_it; cmd_it = cmd_it->forw)
-		printf("%i: %s\n", cmd_n++, cmd_it->line);
-
-	return 0;
-}
-
-static void gsh_bad_cmd(const char *msg, int err)
-{
-	printf("not a command%s %s %s%s%s\n",
-	       (msg ? ":" : ""),
-	       (msg ? msg : ""),
-	       (err ? "(" : ""), (err ? strerror(err) : ""), (err ? ")" : ""));
-}
-
-// TODO: Possibly have a "prev_cmd" struct or something to pass to this,
-// instead of the entire shell state.
-/* Re-run the n-th previous line of input. */
-static int gsh_recall(struct gsh_state *sh, const char *recall_arg)
-{
-	struct gsh_hist_ent *cmd_it = sh->hist->cmd_history;
-
-	int n_arg = (recall_arg ? atoi(recall_arg) : 1);
-
-	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
-		gsh_bad_cmd("no history", 0);
-		return -1;
-	}
-
-	while (cmd_it && n_arg-- > 1)
-		cmd_it = cmd_it->forw;
-
-	printf("%s\n", cmd_it->line);
-	gsh_run_cmd(sh, cmd_it->len, cmd_it->line);
-	return sh->params.last_status;
-}
-
-static void gsh_getcwd(struct gsh_workdir *wd)
+void gsh_getcwd(struct gsh_workdir *wd)
 {
 	if (getcwd(wd->cwd, (size_t)wd->max_path))
 		return;
@@ -289,16 +158,14 @@ static void gsh_getcwd(struct gsh_workdir *wd)
 	wd->max_path = pathconf(wd->cwd, _PC_PATH_MAX);
 }
 
-static int gsh_chdir(struct gsh_workdir *wd, const char *pathname)
+static void gsh_init_wd(struct gsh_workdir *wd)
 {
-	if (chdir(pathname) == -1) {
-		printf("%s: %s\n", pathname, strerror(errno));
-		return -1;
-	}
-
+	// Get working dir and its max path length.
+	wd->cwd = malloc((size_t)(wd->max_path = _POSIX_PATH_MAX));
 	gsh_getcwd(wd);
 
-	return 0;
+	// Get maximum length of terminal input line.
+	wd->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
 }
 
 size_t gsh_max_input(const struct gsh_state *sh)
@@ -317,16 +184,6 @@ static void gsh_init_env(struct gsh_params *params)
 
 	params->homevar = envz_get(*environ, params->env_len, "HOME");
 	params->home_len = strlen(params->homevar);
-}
-
-static void gsh_init_wd(struct gsh_workdir *wd)
-{
-	// Get working dir and its max path length.
-	wd->cwd = malloc((size_t)(wd->max_path = _POSIX_PATH_MAX));
-	gsh_getcwd(wd);
-
-	// Get maximum length of terminal input line.
-	wd->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
 }
 
 void gsh_init(struct gsh_state *sh)
@@ -358,17 +215,6 @@ ssize_t gsh_read_line(const struct gsh_state *sh, char **const out_line)
 
 	(*out_line)[len - 1] = '\0';	// Remove newline.
 	return len - 1;
-}
-
-static int gsh_echo(const char *const *args)
-{
-	for (; *args; putchar(' '), ++args)
-		if (fputs(*args, stdout) == EOF)
-			return -1;
-
-	putchar('\n');
-
-	return 0;
 }
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
@@ -457,13 +303,6 @@ static int gsh_switch(struct gsh_state *sh, const char *pathname,
 
 	else
 		return gsh_exec(sh, pathname, args);
-}
-
-static void gsh_free_parsed(struct gsh_parsed *parsed)
-{
-	// Delete any token substitution buffers.
-	while (parsed->alloc_n > 0)
-		free((char *)parsed->alloc[parsed->alloc_n--]);
 }
 
 void gsh_run_cmd(struct gsh_state *sh, size_t len, char *line)

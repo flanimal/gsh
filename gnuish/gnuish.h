@@ -1,5 +1,9 @@
 #pragma once
 
+#include <unistd.h>
+
+#include <stddef.h>
+
 // TODO: Possibly move the "internal" structs to their own header file.
 
 // Working directory struct?

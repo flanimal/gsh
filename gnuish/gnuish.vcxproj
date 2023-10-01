@@ -83,11 +83,16 @@
     <RemotePreBuildEventUseInBuild>false</RemotePreBuildEventUseInBuild>
   </PropertyGroup>
   <ItemGroup>
+    <ClCompile Include="builtin.c" />
     <ClCompile Include="gnuish.c" />
+    <ClCompile Include="history.c" />
     <ClCompile Include="main.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="builtin.h" />
     <ClInclude Include="gnuish.h" />
+    <ClInclude Include="history.h" />
+    <ClInclude Include="system.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile" />
