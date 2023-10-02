@@ -47,7 +47,7 @@ int gsh_chdir(struct gsh_workdir *wd, const char *pathname)
 	return 0;
 }
 
-int gsh_echo(const char *const *args)
+int gsh_echo(char *const *args)
 {
 	for (; *args; putchar(' '), ++args)
 		if (fputs(*args, stdout) == EOF)
