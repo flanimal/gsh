@@ -105,13 +105,13 @@ static const char *gsh_expand_tok(struct gsh_params *params, const char **const 
 }
 // TODO: strtok_r
 /*      By default, a backslash \ is the _line continuation character_.
- *
+* 
         When it is the last character in an input line, it invokes a 
         secondary prompt for more input, which will be concatenated to the first
         line, and the backslash \ will be excluded.
 
         Returns true while there are still more tokens to collect, similar to strtok.
- */
+*/
 static bool gsh_next_tok(char *const line, const char **const out_tok)
 {
 	if ((*out_tok = strtok(line, " ")) == NULL)
@@ -128,35 +128,30 @@ static bool gsh_next_tok(char *const line, const char **const out_tok)
 *       Otherwise, return NULL.
  */
 static const char *gsh_parse_filename(struct gsh_params *params,
-				      const char **const out_pathname,
-				      const char **const filename)
+				      struct gsh_parsed *parsed, char *line)
 {
 	gsh_next_tok(line, &parsed->tokens[0]);
 	++parsed->token_n;
 
         // TODO: NULL sentinel instead of alloc_n
 	// Perform any substitutions.
-	const char *tok_buf = gsh_parse_tok(params, filename);
+	if ((parsed->alloc[parsed->alloc_n] =
+	     gsh_expand_tok(params, &parsed->tokens[0])))
+		parsed->alloc_n++;
 
-	// Get the pathname, whether relative or absolute, if one
-	// preceded the filename.
-	char *last_slash = strrchr(*filename, '/');
-
+	char *last_slash = strrchr(line, '/');
 	if (last_slash) {
-		*out_pathname = *filename;
-		*filename = last_slash + 1;
-	} else {
-		*out_pathname = NULL;
-	}
+		parsed->tokens[0] = last_slash + 1;
+		return line;	
+        }
 
-	return tok_buf;
+	return NULL;
 }
 
 /*	Return argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
-static void gsh_parse_line(struct gsh_params *params, struct gsh_parsed *parsed,
-			   const char **const out_pathname, char *const line)
+static bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed)
 {
 	size_t tok_n = parsed->token_n;
 
@@ -164,17 +159,20 @@ static void gsh_parse_line(struct gsh_params *params, struct gsh_parsed *parsed,
 	for (; tok_n <= GSH_MAX_ARGS &&
 	     gsh_next_tok(NULL, &parsed->tokens[tok_n]); ++tok_n) {
 
-	if ((allocated = gsh_parse_filename(params, out_pathname,
-					    &parsed->tokens[0])))
-		parsed->alloc[parsed->alloc_n++] = allocated;
+		// If next_tok returned true but the last token was NULL,
+		// then we need more input.
+		if (parsed->tokens[tok_n] == NULL) {
+			parsed->token_n = tok_n;
+			return true;
+		}
 
-	// Get arguments.
-	for (int arg_n = 1; (parsed->tokens[arg_n] = strtok(NULL, " \\")) &&
-	     arg_n <= GSH_MAX_ARGS; ++arg_n) {
-
-		if ((allocated = gsh_parse_tok(params, &parsed->tokens[arg_n])))
-			parsed->alloc[parsed->alloc_n++] = allocated;
+		if ((parsed->alloc[parsed->alloc_n] =
+		     gsh_expand_tok(params, &parsed->tokens[tok_n])))
+			parsed->alloc_n++;
 	}
+
+	// We've gotten all the input we need to parse a line.
+	return false;
 }
 
 static void gsh_free_parsed(struct gsh_parsed *parsed)
@@ -259,7 +257,7 @@ void gsh_init(struct gsh_state *sh)
 ssize_t gsh_read_line(const struct gsh_state *sh, char **const out_line)
 {
 	if (!(*sh->parsed->tokens))	// Check if called to get more input.
-	gsh_put_prompt(&sh->params, sh->wd->cwd);
+		gsh_put_prompt(&sh->params, sh->wd->cwd);
 	else
 		fputs(GSH_SECOND_PROMPT, stdout);
 
@@ -362,7 +360,11 @@ void gsh_run_cmd(struct gsh_state *sh, ssize_t len, char *line)
 	if (len == 0)
 		return;
 
-	gsh_add_hist(sh->hist, len, line);
+	gsh_add_hist(sh->hist, (size_t)len, line);
+
+	const char *pathname =
+	    gsh_parse_filename(&sh->params, sh->parsed, line);
+
 	while (gsh_parse_args(&sh->params, sh->parsed)) {
                 line += len;
 
