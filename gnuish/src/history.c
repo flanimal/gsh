@@ -88,7 +88,7 @@ int gsh_recall(struct gsh_state *sh, const char *recall_arg)
         // gets deleted.
         char *ent_line_cpy = strcpy(malloc(cmd_it->len + 1), cmd_it->line);
 
-        gsh_run_cmd(sh, cmd_it->len, ent_line_cpy);
+        gsh_run_cmd(sh, (ssize_t)cmd_it->len, ent_line_cpy);
         free(ent_line_cpy);
 
 	return sh->params.last_status;
