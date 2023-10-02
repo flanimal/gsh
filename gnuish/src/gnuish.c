@@ -26,6 +26,8 @@
 #define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
 #define GSH_SECOND_PROMPT "> "
 
+extern char **environ;
+
 struct gsh_parsed {
 	/* List of tokens from previous input line. */
 	char **tokens;
@@ -34,8 +36,6 @@ struct gsh_parsed {
 	/* Any dynamically allocated tokens. */
 	char **alloc;
 };
-
-extern char **environ;
 
 #ifndef NDEBUG
 static bool g_gsh_initialized = false;
@@ -80,7 +80,7 @@ static char *gsh_fmt_param(struct gsh_params *params, char **const var)
 	}
 }
 
-/*      Expand tokens.
+/*      Expand a token.
  *
  *      If an allocation was performed, returns the address of the buffer.
  *      Otherwise, returns NULL.
@@ -104,13 +104,15 @@ static char *gsh_expand_tok(struct gsh_params *params, char **const tok)
 }
 
 // TODO: strtok_r
-/*      By default, a backslash \ is the _line continuation character_.
-* 
-        When it is the last character in an input line, it invokes a 
-        secondary prompt for more input, which will be concatenated to the first
-        line, and the backslash \ will be excluded.
 
-        Returns true while there are still more tokens to collect, similar to strtok.
+/*      Returns true while there are still more tokens to collect,
+*	similar to strtok.
+*       
+*       By default, a backslash \ is the _line continuation character_.
+* 
+*       When it is the last character in an input line, it invokes a 
+*       secondary prompt for more input, which will be concatenated to the first
+*       line, and the backslash \ will be excluded.
 */
 static bool gsh_next_tok(char *const line, char **const out_tok)
 {
@@ -123,11 +125,13 @@ static bool gsh_next_tok(char *const line, char **const out_tok)
 	return true;		// Get more tokens.
 }
 
-/*      Retrieve the filename within the pathname.
-*       If a pathname is given, return it.
-*       Otherwise, return NULL.
+/*      Parse the first token in the input line, and place
+*       the filename in the argument array.
+* 
+*       If the first token specifies a pathname, it is returned.
+*       Otherwise, NULL is returned.
  */
-static const char *gsh_parse_filename(struct gsh_params *params,
+static char *gsh_parse_filename(struct gsh_params *params,
 				      struct gsh_parsed *parsed, char *line)
 {
 	gsh_next_tok(line, &parsed->tokens[0]);
@@ -146,8 +150,10 @@ static const char *gsh_parse_filename(struct gsh_params *params,
 	return NULL;
 }
 
-/*	Return argument list terminated with NULL, and pathname.
- *	A NULL pathname means the PATH environment variable must be used.
+/*	Parse tokens and place them into the argument array, which is 
+*       then terminated with a NULL pointer.
+* 
+*       Returns true if we need more input, false if we're done.
  */
 static bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed)
 {
@@ -157,7 +163,7 @@ static bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed)
 	for (; tok_n <= GSH_MAX_ARGS &&
 	     gsh_next_tok(NULL, &parsed->tokens[tok_n]); ++tok_n) {
 
-		// If next_tok returned true but the last token was NULL,
+		// If gsh_next_tok() returned true but the last token was NULL,
 		// then we need more input.
 		if (parsed->tokens[tok_n] == NULL) {
 			parsed->token_n = tok_n;
