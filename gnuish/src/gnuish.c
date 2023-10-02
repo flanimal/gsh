@@ -131,13 +131,14 @@ static const char *gsh_parse_filename(struct gsh_params *params,
 	return tok_buf;
 }
 
+// TODO: Line continuation with \.
 /*	Return argument list terminated with NULL, and pathname.
  *	A NULL pathname means the PATH environment variable must be used.
  */
 static void gsh_parse_line(struct gsh_params *params, struct gsh_parsed *parsed,
 			   const char **const out_pathname, char *const line)
 {
-	parsed->tokens[0] = strtok(line, " \n");
+	parsed->tokens[0] = strtok(line, " ");
 
 	const char *allocated;
 
@@ -146,7 +147,7 @@ static void gsh_parse_line(struct gsh_params *params, struct gsh_parsed *parsed,
 		parsed->alloc[parsed->alloc_n++] = allocated;
 
 	// Get arguments.
-	for (int arg_n = 1; (parsed->tokens[arg_n] = strtok(NULL, " \n")) &&
+	for (int arg_n = 1; (parsed->tokens[arg_n] = strtok(NULL, " ")) &&
 			    arg_n <= GSH_MAX_ARGS;
 	     ++arg_n) {
 		if ((allocated = gsh_parse_tok(params, &parsed->tokens[arg_n])))

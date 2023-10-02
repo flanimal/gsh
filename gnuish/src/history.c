@@ -54,7 +54,7 @@ void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len,
 	if (sh_hist->hist_n > GSH_MAX_HIST)
 		drop_hist_ent(sh_hist, sh_hist->oldest_cmd);
 }
-
+// TODO: Clear history option
 int gsh_list_hist(const struct gsh_hist_ent *cmd_it)
 {
 	// It is not possible for `cmd_history` to be NULL here,
