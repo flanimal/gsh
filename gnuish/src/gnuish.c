@@ -24,6 +24,7 @@
 #define GSH_EXIT_NOTFOUND 127
 
 #define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
+#define GSH_SECOND_PROMPT "> "
 
 struct gsh_parsed {
 	/* List of tokens from previous input line. */
@@ -43,11 +44,10 @@ static bool g_gsh_initialized = false;
 static void gsh_put_prompt(const struct gsh_params *params, const char *cwd)
 {
 	const bool in_home = strncmp(cwd, params->homevar, params->home_len) ==
-			     0;
+	    0;
 
 	const int status = WIFEXITED(params->last_status) ?
-				     WEXITSTATUS(params->last_status) :
-				     255;
+	    WEXITSTATUS(params->last_status) : 255;
 
 	printf((in_home ? "<%d>" GSH_PROMPT("~%s") : "<%d>" GSH_PROMPT("%s")),
 	       status, cwd + (in_home ? params->home_len : 0));
@@ -75,7 +75,7 @@ static const char *gsh_fmt_param(struct gsh_params *params,
 		asprintf(&subst_buf, "%d", params->last_status);
 
 		return (*var = subst_buf);
-	default: // Non-special.
+	default:		// Non-special.
 		*var = envz_get(*environ, params->env_len, &(*var)[1]);
 		return NULL;
 	}
@@ -138,7 +138,7 @@ static const char *gsh_parse_filename(struct gsh_params *params,
 static void gsh_parse_line(struct gsh_params *params, struct gsh_parsed *parsed,
 			   const char **const out_pathname, char *const line)
 {
-	parsed->tokens[0] = strtok(line, " ");
+	parsed->tokens[0] = strtok(line, " \\");
 
 	const char *allocated;
 
@@ -147,9 +147,9 @@ static void gsh_parse_line(struct gsh_params *params, struct gsh_parsed *parsed,
 		parsed->alloc[parsed->alloc_n++] = allocated;
 
 	// Get arguments.
-	for (int arg_n = 1; (parsed->tokens[arg_n] = strtok(NULL, " ")) &&
-			    arg_n <= GSH_MAX_ARGS;
-	     ++arg_n) {
+	for (int arg_n = 1; (parsed->tokens[arg_n] = strtok(NULL, " \\")) &&
+	     arg_n <= GSH_MAX_ARGS; ++arg_n) {
+
 		if ((allocated = gsh_parse_tok(params, &parsed->tokens[arg_n])))
 			parsed->alloc[parsed->alloc_n++] = allocated;
 	}
@@ -192,7 +192,7 @@ size_t gsh_max_input(const struct gsh_state *sh)
 	return (size_t)sh->wd->max_input;
 }
 
-static void gsh_init_env(struct gsh_params *params)
+static void gsh_init_params(struct gsh_params *params)
 {
 	params->env_len = 0;
 	for (char **env_it = environ; *env_it; ++env_it)
@@ -202,11 +202,13 @@ static void gsh_init_env(struct gsh_params *params)
 
 	params->homevar = envz_get(*environ, params->env_len, "HOME");
 	params->home_len = strlen(params->homevar);
+
+	params->last_status = 0;	// TODO: Designated initializer?
 }
 
 void gsh_init(struct gsh_state *sh)
 {
-	gsh_init_env(&sh->params);
+	gsh_init_params(&sh->params);
 	gsh_init_wd((sh->wd = malloc(sizeof(*sh->wd))));
 
 	sh->parsed = malloc(sizeof(*sh->parsed));
@@ -217,8 +219,6 @@ void gsh_init(struct gsh_state *sh)
 	sh->hist = malloc(sizeof(*sh->hist));
 	sh->hist->cmd_history = sh->hist->oldest_cmd = NULL;
 	sh->hist->hist_n = 0;
-
-	sh->params.last_status = 0;
 
 #ifndef NDEBUG
 	g_gsh_initialized = true;
@@ -231,7 +231,7 @@ ssize_t gsh_read_line(const struct gsh_state *sh, char **const out_line)
 
 	ssize_t len = getline(out_line, (size_t *)&sh->wd->max_input, stdin);
 
-	(*out_line)[len - 1] = '\0'; // Remove newline.
+	(*out_line)[len - 1] = '\0';	// Remove newline.
 	return len - 1;
 }
 
@@ -242,7 +242,7 @@ static void copy_path_ent(char **const dest_it, const char **const src_it)
 	for (;; ++(*dest_it), ++(*src_it)) {
 		switch (**src_it) {
 		case ':':
-			++(*src_it); // Move to next path following the colon.
+			++(*src_it);	// Move to next path following the colon.
 			/* fall through */
 		case '\0':
 			**dest_it = '\0';
@@ -334,6 +334,5 @@ void gsh_run_cmd(struct gsh_state *sh, size_t len, char *line)
 	gsh_parse_line(&sh->params, sh->parsed, &pathname, line);
 
 	sh->params.last_status = gsh_switch(sh, pathname, sh->parsed->tokens);
-
 	gsh_free_parsed(sh->parsed);
 }

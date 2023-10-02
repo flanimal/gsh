@@ -27,6 +27,7 @@ struct gsh_state {
         // IDEA: Execution context?
 	struct gsh_workdir *wd;
 
+        // TODO: Hashtable for important params?
         /* Parameters. */
 	struct gsh_params {
 		size_t env_len;
