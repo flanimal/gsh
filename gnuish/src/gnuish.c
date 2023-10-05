@@ -29,6 +29,8 @@
 extern char **environ;
 
 struct gsh_parsed {
+	bool has_pathname;
+
 	/* List of tokens from previous input line. */
 	char **tokens;
 	size_t token_n;
@@ -128,27 +130,23 @@ static bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
 }
 
 /*      Parse the first token in the input line, and place
-*       the filename in the argument array.
-* 
-*       If the first token specifies a pathname, it is returned.
-*       Otherwise, NULL is returned.
+ *      the filename in the argument array.
  */
-static char *gsh_parse_filename(struct gsh_params *params,
+static bool gsh_parse_filename(struct gsh_params *params,
 				      struct gsh_parsed *parsed, char *line)
 {
-	gsh_next_tok(line, &parsed->tokens[0]);
-	++parsed->token_n;
+	if (gsh_next_tok(parsed, line) && *parsed->token_it)
+		return true;
 
 	// Perform any substitutions.
 	gsh_expand_tok(params, parsed);
 
 	char *last_slash = strrchr(line, '/');
-	if (last_slash) {
-		parsed->tokens[0] = last_slash + 1;
-		return line;
-	}
+	if (last_slash)
+		*parsed->token_it = last_slash + 1;
 
-	return NULL;
+	parsed->has_pathname = !!last_slash;
+	return false;
 }
 
 /*	Parse tokens and place them into the argument array, which is 
@@ -363,8 +361,15 @@ void gsh_run_cmd(struct gsh_state *sh, ssize_t len, char *line)
 
 	gsh_add_hist(sh->hist, (size_t)len, line);
 
-	const char *pathname =
-	    gsh_parse_filename(&sh->params, sh->parsed, line);
+	char *line_it = line;
+	// TODO: combine, simply, put into subroutines or something
+
+	while (gsh_parse_filename(&sh->params, sh->parsed, line)) {
+		line_it += len;
+
+		if ((len = gsh_read_line(sh, &line_it)) == -1)
+			return; // Error reading line.
+	}
 
 	while (gsh_parse_args(&sh->params, sh->parsed)) {
 		line += len;
@@ -373,6 +378,9 @@ void gsh_run_cmd(struct gsh_state *sh, ssize_t len, char *line)
 			return;
 	}
 
-	sh->params.last_status = gsh_switch(sh, pathname, sh->parsed->tokens);
+	sh->params.last_status =
+		gsh_switch(sh, (sh->parsed->has_pathname ? line : NULL),
+			   sh->parsed->tokens);
+
 	gsh_free_parsed(sh->parsed);
 }
