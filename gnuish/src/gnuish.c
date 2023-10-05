@@ -46,7 +46,7 @@ static bool g_gsh_initialized = false;
 static void gsh_put_prompt(const struct gsh_params *params, const char *cwd)
 {
 	const bool in_home = strncmp(cwd, params->homevar, params->home_len) ==
-	    0;
+			     0;
 
 	const int status = WIFEXITED(params->last_status) ?
 				   WEXITSTATUS(params->last_status) :
@@ -104,10 +104,10 @@ static void gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 // TODO: strtok_r
 
 /*      Returns true while there are still more tokens to collect,
-*	similar to strtok.
-*       
+ *	similar to strtok.
+ *
  *      By default, a backslash \ is the _line continuation character_.
-* 
+ *
  *      When it is the last character in an input line, it invokes a
  *      secondary prompt for more input, which will be concatenated to the first
  *      line, and the backslash \ will be excluded.
@@ -117,7 +117,7 @@ static void gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
  *
  *      Or, in other *other* words, it means to append to the preceding token,
  *      stopping at spaces.
-*/
+ */
 static bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
 {
 	char *const next_tok =
@@ -146,7 +146,7 @@ static bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
 
 		*parsed->token_it++ = next_tok;
 		++parsed->token_n;
-}
+	}
 
 	return true;
 }
@@ -155,7 +155,7 @@ static bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
  *      the filename in the argument array.
  */
 static bool gsh_parse_filename(struct gsh_params *params,
-				      struct gsh_parsed *parsed, char *line)
+			       struct gsh_parsed *parsed, char *line)
 {
 	if (gsh_next_tok(parsed, line) && *parsed->token_it)
 		return true;
@@ -171,9 +171,9 @@ static bool gsh_parse_filename(struct gsh_params *params,
 	return false;
 }
 
-/*	Parse tokens and place them into the argument array, which is 
+/*	Parse tokens and place them into the argument array, which is
  *      then terminated with a NULL pointer.
-* 
+ *
  *      Returns true if we need more input, false if we're done.
  */
 static bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed)
@@ -391,9 +391,9 @@ void gsh_run_cmd(struct gsh_state *sh, ssize_t len, char *line)
 	}
 
 	while (gsh_parse_args(&sh->params, sh->parsed)) {
-		line += len;
+		line_it += len;
 
-		if ((len = gsh_read_line(sh, &line)) == -1)	// Get more input.
+		if ((len = gsh_read_line(sh, &line_it)) == -1)
 			return;
 	}
 
