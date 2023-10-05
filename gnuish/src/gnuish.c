@@ -32,7 +32,7 @@ struct gsh_parsed {
 	bool has_pathname;
 
 	/* List of tokens from previous input line. */
-	char **tokens;
+	char **tokens, **token_it;
 	size_t token_n;
 
 	/* Any dynamically allocated tokens. */
@@ -120,13 +120,35 @@ static void gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 */
 static bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
 {
-	if ((*out_tok = strtok(line, " ")) == NULL)
-		return false;	// Reached end of line and there wasn't a continuation.
+	char *const next_tok =
+		strtok((*parsed->token_it ? *parsed->token_it : line), " ");
 
-	if ((*out_tok)[0] == '\\' && (*out_tok)[1] == '\0')
-		*out_tok = NULL;
+	if (!next_tok)
+		// Reached the null byte, meaning there weren't any
+		// continuations. No more tokens available or needed.
+		return false;
 
-	return true;		// Get more tokens.
+	char *line_cont = strchr(next_tok, '\\');
+
+	if (!line_cont) {
+		// No line continuation, and more input available.
+		// Get more tokens.
+		*parsed->token_it++ = next_tok;
+		++parsed->token_n;
+	} else if (line_cont[1] == '\0') {
+		// Line continuation followed by null byte.
+		// Need more input to finish the current token.
+		*parsed->token_it = next_tok;
+	} else {
+		// Line continuation followed by more input.
+		for (; *line_cont; ++line_cont)
+			line_cont[0] = line_cont[1];
+
+		*parsed->token_it++ = next_tok;
+		++parsed->token_n;
+}
+
+	return true;
 }
 
 /*      Parse the first token in the input line, and place
@@ -150,24 +172,18 @@ static bool gsh_parse_filename(struct gsh_params *params,
 }
 
 /*	Parse tokens and place them into the argument array, which is 
-*       then terminated with a NULL pointer.
+ *      then terminated with a NULL pointer.
 * 
-*       Returns true if we need more input, false if we're done.
+ *      Returns true if we need more input, false if we're done.
  */
 static bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed)
 {
-	size_t tok_n = parsed->token_n;
-
 	// Get arguments.
-	for (; tok_n <= GSH_MAX_ARGS &&
-	     gsh_next_tok(NULL, &parsed->tokens[tok_n]); ++tok_n) {
-
-		// If gsh_next_tok() returned true but the last token was NULL,
-		// then we need more input.
-		if (parsed->tokens[tok_n] == NULL) {
-			parsed->token_n = tok_n;
+	while (parsed->token_n <= GSH_MAX_ARGS && gsh_next_tok(parsed, NULL)) {
+		// If gsh_next_tok() returned true but we're still
+		// on an incomplete token, then we need more input.
+		if (*parsed->token_it)
 			return true;
-		}
 
 		gsh_expand_tok(params, parsed);
 	}
@@ -176,14 +192,15 @@ static bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed)
 	return false;
 }
 
-static void gsh_free_parsed(struct gsh_parsed *parsed)
+void gsh_free_parsed(struct gsh_parsed *parsed)
 {
 	// Delete any token substitution buffers.
 	while (parsed->alloc[-1])
 		free(*parsed->alloc--);
 
-	*parsed->tokens = NULL;
-	parsed->token_n = 0;
+	// Mark tokens as empty.
+	for (; parsed->token_n > 0; --parsed->token_n)
+		*(--parsed->token_it) = NULL;
 }
 
 void gsh_getcwd(struct gsh_workdir *wd)
@@ -227,17 +244,19 @@ static void gsh_init_params(struct gsh_params *params)
 	params->homevar = envz_get(*environ, params->env_len, "HOME");
 	params->home_len = strlen(params->homevar);
 
-	params->last_status = 0;	// TODO: Designated initializer?
+	params->last_status = 0; // TODO: Designated initializer?
 }
 
 static void gsh_init_parsed(struct gsh_parsed *parsed)
 {
-	parsed->tokens = malloc(sizeof(char *) * GSH_MAX_ARGS);
-	*parsed->tokens = NULL;
+	parsed->token_it = parsed->tokens =
+		calloc(GSH_MAX_ARGS, sizeof(char *));
 	parsed->token_n = 0;
 
-	parsed->alloc = malloc(sizeof(char *) * (GSH_MAX_ARGS + 1));	// MAX_ARGS plus sentinel.
-	*parsed->alloc++ = NULL;	// Set empty sentinel.
+	parsed->alloc =
+		malloc(sizeof(char *) * (GSH_MAX_ARGS + 1)); // MAX_ARGS plus
+							     // sentinel.
+	*parsed->alloc++ = NULL; // Set empty sentinel.
 }
 
 void gsh_init(struct gsh_state *sh)
@@ -257,14 +276,14 @@ void gsh_init(struct gsh_state *sh)
 
 ssize_t gsh_read_line(const struct gsh_state *sh, char **const out_line)
 {
-	if (!(*sh->parsed->tokens))	// Check if called to get more input.
-		gsh_put_prompt(&sh->params, sh->wd->cwd);
-	else
+	if (*sh->parsed->token_it) // Check if called to get more input.
 		fputs(GSH_SECOND_PROMPT, stdout);
+	else
+		gsh_put_prompt(&sh->params, sh->wd->cwd);
 
 	ssize_t len = getline(out_line, (size_t *)&sh->wd->max_input, stdin);
 
-	(*out_line)[len - 1] = '\0';	// Remove newline.
+	(*out_line)[len - 1] = '\0'; // Remove newline.
 	return len - 1;
 }
 
@@ -275,7 +294,7 @@ static void copy_path_ent(char **const dest_it, const char **const src_it)
 	for (;; ++(*dest_it), ++(*src_it)) {
 		switch (**src_it) {
 		case ':':
-			++(*src_it);	// Move to next path following the colon.
+			++(*src_it); // Move to next path following the colon.
 			/* fall through */
 		case '\0':
 			**dest_it = '\0';

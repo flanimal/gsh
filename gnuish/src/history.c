@@ -12,6 +12,7 @@
 
 void gsh_bad_cmd(const char *msg, int err);
 
+void gsh_free_parsed(struct gsh_parsed *parsed);
 static void new_hist_ent(struct gsh_cmd_hist *sh_hist,
 					 size_t len, const char *line)
 {
@@ -67,6 +68,7 @@ int gsh_list_hist(const struct gsh_hist_ent *cmd_it)
 	return 0;
 }
 
+// TODO: Move to gnuish.c?
 /* Re-run the n-th previous line of input. */
 int gsh_recall(struct gsh_state *sh, const char *recall_arg)
 {
