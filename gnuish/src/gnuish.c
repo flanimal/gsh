@@ -47,7 +47,8 @@ static void gsh_put_prompt(const struct gsh_params *params, const char *cwd)
 	    0;
 
 	const int status = WIFEXITED(params->last_status) ?
-	    WEXITSTATUS(params->last_status) : 255;
+				   WEXITSTATUS(params->last_status) :
+				   255;
 
 	printf((in_home ? "<%d>" GSH_PROMPT("~%s") : "<%d>" GSH_PROMPT("%s")),
 	       status, cwd + (in_home ? params->home_len : 0));
@@ -61,45 +62,40 @@ void gsh_bad_cmd(const char *msg, int err)
 }
 
 /*      Substitute a parameter reference with its value.
- *
- *      If an allocation was performed, returns the address of the buffer.
- *      Otherwise, returns NULL.
  */
-static char *gsh_fmt_param(struct gsh_params *params, char **const var)
+static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed)
 {
-	char *subst_buf;
-
-	switch ((*var)[1]) {
+	switch (parsed->token_it[-1][1]) {
 	case '?':
-		asprintf(&subst_buf, "%d", params->last_status);
+		asprintf(parsed->alloc, "%d", params->last_status);
 
-		return (*var = subst_buf);
-	default:		// Non-special.
-		*var = envz_get(*environ, params->env_len, &(*var)[1]);
-		return NULL;
+		parsed->token_it[-1] = *parsed->alloc++;
+		break;
+	default: // Non-special.
+		parsed->token_it[-1] = envz_get(*environ, params->env_len,
+						&parsed->token_it[-1][2]);
+		break;
 	}
 }
 
-/*      Expand a token.
- *
- *      If an allocation was performed, returns the address of the buffer.
- *      Otherwise, returns NULL.
+/*      Expand the last token.
  */
-static char *gsh_expand_tok(struct gsh_params *params, char **const tok)
+static void gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 {
-	char *subst_buf;
-
 	// TODO: globbing, piping
-	switch ((*tok)[0]) {
+	switch (parsed->token_it[-1][0]) {
 	case '$':
-		return gsh_fmt_param(params, tok);
+		gsh_fmt_param(params, parsed);
+		break;
 	case '~':
-		subst_buf = malloc(strlen(*tok) + params->home_len + 1);
-		strcpy(stpcpy(subst_buf, params->homevar), *tok + 1);
+		*parsed->alloc = malloc(strlen(parsed->token_it[-1]) +
+					params->home_len + 1);
 
-		return (*tok = subst_buf);
-	default:
-		return NULL;
+		strcpy(stpcpy(*parsed->alloc, params->homevar),
+		       &parsed->token_it[-1][1]);
+
+		parsed->token_it[-1] = *parsed->alloc++;
+		break;
 	}
 }
 
@@ -108,13 +104,19 @@ static char *gsh_expand_tok(struct gsh_params *params, char **const tok)
 /*      Returns true while there are still more tokens to collect,
 *	similar to strtok.
 *       
-*       By default, a backslash \ is the _line continuation character_.
+ *      By default, a backslash \ is the _line continuation character_.
 * 
-*       When it is the last character in an input line, it invokes a 
-*       secondary prompt for more input, which will be concatenated to the first
-*       line, and the backslash \ will be excluded.
+ *      When it is the last character in an input line, it invokes a
+ *      secondary prompt for more input, which will be concatenated to the first
+ *      line, and the backslash \ will be excluded.
+ *
+ *      Or, in other words, it concatenates what appears on both sides of it,
+ *      skipping null bytes and newlines, but stopping at spaces.
+ *
+ *      Or, in other *other* words, it means to append to the preceding token,
+ *      stopping at spaces.
 */
-static bool gsh_next_tok(char *const line, char **const out_tok)
+static bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
 {
 	if ((*out_tok = strtok(line, " ")) == NULL)
 		return false;	// Reached end of line and there wasn't a continuation.
@@ -138,8 +140,7 @@ static char *gsh_parse_filename(struct gsh_params *params,
 	++parsed->token_n;
 
 	// Perform any substitutions.
-	if ((*parsed->alloc = gsh_expand_tok(params, &parsed->tokens[0])))
-		++parsed->alloc;
+	gsh_expand_tok(params, parsed);
 
 	char *last_slash = strrchr(line, '/');
 	if (last_slash) {
@@ -170,9 +171,7 @@ static bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed)
 			return true;
 		}
 
-		if ((*parsed->alloc =
-		     gsh_expand_tok(params, &parsed->tokens[tok_n])))
-			++parsed->alloc;
+		gsh_expand_tok(params, parsed);
 	}
 
 	// We've gotten all the input we need to parse a line.
