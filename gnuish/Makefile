@@ -10,6 +10,8 @@ gsh : $(objects)
 $(objects): obj/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@ 
 
-.PHONY : clean
-clean :
-	rm -f obj/*.o src/*.{h,c} 
+.PHONY : clean softclean 
+clean : 
+        rm -rf obj/* src/*
+softclean :
+	rm -f obj/*
