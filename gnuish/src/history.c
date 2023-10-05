@@ -13,6 +13,7 @@
 void gsh_bad_cmd(const char *msg, int err);
 
 void gsh_free_parsed(struct gsh_parsed *parsed);
+
 static void new_hist_ent(struct gsh_cmd_hist *sh_hist,
 					 size_t len, const char *line)
 {
@@ -85,6 +86,10 @@ int gsh_recall(struct gsh_state *sh, const char *recall_arg)
 		cmd_it = cmd_it->forw;
 
 	printf("%s\n", cmd_it->line);
+
+	// Ensure that parse state from recall invocation is not
+	// reused.
+	gsh_free_parsed(sh->parsed);
 
         // Make a copy so we don't lose it if the history entry
         // gets deleted.
