@@ -49,8 +49,7 @@ static void gsh_put_prompt(const struct gsh_params *params, const char *cwd)
 	    0;
 
 	const int status = WIFEXITED(params->last_status) ?
-				   WEXITSTATUS(params->last_status) :
-				   255;
+	    WEXITSTATUS(params->last_status) : 255;
 
 	printf((in_home ? "<%d>" GSH_PROMPT("~%s") : "<%d>" GSH_PROMPT("%s")),
 	       status, cwd + (in_home ? params->home_len : 0));
@@ -73,7 +72,7 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed)
 
 		parsed->token_it[-1] = *parsed->alloc++;
 		break;
-	default: // Non-special.
+	default:		// Non-special.
 		parsed->token_it[-1] = envz_get(*environ, params->env_len,
 						&parsed->token_it[-1][2]);
 		break;
@@ -253,8 +252,8 @@ static void gsh_init_parsed(struct gsh_parsed *parsed)
 	    calloc(GSH_MAX_ARGS, sizeof(char *));
 	parsed->token_n = 0;
 
-	parsed->alloc = malloc(sizeof(char *) * (GSH_MAX_ARGS + 1));	// MAX_ARGS plus
-	// sentinel.
+        // MAX_ARGS plus sentinel.
+	parsed->alloc = malloc(sizeof(char *) * (GSH_MAX_ARGS + 1));
 	*parsed->alloc++ = NULL; // Set empty sentinel.
 }
 
@@ -268,7 +267,7 @@ void gsh_init(struct gsh_state *sh)
 	sh->hist->cmd_history = sh->hist->oldest_cmd = NULL;
 	sh->hist->hist_n = 0;
 
-        sh->line_it = sh->line = malloc((size_t)sh->wd->max_input);
+	sh->line_it = sh->line = malloc((size_t)sh->wd->max_input);
 	sh->input_len = 0;
 
 #ifndef NDEBUG
@@ -283,20 +282,21 @@ bool gsh_read_line(struct gsh_state *sh)
 		sh->line_it += sh->input_len;
 
 		fputs(GSH_SECOND_PROMPT, stdout);
-        } else {
+	} else {
 		sh->line_it = sh->line;
 		sh->input_len = 0;
 
 		gsh_put_prompt(&sh->params, sh->wd->cwd);
 	}
 
+        // FIXME: Correctly handle if getline resizes the buffer.
 	size_t max_input = gsh_max_input(sh) - sh->input_len;
-        ssize_t len = getline(&sh->line_it, &max_input, stdin);
+	ssize_t len = getline(&sh->line_it, &max_input, stdin);
 
 	if (len == -1)
 		return false;
 
-	sh->line_it[len - 1] = '\0'; // Remove newline.
+	sh->line_it[len - 1] = '\0';	// Remove newline.
 	sh->input_len += (size_t)(len - 1);
 
 	return true;
@@ -309,7 +309,7 @@ static void copy_path_ent(char **const dest_it, const char **const src_it)
 	for (;; ++(*dest_it), ++(*src_it)) {
 		switch (**src_it) {
 		case ':':
-			++(*src_it); // Move to next path following the colon.
+			++(*src_it);	// Move to next path following the colon.
 			/* fall through */
 		case '\0':
 			**dest_it = '\0';
@@ -386,16 +386,18 @@ static int gsh_recall(struct gsh_state *sh, const char *recall_arg)
 
 	// Make a copy so we don't lose it if the history entry
 	// gets deleted.
-	sh->line_it     = strcpy(sh->line, cmd_it->line);
-	sh->input_len   = cmd_it->len;
+	sh->line_it = strcpy(sh->line, cmd_it->line);
+	sh->input_len = cmd_it->len;
 
 	gsh_run_cmd(sh);
 
 	return sh->params.last_status;
 }
 
-static int gsh_switch(struct gsh_state *sh, const char *pathname, char **args)
+static int gsh_switch(struct gsh_state *sh)
 {
+	char **args = sh->parsed->tokens;
+
 	// TODO: hash table or something
 	if (strcmp(args[0], "cd") == 0)
 		return gsh_chdir(sh->wd, args[1]);
@@ -416,7 +418,7 @@ static int gsh_switch(struct gsh_state *sh, const char *pathname, char **args)
 		exit(EXIT_SUCCESS);
 
 	else
-		return gsh_exec(sh, pathname, args);
+		return gsh_exec(sh, (sh->parsed->has_pathname ? sh->line : NULL), args);
 }
 
 void gsh_run_cmd(struct gsh_state *sh)
@@ -434,9 +436,7 @@ void gsh_run_cmd(struct gsh_state *sh)
 		if (!gsh_read_line(sh))
 			return;
 
-	sh->params.last_status =
-	    gsh_switch(sh, (sh->parsed->has_pathname ? sh->line : NULL),
-		       sh->parsed->tokens);
+	sh->params.last_status = gsh_switch(sh);
 
 	gsh_free_parsed(sh->parsed);
 }
