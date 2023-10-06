@@ -278,14 +278,19 @@ void gsh_init(struct gsh_state *sh)
 
 bool gsh_read_line(struct gsh_state *sh)
 {
-	if (*sh->parsed->token_it)	// Check if called to get more input.
-		fputs(GSH_SECOND_PROMPT, stdout);
-	else
-		gsh_put_prompt(&sh->params, sh->wd->cwd);
+	// Check if called to get more input.
+	if (*sh->parsed->token_it) {
+		sh->line_it += sh->input_len;
 
-	sh->line_it += sh->input_len;
+		fputs(GSH_SECOND_PROMPT, stdout);
+        } else {
+		sh->line_it = sh->line;
+		sh->input_len = 0;
+
+		gsh_put_prompt(&sh->params, sh->wd->cwd);
+	}
+
 	size_t max_input = gsh_max_input(sh) - sh->input_len;
-	
         ssize_t len = getline(&sh->line_it, &max_input, stdin);
 
 	if (len == -1)
@@ -434,7 +439,4 @@ void gsh_run_cmd(struct gsh_state *sh)
 		       sh->parsed->tokens);
 
 	gsh_free_parsed(sh->parsed);
-
-	sh->line_it = sh->line;
-	sh->input_len = 0;
 }
