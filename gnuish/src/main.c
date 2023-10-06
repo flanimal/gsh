@@ -15,8 +15,8 @@ int main(__attribute_maybe_unused__ int argc,
 	/* Main loop. */
 	char *line = malloc(gsh_max_input(&sh_state));
 
-	for (ssize_t len; (len = gsh_read_line(&sh_state, &line)) != -1; )
-		gsh_run_cmd(&sh_state, len, line);
+	while (gsh_read_line(&sh_state, &line))
+		gsh_run_cmd(&sh_state, line);
         
 	printf("%s\n", strerror(errno));
 	exit(EXIT_FAILURE);

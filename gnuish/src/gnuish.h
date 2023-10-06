@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <stddef.h>
+#include <stdbool.h>
 
 // TODO: Possibly move the "internal" structs to their own header file.
 
@@ -52,8 +53,8 @@ size_t gsh_max_input(const struct gsh_state *sh);
 
 /* Get a null-terminated line of input from the terminal,
  * including the newline. */
-ssize_t gsh_read_line(const struct gsh_state *sh, char **const out_line);
+bool gsh_read_line(const struct gsh_state *sh, char **const out_line);
 
 /* Execute a null-terminated line of input.
  * The line will be modified by calls to `strtok`. */
-void gsh_run_cmd(struct gsh_state *sh, ssize_t len, char *line);
+void gsh_run_cmd(struct gsh_state *sh, char *line);

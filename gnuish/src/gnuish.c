@@ -37,6 +37,8 @@ struct gsh_parsed {
 
 	/* Any dynamically allocated tokens. */
 	char **alloc;
+
+	size_t input_len;
 };
 
 #ifndef NDEBUG
@@ -46,7 +48,7 @@ static bool g_gsh_initialized = false;
 static void gsh_put_prompt(const struct gsh_params *params, const char *cwd)
 {
 	const bool in_home = strncmp(cwd, params->homevar, params->home_len) ==
-			     0;
+	    0;
 
 	const int status = WIFEXITED(params->last_status) ?
 				   WEXITSTATUS(params->last_status) :
@@ -121,7 +123,7 @@ static void gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 static bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
 {
 	char *const next_tok =
-		strtok((*parsed->token_it ? *parsed->token_it : line), " ");
+	    strtok((*parsed->token_it ? *parsed->token_it : line), " ");
 
 	if (!next_tok)
 		// Reached the null byte, meaning there weren't any
@@ -201,6 +203,8 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 	// Mark tokens as empty.
 	for (; parsed->token_n > 0; --parsed->token_n)
 		*(--parsed->token_it) = NULL;
+
+	parsed->input_len = 0;
 }
 
 void gsh_getcwd(struct gsh_workdir *wd)
@@ -244,19 +248,20 @@ static void gsh_init_params(struct gsh_params *params)
 	params->homevar = envz_get(*environ, params->env_len, "HOME");
 	params->home_len = strlen(params->homevar);
 
-	params->last_status = 0; // TODO: Designated initializer?
+	params->last_status = 0;
 }
 
 static void gsh_init_parsed(struct gsh_parsed *parsed)
 {
 	parsed->token_it = parsed->tokens =
-		calloc(GSH_MAX_ARGS, sizeof(char *));
+	    calloc(GSH_MAX_ARGS, sizeof(char *));
 	parsed->token_n = 0;
 
-	parsed->alloc =
-		malloc(sizeof(char *) * (GSH_MAX_ARGS + 1)); // MAX_ARGS plus
-							     // sentinel.
+	parsed->alloc = malloc(sizeof(char *) * (GSH_MAX_ARGS + 1));	// MAX_ARGS plus
+	// sentinel.
 	*parsed->alloc++ = NULL; // Set empty sentinel.
+
+        parsed->input_len = 0;
 }
 
 void gsh_init(struct gsh_state *sh)
@@ -274,17 +279,35 @@ void gsh_init(struct gsh_state *sh)
 #endif
 }
 
-ssize_t gsh_read_line(const struct gsh_state *sh, char **const out_line)
+bool gsh_read_line(const struct gsh_state *sh, char **const out_line)
 {
-	if (*sh->parsed->token_it) // Check if called to get more input.
+	if (*sh->parsed->token_it)	// Check if called to get more input.
 		fputs(GSH_SECOND_PROMPT, stdout);
 	else
 		gsh_put_prompt(&sh->params, sh->wd->cwd);
 
-	ssize_t len = getline(out_line, (size_t *)&sh->wd->max_input, stdin);
+	*out_line += sh->parsed->input_len;
+	size_t max_input = gsh_max_input(sh) - sh->parsed->input_len;
+	
+        ssize_t len = getline(out_line, &max_input, stdin);
 
-	(*out_line)[len - 1] = '\0'; // Remove newline.
-	return len - 1;
+	if (len == -1)
+		return false;
+	// FIXME: If there are already characters in the buffer,
+	// yet we still use the same maximum length, there is a possibility
+	// we will overflow the buffer. 
+	// 
+	// getline() will NOT automatically resize
+	// the buffer in this case, either, since as far as it knows the buffer length
+	// is still below max_input.
+	// 
+	// The simplest solution would be to store the current length of the buffer
+	// in gsh_state or gsh_parsed.
+
+	(*out_line)[len - 1] = '\0';	// Remove newline.
+	sh->parsed->input_len += (size_t)(len - 1);
+
+	return true;
 }
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
@@ -405,33 +428,29 @@ static int gsh_switch(struct gsh_state *sh, const char *pathname, char **args)
 		return gsh_exec(sh, pathname, args);
 }
 
-void gsh_run_cmd(struct gsh_state *sh, ssize_t len, char *line)
+void gsh_run_cmd(struct gsh_state *sh, char *line)
 {
-	if (len == 0)
+	if (sh->parsed->input_len == 0)
 		return;
 
-	gsh_add_hist(sh->hist, (size_t)len, line);
+	gsh_add_hist(sh->hist, sh->parsed->input_len, line);
 
 	char *line_it = line;
-	// TODO: combine, simply, put into subroutines or something
+	// TODO: Should we put the input loop in the parse_* functions
+        // and take the argument tokenization loop out instead?
+        //      This would keep with the "one-token-per-call" pattern.
 
-	while (gsh_parse_filename(&sh->params, sh->parsed, line)) {
-		line_it += len;
+	while (gsh_parse_filename(&sh->params, sh->parsed, line))
+		if (!gsh_read_line(sh, &line_it))
+			return;	// Error reading line.
 
-		if ((len = gsh_read_line(sh, &line_it)) == -1)
-			return; // Error reading line.
-	}
-
-	while (gsh_parse_args(&sh->params, sh->parsed)) {
-		line_it += len;
-
-		if ((len = gsh_read_line(sh, &line_it)) == -1)
+	while (gsh_parse_args(&sh->params, sh->parsed))
+		if (!gsh_read_line(sh, &line_it))
 			return;
-	}
 
 	sh->params.last_status =
-		gsh_switch(sh, (sh->parsed->has_pathname ? line : NULL),
-			   sh->parsed->tokens);
+	    gsh_switch(sh, (sh->parsed->has_pathname ? line : NULL),
+		       sh->parsed->tokens);
 
 	gsh_free_parsed(sh->parsed);
 }
