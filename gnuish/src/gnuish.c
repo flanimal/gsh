@@ -112,6 +112,8 @@ void gsh_init(struct gsh_state *sh)
 
 bool gsh_read_line(struct gsh_state *sh)
 {
+	assert(g_gsh_initialized);
+
 	// Check if called to get more input.
 	if (*sh->parsed->token_it) {
 		sh->line_it += sh->input_len;
@@ -254,6 +256,8 @@ static int gsh_switch(struct gsh_state *sh)
 
 void gsh_run_cmd(struct gsh_state *sh)
 {
+	assert(g_gsh_initialized);
+
 	if (sh->input_len == 0)
 		return;
 
