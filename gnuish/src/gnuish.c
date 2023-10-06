@@ -109,7 +109,7 @@ static void gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 
 /*      Returns true while there are still more tokens to collect,
  *	similar to strtok.
- *
+ * 
  *      Increments token_n and token_it by 1 for each completed token.
  * 
  *      ***
@@ -269,7 +269,7 @@ static void gsh_init_parsed(struct gsh_parsed *parsed)
 	    calloc(GSH_MAX_ARGS, sizeof(char *));
 	parsed->token_n = 0;
 
-        // MAX_ARGS plus sentinel.
+	// MAX_ARGS plus sentinel.
 	parsed->alloc = malloc(sizeof(char *) * (GSH_MAX_ARGS + 1));
 	*parsed->alloc++ = NULL;	// Set empty sentinel.
 }
@@ -306,7 +306,7 @@ bool gsh_read_line(struct gsh_state *sh)
 		gsh_put_prompt(&sh->params, sh->wd->cwd);
 	}
 
-        // FIXME: Correctly handle if getline resizes the buffer.
+	// FIXME: Correctly handle if getline resizes the buffer.
 	size_t max_input = gsh_max_input(sh) - sh->input_len;
 	ssize_t len = getline(&sh->line_it, &max_input, stdin);
 
@@ -361,7 +361,7 @@ static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
 // TODO: Call the functions for path and for no path directly in run_cmd above?
 // Also pass sub-structs directly.
 /* Fork and exec a program. */
-static int gsh_exec(struct gsh_state *sh, const char *pathname, char **args)
+static int gsh_exec(struct gsh_state *sh, char **args)
 {
 	pid_t cmd_pid = fork();
 
@@ -370,13 +370,13 @@ static int gsh_exec(struct gsh_state *sh, const char *pathname, char **args)
 		return sh->params.last_status;
 	}
 
-	if (pathname)
-		execve(pathname, (char *const *)args, environ);
+	if (sh->parsed->has_pathname)
+		execve(sh->line, (char *const *)args, environ);
 	else
 		gsh_exec_path(sh->params.pathvar, sh->wd, args);
 
 	// Named program couldn't be executed.
-	gsh_bad_cmd((pathname ? pathname : args[0]), errno);
+	gsh_bad_cmd(sh->line, errno);
 	exit(GSH_EXIT_NOTFOUND);
 }
 
@@ -435,7 +435,7 @@ static int gsh_switch(struct gsh_state *sh)
 		exit(EXIT_SUCCESS);
 
 	else
-		return gsh_exec(sh, (sh->parsed->has_pathname ? sh->line : NULL), args);
+		return gsh_exec(sh, args);
 }
 
 void gsh_run_cmd(struct gsh_state *sh)
