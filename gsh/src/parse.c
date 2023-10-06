@@ -33,7 +33,7 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed)
 		break;
 	default: // Non-special.
 		parsed->token_it[-1] = envz_get(*environ, params->env_len,
-						&parsed->token_it[-1][2]);
+						&parsed->token_it[-1][1]);
 		break;
 	}
 }
