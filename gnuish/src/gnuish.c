@@ -67,10 +67,13 @@ static void gsh_init_wd(struct gsh_workdir *wd)
 	wd->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
 }
 
-size_t gsh_max_input(const struct gsh_state *sh)
+/*	The maximum length of an input line on the terminal
+ *	that will currently be accepted, not including the newline
+ *	or null byte.
+ */
+static size_t gsh_max_input(const struct gsh_state *sh)
 {
-	assert(g_gsh_initialized);
-	return (size_t)sh->wd->max_input;
+	return (size_t)sh->wd->max_input - sh->input_len;
 }
 
 static void gsh_init_params(struct gsh_params *params)

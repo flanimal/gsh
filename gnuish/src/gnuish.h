@@ -38,10 +38,7 @@ struct gsh_state {
 /* Set initial values and resources for the shell. */
 void gsh_init(struct gsh_state *sh);
 
-size_t gsh_max_input(const struct gsh_state *sh);
-
-/* Get a null-terminated line of input from the terminal,
- * including the newline. */
+/* Get a null-terminated line of input from the terminal. */
 bool gsh_read_line(struct gsh_state *sh);
 
 /* Execute a null-terminated line of input.
