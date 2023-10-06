@@ -91,11 +91,13 @@
     <ClCompile Include="src\gnuish.c" />
     <ClCompile Include="src\history.c" />
     <ClCompile Include="src\main.c" />
+    <ClCompile Include="src\parse.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\builtin.h" />
     <ClInclude Include="src\gnuish.h" />
     <ClInclude Include="src\history.h" />
+    <ClInclude Include="src\parse.h" />
     <ClInclude Include="src\system.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-
 #include <unistd.h>
 #include <limits.h>
 #include <envz.h>
@@ -14,35 +12,15 @@
 #include <assert.h>
 
 #include "gnuish.h"
+#include "parse.h"
 #include "builtin.h"
 #include "history.h"
 #include "system.h"
-
-/* The maximum number of arguments that can be passed on the command line. */
-#define GSH_MAX_ARGS 64
 
 #define GSH_EXIT_NOTFOUND 127
 
 #define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
 #define GSH_SECOND_PROMPT "> "
-
-extern char **environ;
-
-struct gsh_parsed {
-	bool has_pathname;
-
-	/* The tokens gotten from the current input line. */
-	char **tokens;
-
-	/* The token that is currently being parsed. */
-	char **token_it;
-
-	/* Number of complete tokens so far. */
-	size_t token_n;
-
-	/* Buffers for any substitutions performed on tokens. */
-	char **alloc;
-};
 
 #ifndef NDEBUG
 static bool g_gsh_initialized = false;
@@ -65,158 +43,6 @@ void gsh_bad_cmd(const char *msg, int err)
 	printf("not a command%s %s %s%s%s\n", (msg ? ":" : ""),
 	       (msg ? msg : ""), (err ? "(" : ""), (err ? strerror(err) : ""),
 	       (err ? ")" : ""));
-}
-
-/*      Substitute a parameter reference with its value.
- */
-static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed)
-{
-	switch (parsed->token_it[-1][1]) {
-	case '?':
-		asprintf(parsed->alloc, "%d", params->last_status);
-
-		parsed->token_it[-1] = *parsed->alloc++;
-		break;
-	default:		// Non-special.
-		parsed->token_it[-1] = envz_get(*environ, params->env_len,
-						&parsed->token_it[-1][2]);
-		break;
-	}
-}
-
-/*      Expand the last token.
- */
-static void gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
-{
-	// TODO: globbing, piping
-	switch (parsed->token_it[-1][0]) {
-	case '$':
-		gsh_fmt_param(params, parsed);
-		break;
-	case '~':
-		*parsed->alloc = malloc(strlen(parsed->token_it[-1]) +
-					params->home_len + 1);
-
-		strcpy(stpcpy(*parsed->alloc, params->homevar),
-		       &parsed->token_it[-1][1]);
-
-		parsed->token_it[-1] = *parsed->alloc++;
-		break;
-	}
-}
-
-// TODO: strtok_r
-
-/*      Returns true while there are still more tokens to collect,
- *	similar to strtok.
- * 
- *      Increments token_n and token_it by 1 for each completed token.
- * 
- *      ***
- *
- *      By default, a backslash \ is the _line continuation character_.
- *
- *      When it is the last character in an input line, it invokes a
- *      secondary prompt for more input, which will be concatenated to the first
- *      line, and the backslash \ will be excluded.
- *
- *      Or, in other words, it concatenates what appears on both sides of it,
- *      skipping null bytes and newlines, but stopping at spaces.
- *
- *      Or, in other *other* words, it means to append to the preceding token,
- *      stopping at spaces.
- */
-static bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
-{
-	char *const next_tok =
-	    strtok((*parsed->token_it ? *parsed->token_it : line), " ");
-
-	if (!next_tok)
-		// Reached the null byte, meaning there weren't any
-		// continuations. No more tokens available or needed.
-		return false;
-
-	char *line_cont = strchr(next_tok, '\\');
-
-	if (!line_cont) {
-		// No line continuation, and more input available.
-		// Get more tokens.
-		*parsed->token_it++ = next_tok;
-		++parsed->token_n;
-	} else if (line_cont[1] == '\0') {
-		// Line continuation followed by null byte.
-		// Need more input to finish the current token.
-		*parsed->token_it = next_tok;
-	} else {
-		// Line continuation followed by more input.
-		for (; *line_cont; ++line_cont)
-			line_cont[0] = line_cont[1];
-
-		*parsed->token_it++ = next_tok;
-		++parsed->token_n;
-	}
-
-	return true;
-}
-
-/*      Parse the first token in the input line, and place
- *      the filename in the argument array.
- * 
- *      Returns true if we need more input to parse a filename, 
- *      false if we're done.
- */
-static bool gsh_parse_filename(struct gsh_params *params,
-			       struct gsh_parsed *parsed, char *line)
-{
-	// Immediately return if we already got the filename.
-	if (parsed->token_n > 0)
-		return false;
-
-	if (gsh_next_tok(parsed, line) && *parsed->token_it)
-		return true;	// Need more input.
-
-	// Perform any substitutions.
-	gsh_expand_tok(params, parsed);
-
-	char *last_slash = strrchr(line, '/');
-	if (last_slash)
-		*parsed->token_it = last_slash + 1;
-
-	parsed->has_pathname = !!last_slash;
-	return false;
-}
-
-/*	Parse tokens and place them into the argument array, which is
- *      then terminated with a NULL pointer.
- *
- *      Returns true if we need more input to parse an argument, 
- *      false if we're done.
- */
-static bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed)
-{
-	// Get arguments.
-	while (parsed->token_n <= GSH_MAX_ARGS && gsh_next_tok(parsed, NULL)) {
-		// If gsh_next_tok() returned true but we're still
-		// on an incomplete token, then we need more input.
-		if (*parsed->token_it)
-			return true;
-
-		gsh_expand_tok(params, parsed);
-	}
-
-	// We've gotten all the input we need to parse a line.
-	return false;
-}
-
-void gsh_free_parsed(struct gsh_parsed *parsed)
-{
-	// Delete any token substitution buffers.
-	while (parsed->alloc[-1])
-		free(*parsed->alloc--);
-
-	// Mark tokens as empty.
-	for (; parsed->token_n > 0; --parsed->token_n)
-		*(--parsed->token_it) = NULL;
 }
 
 void gsh_getcwd(struct gsh_workdir *wd)
@@ -261,17 +87,6 @@ static void gsh_init_params(struct gsh_params *params)
 	params->home_len = strlen(params->homevar);
 
 	params->last_status = 0;
-}
-
-static void gsh_init_parsed(struct gsh_parsed *parsed)
-{
-	parsed->token_it = parsed->tokens =
-	    calloc(GSH_MAX_ARGS, sizeof(char *));
-	parsed->token_n = 0;
-
-	// MAX_ARGS plus sentinel.
-	parsed->alloc = malloc(sizeof(char *) * (GSH_MAX_ARGS + 1));
-	*parsed->alloc++ = NULL;	// Set empty sentinel.
 }
 
 void gsh_init(struct gsh_state *sh)
@@ -358,8 +173,6 @@ static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
 	return -1;
 }
 
-// TODO: Call the functions for path and for no path directly in run_cmd above?
-// Also pass sub-structs directly.
 /* Fork and exec a program. */
 static int gsh_exec(struct gsh_state *sh, char **args)
 {

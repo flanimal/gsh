@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 
-objects = $(addprefix obj/, main.o gnuish.o builtin.o history.o)
+objects = $(addprefix obj/, main.o gnuish.o builtin.o history.o parse.o)
 
 CFLAGS = -O0 -Werror -Wall -Wextra -fno-omit-frame-pointer -std=gnu11
 
@@ -12,6 +12,6 @@ $(objects): obj/%.o: src/%.c
 
 .PHONY : clean softclean 
 clean : 
-        rm -rf obj/* src/*
+	rm -rf obj/* src/*
 softclean :
 	rm -f obj/*
