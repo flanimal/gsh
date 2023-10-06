@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #include "gsh.h"
 #include "parse.h"
@@ -20,7 +21,9 @@ void gsh_init_parsed(struct gsh_parsed *parsed)
 	*parsed->alloc++ = NULL; // Set empty sentinel.
 }
 
-void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed)
+/*      Substitute a parameter reference with its value.
+ */
+static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed)
 {
 	switch (parsed->token_it[-1][1]) {
 	case '?':
@@ -35,8 +38,12 @@ void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed)
 	}
 }
 
-void gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
+/*      Expand the last token.
+ */
+static void gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 {
+	assert(parsed->token_n > 0);
+
 	// TODO: globbing, piping
 	switch (parsed->token_it[-1][0]) {
 	case '$':
@@ -54,7 +61,28 @@ void gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 	}
 }
 
-bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
+// TODO: strtok_r
+
+/*      Returns true while there are still more tokens to collect,
+ *	similar to strtok.
+ *
+ *      Increments token_n and token_it by 1 for each completed token.
+ *
+ *      ***
+ *
+ *      By default, a backslash \ is the _line continuation character_.
+ *
+ *      When it is the last character in an input line, it invokes a
+ *      secondary prompt for more input, which will be concatenated to the first
+ *      line, and the backslash \ will be excluded.
+ *
+ *      Or, in other words, it concatenates what appears on both sides of it,
+ *      skipping null bytes and newlines, but stopping at spaces.
+ *
+ *      Or, in other *other* words, it means to append to the preceding token,
+ *      stopping at spaces.
+ */
+static bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
 {
 	char *const next_tok =
 		strtok((*parsed->token_it ? *parsed->token_it : line), " ");
