@@ -168,8 +168,12 @@ static bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
 static bool gsh_parse_filename(struct gsh_params *params,
 			       struct gsh_parsed *parsed, char *line)
 {
+	// Immediately return if we already got the filename.
+	if (parsed->token_n > 0)
+		return false;
+
 	if (gsh_next_tok(parsed, line) && *parsed->token_it)
-		return true;
+		return true;	// Need more input.
 
 	// Perform any substitutions.
 	gsh_expand_tok(params, parsed);
@@ -185,7 +189,8 @@ static bool gsh_parse_filename(struct gsh_params *params,
 /*	Parse tokens and place them into the argument array, which is
  *      then terminated with a NULL pointer.
  *
- *      Returns true if we need more input, false if we're done.
+ *      Returns true if we need more input to parse an argument, 
+ *      false if we're done.
  */
 static bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed)
 {
@@ -266,7 +271,7 @@ static void gsh_init_parsed(struct gsh_parsed *parsed)
 
         // MAX_ARGS plus sentinel.
 	parsed->alloc = malloc(sizeof(char *) * (GSH_MAX_ARGS + 1));
-	*parsed->alloc++ = NULL; // Set empty sentinel.
+	*parsed->alloc++ = NULL;	// Set empty sentinel.
 }
 
 void gsh_init(struct gsh_state *sh)
@@ -440,13 +445,11 @@ void gsh_run_cmd(struct gsh_state *sh)
 
 	gsh_add_hist(sh->hist, sh->input_len, sh->line);
 
-	while (gsh_parse_filename(&sh->params, sh->parsed, sh->line))
+	while (gsh_parse_filename(&sh->params, sh->parsed, sh->line) ||
+	       gsh_parse_args(&sh->params, sh->parsed)) {
 		if (!gsh_read_line(sh))
-			return;	// Error reading line.
-
-	while (gsh_parse_args(&sh->params, sh->parsed))
-		if (!gsh_read_line(sh))
-			return;
+			return;	// Error occurred when getting more input.
+	}
 
 	sh->params.last_status = gsh_switch(sh);
 
