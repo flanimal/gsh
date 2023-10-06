@@ -348,6 +348,38 @@ static int gsh_exec(struct gsh_state *sh, const char *pathname, char **args)
 	exit(GSH_EXIT_NOTFOUND);
 }
 
+/* Re-run the n-th previous line of input. */
+static int gsh_recall(struct gsh_state *sh, const char *recall_arg)
+{
+	int n_arg = (recall_arg ? atoi(recall_arg) : 1);
+
+	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
+		gsh_bad_cmd("no matching history entry", 0);
+		return -1;
+	}
+
+	struct gsh_hist_ent *cmd_it = sh->hist->cmd_history;
+
+	while (cmd_it->forw && n_arg-- > 1)
+		cmd_it = cmd_it->forw;
+
+	printf("%s\n", cmd_it->line);
+
+	// Ensure that parse state from recall invocation is not
+	// reused.
+	gsh_free_parsed(sh->parsed);
+
+	// Make a copy so we don't lose it if the history entry
+	// gets deleted.
+	char *ent_line_cpy = strcpy(malloc(cmd_it->len + 1), cmd_it->line);
+	sh->parsed->input_len = cmd_it->len;
+
+	gsh_run_cmd(sh, ent_line_cpy);
+	free(ent_line_cpy);
+
+	return sh->params.last_status;
+}
+
 static int gsh_switch(struct gsh_state *sh, const char *pathname, char **args)
 {
 	// TODO: hash table or something
