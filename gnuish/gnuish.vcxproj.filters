@@ -37,7 +37,7 @@
     <ClInclude Include="src\history.h">
       <Filter>Public</Filter>
     </ClInclude>
-    <ClInclude Include="src\system.h">
+    <ClInclude Include="src\process.h">
       <Filter>Public</Filter>
     </ClInclude>
     <ClInclude Include="src\parse.h">

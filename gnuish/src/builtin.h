@@ -1,6 +1,6 @@
 #pragma once
 
-#include "system.h"
+#include "process.h"
 
 int gsh_puthelp();
 

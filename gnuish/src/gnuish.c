@@ -15,9 +15,7 @@
 #include "parse.h"
 #include "builtin.h"
 #include "history.h"
-#include "system.h"
-
-#define GSH_EXIT_NOTFOUND 127
+#include "process.h"
 
 #define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
 #define GSH_SECOND_PROMPT "> "

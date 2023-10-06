@@ -98,7 +98,7 @@
     <ClInclude Include="src\gnuish.h" />
     <ClInclude Include="src\history.h" />
     <ClInclude Include="src\parse.h" />
-    <ClInclude Include="src\system.h" />
+    <ClInclude Include="src\process.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile />

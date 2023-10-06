@@ -1,5 +1,7 @@
 #pragma once
 
+#define GSH_EXIT_NOTFOUND 127
+
 struct gsh_workdir {
 	/* Current working directory of the shell process. */
 	char *cwd;
