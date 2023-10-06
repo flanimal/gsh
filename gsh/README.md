@@ -1,8 +1,8 @@
-# gnuish - GNU island shell
+# gsh - island shell
 
 In this directory you will find two source files and a header file. Run `make` to build the shell.
 
-gnuish displays the current working directory in the shell prompt:
+gsh displays the current working directory in the shell prompt:
  
  	~ @
  	/usr/ @

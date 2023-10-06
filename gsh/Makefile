@@ -1,6 +1,4 @@
-SHELL = /bin/bash
-
-objects = $(addprefix obj/, main.o gnuish.o builtin.o history.o parse.o)
+objects = $(addprefix obj/, main.o gsh.o builtin.o history.o parse.o)
 
 CFLAGS = -O0 -Werror -Wall -Wextra -fno-omit-frame-pointer -std=gnu11
 

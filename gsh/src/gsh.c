@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <assert.h>
 
-#include "gnuish.h"
+#include "gsh.h"
 #include "parse.h"
 #include "builtin.h"
 #include "history.h"

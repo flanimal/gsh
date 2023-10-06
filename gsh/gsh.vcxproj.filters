@@ -16,7 +16,7 @@
     <ClCompile Include="src\builtin.c">
       <Filter>Private</Filter>
     </ClCompile>
-    <ClCompile Include="src\gnuish.c">
+    <ClCompile Include="src\gsh.c">
       <Filter>Private</Filter>
     </ClCompile>
     <ClCompile Include="src\history.c">
@@ -31,7 +31,7 @@
     <ClInclude Include="src\builtin.h">
       <Filter>Public</Filter>
     </ClInclude>
-    <ClInclude Include="src\gnuish.h">
+    <ClInclude Include="src\gsh.h">
       <Filter>Public</Filter>
     </ClInclude>
     <ClInclude Include="src\history.h">

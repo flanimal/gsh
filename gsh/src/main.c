@@ -3,7 +3,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "gnuish.h"
+#include "gsh.h"
 
 int main(__attribute_maybe_unused__ int argc,
 	 __attribute_maybe_unused__ char *argv[])

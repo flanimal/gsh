@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "gnuish.h"
+#include "gsh.h"
 #include "parse.h"
 
 void gsh_init_parsed(struct gsh_parsed *parsed)
