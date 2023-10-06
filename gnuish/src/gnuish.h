@@ -44,6 +44,9 @@ struct gsh_state {
 
 		int last_status;
 	} params;
+
+        char *line, *line_it;
+	size_t input_len;
 };
 
 /* Set initial values and resources for the shell. */
@@ -53,8 +56,8 @@ size_t gsh_max_input(const struct gsh_state *sh);
 
 /* Get a null-terminated line of input from the terminal,
  * including the newline. */
-bool gsh_read_line(const struct gsh_state *sh, char **const out_line);
+bool gsh_read_line(struct gsh_state *sh);
 
 /* Execute a null-terminated line of input.
  * The line will be modified by calls to `strtok`. */
-void gsh_run_cmd(struct gsh_state *sh, char *line);
+void gsh_run_cmd(struct gsh_state *sh);

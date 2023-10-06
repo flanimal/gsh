@@ -31,14 +31,12 @@ extern char **environ;
 struct gsh_parsed {
 	bool has_pathname;
 
-	/* List of tokens from previous input line. */
+	/* List of tokens from current input line. */
 	char **tokens, **token_it;
 	size_t token_n;
 
 	/* Any dynamically allocated tokens. */
 	char **alloc;
-
-	size_t input_len;
 };
 
 #ifndef NDEBUG
@@ -203,8 +201,6 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 	// Mark tokens as empty.
 	for (; parsed->token_n > 0; --parsed->token_n)
 		*(--parsed->token_it) = NULL;
-
-	parsed->input_len = 0;
 }
 
 void gsh_getcwd(struct gsh_workdir *wd)
@@ -260,8 +256,6 @@ static void gsh_init_parsed(struct gsh_parsed *parsed)
 	parsed->alloc = malloc(sizeof(char *) * (GSH_MAX_ARGS + 1));	// MAX_ARGS plus
 	// sentinel.
 	*parsed->alloc++ = NULL; // Set empty sentinel.
-
-        parsed->input_len = 0;
 }
 
 void gsh_init(struct gsh_state *sh)
@@ -274,38 +268,31 @@ void gsh_init(struct gsh_state *sh)
 	sh->hist->cmd_history = sh->hist->oldest_cmd = NULL;
 	sh->hist->hist_n = 0;
 
+        sh->line_it = sh->line = malloc((size_t)sh->wd->max_input);
+	sh->input_len = 0;
+
 #ifndef NDEBUG
 	g_gsh_initialized = true;
 #endif
 }
 
-bool gsh_read_line(const struct gsh_state *sh, char **const out_line)
+bool gsh_read_line(struct gsh_state *sh)
 {
 	if (*sh->parsed->token_it)	// Check if called to get more input.
 		fputs(GSH_SECOND_PROMPT, stdout);
 	else
 		gsh_put_prompt(&sh->params, sh->wd->cwd);
 
-	*out_line += sh->parsed->input_len;
-	size_t max_input = gsh_max_input(sh) - sh->parsed->input_len;
+	sh->line_it += sh->input_len;
+	size_t max_input = gsh_max_input(sh) - sh->input_len;
 	
-        ssize_t len = getline(out_line, &max_input, stdin);
+        ssize_t len = getline(&sh->line_it, &max_input, stdin);
 
 	if (len == -1)
 		return false;
-	// FIXME: If there are already characters in the buffer,
-	// yet we still use the same maximum length, there is a possibility
-	// we will overflow the buffer. 
-	// 
-	// getline() will NOT automatically resize
-	// the buffer in this case, either, since as far as it knows the buffer length
-	// is still below max_input.
-	// 
-	// The simplest solution would be to store the current length of the buffer
-	// in gsh_state or gsh_parsed.
 
-	(*out_line)[len - 1] = '\0';	// Remove newline.
-	sh->parsed->input_len += (size_t)(len - 1);
+	sh->line_it[len - 1] = '\0'; // Remove newline.
+	sh->input_len += (size_t)(len - 1);
 
 	return true;
 }
@@ -394,11 +381,10 @@ static int gsh_recall(struct gsh_state *sh, const char *recall_arg)
 
 	// Make a copy so we don't lose it if the history entry
 	// gets deleted.
-	char *ent_line_cpy = strcpy(malloc(cmd_it->len + 1), cmd_it->line);
-	sh->parsed->input_len = cmd_it->len;
+	sh->line_it     = strcpy(sh->line, cmd_it->line);
+	sh->input_len   = cmd_it->len;
 
-	gsh_run_cmd(sh, ent_line_cpy);
-	free(ent_line_cpy);
+	gsh_run_cmd(sh);
 
 	return sh->params.last_status;
 }
@@ -428,29 +414,27 @@ static int gsh_switch(struct gsh_state *sh, const char *pathname, char **args)
 		return gsh_exec(sh, pathname, args);
 }
 
-void gsh_run_cmd(struct gsh_state *sh, char *line)
+void gsh_run_cmd(struct gsh_state *sh)
 {
-	if (sh->parsed->input_len == 0)
+	if (sh->input_len == 0)
 		return;
 
-	gsh_add_hist(sh->hist, sh->parsed->input_len, line);
+	gsh_add_hist(sh->hist, sh->input_len, sh->line);
 
-	char *line_it = line;
-	// TODO: Should we put the input loop in the parse_* functions
-        // and take the argument tokenization loop out instead?
-        //      This would keep with the "one-token-per-call" pattern.
-
-	while (gsh_parse_filename(&sh->params, sh->parsed, line))
-		if (!gsh_read_line(sh, &line_it))
+	while (gsh_parse_filename(&sh->params, sh->parsed, sh->line))
+		if (!gsh_read_line(sh))
 			return;	// Error reading line.
 
 	while (gsh_parse_args(&sh->params, sh->parsed))
-		if (!gsh_read_line(sh, &line_it))
+		if (!gsh_read_line(sh))
 			return;
 
 	sh->params.last_status =
-	    gsh_switch(sh, (sh->parsed->has_pathname ? line : NULL),
+	    gsh_switch(sh, (sh->parsed->has_pathname ? sh->line : NULL),
 		       sh->parsed->tokens);
 
 	gsh_free_parsed(sh->parsed);
+
+	sh->line_it = sh->line;
+	sh->input_len = 0;
 }
