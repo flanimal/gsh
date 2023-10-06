@@ -100,8 +100,10 @@ void gsh_init(struct gsh_state *sh)
 	sh->hist->cmd_history = sh->hist->oldest_cmd = NULL;
 	sh->hist->hist_n = 0;
 
-	sh->line_it = sh->line = malloc((size_t)sh->wd->max_input);
 	sh->input_len = 0;
+
+	// Max input line length + newline + null byte.
+	sh->line_it = sh->line = malloc(gsh_max_input(sh) + 2);
 
 #ifndef NDEBUG
 	g_gsh_initialized = true;
@@ -122,15 +124,13 @@ bool gsh_read_line(struct gsh_state *sh)
 		gsh_put_prompt(&sh->params, sh->wd->cwd);
 	}
 
-	// FIXME: Correctly handle if getline resizes the buffer.
-	size_t max_input = gsh_max_input(sh) - sh->input_len;
-	ssize_t len = getline(&sh->line_it, &max_input, stdin);
-
-	if (len == -1)
+	if (!fgets(sh->line_it, (int)(gsh_max_input(sh) + 1), stdin))
 		return false;
 
+	const size_t len = strlen(sh->line_it);
+
 	sh->line_it[len - 1] = '\0';	// Remove newline.
-	sh->input_len += (size_t)(len - 1);
+	sh->input_len += len - 1;
 
 	return true;
 }
