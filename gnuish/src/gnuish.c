@@ -31,11 +31,16 @@ extern char **environ;
 struct gsh_parsed {
 	bool has_pathname;
 
-	/* List of tokens from current input line. */
-	char **tokens, **token_it;
+	/* The tokens gotten from the current input line. */
+	char **tokens;
+
+	/* The token that is currently being parsed. */
+	char **token_it;
+
+	/* Number of complete tokens so far. */
 	size_t token_n;
 
-	/* Any dynamically allocated tokens. */
+	/* Buffers for any substitutions performed on tokens. */
 	char **alloc;
 };
 
@@ -105,6 +110,10 @@ static void gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 /*      Returns true while there are still more tokens to collect,
  *	similar to strtok.
  *
+ *      Increments token_n and token_it by 1 for each completed token.
+ * 
+ *      ***
+ *
  *      By default, a backslash \ is the _line continuation character_.
  *
  *      When it is the last character in an input line, it invokes a
@@ -152,6 +161,9 @@ static bool gsh_next_tok(struct gsh_parsed *parsed, char *const line)
 
 /*      Parse the first token in the input line, and place
  *      the filename in the argument array.
+ * 
+ *      Returns true if we need more input to parse a filename, 
+ *      false if we're done.
  */
 static bool gsh_parse_filename(struct gsh_params *params,
 			       struct gsh_parsed *parsed, char *line)
