@@ -1,6 +1,6 @@
 objects = $(addprefix obj/, main.o gsh.o builtin.o history.o parse.o)
 
-CFLAGS = -O0 -Werror -Wall -Wextra -fno-omit-frame-pointer -std=gnu11
+CFLAGS = -O0 -Werror -Wall -Wextra -pedantic-errors -fno-omit-frame-pointer -std=gnu11
 
 gsh : $(objects)
 	gcc -o gsh $(objects)
@@ -8,8 +8,8 @@ gsh : $(objects)
 $(objects): obj/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@ 
 
-.PHONY : clean softclean 
+.PHONY : clean reset 
 clean : 
-	rm -rf obj/* src/*
-softclean :
-	rm -f obj/*
+	find -not \( -name gsh -or -name README.md \) -delete
+reset :
+	rm -f obj/* gsh
