@@ -110,7 +110,7 @@ void gsh_init(struct gsh_state *sh)
 #endif
 }
 
-bool gsh_read_line(struct gsh_state *sh)
+void gsh_read_line(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);
 
@@ -126,15 +126,17 @@ bool gsh_read_line(struct gsh_state *sh)
 		gsh_put_prompt(&sh->params, sh->wd->cwd);
 	}
 
-	if (!fgets(sh->line_it, (int)(gsh_max_input(sh) + 1), stdin))
-		return false;
+	if (!fgets(sh->line_it, (int)(gsh_max_input(sh) + 1), stdin)) {
+		if (ferror(stdin))
+			perror("gsh exited");
+		
+		exit((feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE));
+	}
 
 	const size_t len = strlen(sh->line_it);
 
 	sh->line_it[len - 1] = '\0';	// Remove newline.
 	sh->input_len += len - 1;
-
-	return true;
 }
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
@@ -265,8 +267,7 @@ void gsh_run_cmd(struct gsh_state *sh)
 
 	while (gsh_parse_filename(&sh->params, sh->parsed, sh->line) ||
 	       gsh_parse_args(&sh->params, sh->parsed)) {
-		if (!gsh_read_line(sh))
-			return;	// Error occurred when getting more input.
+		gsh_read_line(sh);
 	}
 
 	sh->params.last_status = gsh_switch(sh);

@@ -39,7 +39,7 @@ struct gsh_state {
 void gsh_init(struct gsh_state *sh);
 
 /* Get a null-terminated line of input from the terminal. */
-bool gsh_read_line(struct gsh_state *sh);
+void gsh_read_line(struct gsh_state *sh);
 
 /* Execute a null-terminated line of input.
  * The line will be modified by calls to `strtok`. */
