@@ -65,8 +65,10 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 		// If whole token is a parameter reference, substitute
 		// with pointer to env variable value.
 		if (strcmp(*parsed->token_it, fmt_begin) == 0) {
-			*parsed->token_it = envz_get(*environ, params->env_len,
+			char *const value = envz_get(*environ, params->env_len,
 						     fmt_begin + 1);
+
+			*parsed->token_it = value ? value : "";
 			break;
 		}
 
@@ -90,24 +92,21 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 /*      Expand the last token.
  *	Returns true while there are still expansions to be performed.
  */
-static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed,
-			   char *tok)
+static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 {
 	// TODO: globbing, piping
 
-	char *const fmt_begin = strpbrk(tok, "$~");
+	char *const fmt_begin = strpbrk(*parsed->token_it, "$~");
 
-	if (!fmt_begin) {
-		*parsed->token_it = tok;
+	if (!fmt_begin)
 		return false;
-	}
 
 	switch (*fmt_begin) {
 	case '$':
 		gsh_fmt_param(params, parsed, fmt_begin);
 		break;
 	case '~':
-		if (strcmp(tok, "~") == 0) {
+		if (strcmp(*parsed->token_it, "~") == 0) {
 			// Just subsitute the token with a reference to HOME.
 			*parsed->token_it = params->homevar;
 			break;
@@ -167,17 +166,17 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 
 	char *line_cont = strchr(next_tok, '\\');
 	if (line_cont) {
-
 		if (!line_cont[1]) {
 			parsed->need_more = true;
 			return true;
 		}
+
 		// Remove the backslash.
 		for (; *line_cont; ++line_cont)
 			line_cont[0] = line_cont[1];
 	}
 
-	while (gsh_expand_tok(params, parsed, next_tok))
+	while (gsh_expand_tok(params, parsed))
 		;
 
 	if (*parsed->alloc)
