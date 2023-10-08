@@ -103,7 +103,7 @@ void gsh_init(struct gsh_state *sh)
 	sh->input_len = 0;
 
 	// Max input line length + newline + null byte.
-	sh->line_it = sh->line = malloc(gsh_max_input(sh) + 2);
+	sh->line = malloc(gsh_max_input(sh) + 2);
 
 #ifndef NDEBUG
 	g_gsh_initialized = true;
@@ -120,13 +120,12 @@ void gsh_read_line(struct gsh_state *sh)
 
 		fputs(GSH_SECOND_PROMPT, stdout);
 	} else {
-		sh->line_it = sh->line;
 		sh->input_len = 0;
 
 		gsh_put_prompt(&sh->params, sh->wd->cwd);
 	}
 
-	if (!fgets(sh->line_it + sh->input_len,
+	if (!fgets(sh->line + sh->input_len,
 		   (int)(gsh_max_input(sh) + 1), stdin)) {
 		if (ferror(stdin))
 			perror("gsh exited");
@@ -134,9 +133,9 @@ void gsh_read_line(struct gsh_state *sh)
 		exit((feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE));
 	}
 
-	const size_t len = strlen(sh->line_it + sh->input_len);
+	const size_t len = strlen(sh->line + sh->input_len);
 
-	sh->line_it[sh->input_len + len - 1] = '\0';	// Remove newline.
+	sh->line[sh->input_len + len - 1] = '\0';	// Remove newline.
 	sh->input_len = len - 1;
 }
 
@@ -222,7 +221,7 @@ static int gsh_recall(struct gsh_state *sh, const char *recall_arg)
 
 	// Make a copy so we don't lose it if the history entry
 	// gets deleted.
-	sh->line_it = strcpy(sh->line, cmd_it->line);
+	strcpy(sh->line, cmd_it->line);
 	sh->input_len = cmd_it->len;
 
 	gsh_run_cmd(sh);

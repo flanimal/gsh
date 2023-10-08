@@ -34,8 +34,6 @@ struct gsh_state {
 	struct gsh_params params;
 
         char *line; 
-	char *line_it;
-
 	size_t input_len;
 };
 
