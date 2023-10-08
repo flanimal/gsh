@@ -5,6 +5,7 @@
 
 struct gsh_parsed {
 	bool has_pathname;
+	bool need_more;
 
 	/* The tokens gotten from the current input line. */
 	char **tokens;
@@ -13,10 +14,12 @@ struct gsh_parsed {
 	char **token_it;
 
 	/* Number of complete tokens so far. */
-	size_t token_n;
+	size_t token_n; // <<< get rid
 
 	/* Buffers for any substitutions performed on tokens. */
 	char **alloc;
+
+	char *tok_state;
 };
 
 void gsh_init_parsed(struct gsh_parsed *parsed);
@@ -36,6 +39,6 @@ bool gsh_parse_filename(struct gsh_params *params, struct gsh_parsed *parsed,
  *      Returns true if we need more input to parse an argument,
  *      false if we're done.
  */
-bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed);
+bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed, char **line, struct gsh_state *sh);
 
 void gsh_free_parsed(struct gsh_parsed *parsed);

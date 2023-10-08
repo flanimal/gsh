@@ -115,8 +115,8 @@ void gsh_read_line(struct gsh_state *sh)
 	assert(g_gsh_initialized);
 
 	// Check if called to get more input.
-	if (*sh->parsed->token_it) {
-		sh->line_it += sh->input_len;
+	if (sh->parsed->need_more) {
+		--sh->input_len;
 
 		fputs(GSH_SECOND_PROMPT, stdout);
 	} else {
@@ -126,17 +126,18 @@ void gsh_read_line(struct gsh_state *sh)
 		gsh_put_prompt(&sh->params, sh->wd->cwd);
 	}
 
-	if (!fgets(sh->line_it, (int)(gsh_max_input(sh) + 1), stdin)) {
+	if (!fgets(sh->line_it + sh->input_len,
+		   (int)(gsh_max_input(sh) + 1), stdin)) {
 		if (ferror(stdin))
 			perror("gsh exited");
-		
+
 		exit((feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE));
 	}
 
-	const size_t len = strlen(sh->line_it);
+	const size_t len = strlen(sh->line_it + sh->input_len);
 
-	sh->line_it[len - 1] = '\0';	// Remove newline.
-	sh->input_len += len - 1;
+	sh->line_it[sh->input_len + len - 1] = '\0';	// Remove newline.
+	sh->input_len = len - 1;
 }
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
@@ -265,9 +266,10 @@ void gsh_run_cmd(struct gsh_state *sh)
 
 	gsh_add_hist(sh->hist, sh->input_len, sh->line);
 
-	while (gsh_parse_filename(&sh->params, sh->parsed, sh->line) ||
-	       gsh_parse_args(&sh->params, sh->parsed)) {
-		gsh_read_line(sh);
+	char *line_tmp = sh->line;
+	while (gsh_parse_filename(&sh->params, sh->parsed, line_tmp) ||
+	       gsh_parse_args(&sh->params, sh->parsed, &line_tmp, sh)) {
+		gsh_read_line(sh); 
 	}
 
 	sh->params.last_status = gsh_switch(sh);

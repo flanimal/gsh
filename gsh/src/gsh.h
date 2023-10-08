@@ -8,6 +8,20 @@
 
 extern char **environ;
 
+/* Parameters. */
+struct gsh_params {
+	size_t env_len;
+
+	/* Null-terminated value of PATH. */
+	char *pathvar;
+
+	/* Null-terminated value of HOME. */
+	char *homevar;
+	size_t home_len;
+
+	int last_status;
+};
+
 struct gsh_state {
 	/* Line history. */
 	struct gsh_cmd_hist *hist;
@@ -17,21 +31,11 @@ struct gsh_state {
 
 	struct gsh_workdir *wd;
 
-        /* Parameters. */
-	struct gsh_params {
-		size_t env_len;
+	struct gsh_params params;
 
-		/* Null-terminated value of PATH. */
-		char *pathvar;
+        char *line; 
+	char *line_it;
 
-		/* Null-terminated value of HOME. */
-		char *homevar;
-		size_t home_len;
-
-		int last_status;
-	} params;
-
-        char *line, *line_it;
 	size_t input_len;
 };
 
