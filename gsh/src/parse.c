@@ -10,6 +10,24 @@
 #include "gsh.h"
 #include "parse.h"
 
+#define PARAM_CH "$"
+#define HOME_CH "~"
+
+#define STATUS_PARAM "?"
+
+#define SPECIAL_CHAR(special) GSH_## special = special[0]
+
+enum gsh_special_char {
+	SPECIAL_CHAR(PARAM_CH),
+	SPECIAL_CHAR(HOME_CH),
+};
+
+const char *gsh_special_chars = PARAM_CH HOME_CH;
+
+enum gsh_special_param {
+	SPECIAL_CHAR(STATUS_PARAM),
+};
+
 void gsh_init_parsed(struct gsh_parsed *parsed)
 {
 	parsed->token_it = parsed->tokens =
@@ -46,14 +64,14 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed, size_t fmt_len,
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			  char *const fmt_begin)
 {
-	const size_t fmt_len = strcspn(fmt_begin + 1, "$") + 1;
+	const size_t fmt_len = strcspn(fmt_begin + 1, GSH_PARAM_CH) + 1;
 
 	char *tmp = NULL;
 	if (fmt_begin[fmt_len] != '\0')
 		tmp = strdup(fmt_begin + fmt_len);
 
-	switch (fmt_begin[1]) {
-	case '?': {
+	switch ((enum gsh_special_param)fmt_begin[1]) {
+	case GSH_STATUS_PARAM: {
 		gsh_expand_alloc(parsed, fmt_len,
 				 (size_t)snprintf(NULL, 0, "%d",
 						  params->last_status));
@@ -92,9 +110,10 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 	free(tmp);
 }
 
-static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed, char *const fmt_begin)
+static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
+			 char *const fmt_begin)
 {
-	if (strcmp(*parsed->token_it, "~") == 0) {
+	if (strcmp(*parsed->token_it, HOME_CH) == 0) {
 		// Just subsitute the token with a reference to HOME.
 		*parsed->token_it = params->homevar;
 		return;
@@ -124,16 +143,16 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 {
 	// TODO: globbing, piping
 
-	char *const fmt_begin = strpbrk(*parsed->token_it, "$~");
+	char *const fmt_begin = strpbrk(*parsed->token_it, gsh_special_chars);
 
 	if (!fmt_begin)
 		return false;
 
-	switch (*fmt_begin) {
-	case '$':
+	switch ((enum gsh_special_char)*fmt_begin) {
+	case GSH_PARAM_CH:
 		gsh_fmt_param(params, parsed, fmt_begin);
 		break;
-	case '~':
+	case GSH_HOME_CH:
 		gsh_fmt_home(params, parsed, fmt_begin);
 		break;
 	}
