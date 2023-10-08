@@ -268,7 +268,7 @@ void gsh_run_cmd(struct gsh_state *sh)
 
 	char *line_tmp = sh->line;
 	while (gsh_parse_filename(&sh->params, sh->parsed, line_tmp) ||
-	       gsh_parse_args(&sh->params, sh->parsed, &line_tmp, sh)) {
+	       gsh_parse_args(&sh->params, sh->parsed, &line_tmp)) {
 		gsh_read_line(sh); 
 	}
 

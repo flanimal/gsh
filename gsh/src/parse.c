@@ -212,7 +212,7 @@ bool gsh_parse_filename(struct gsh_params *params, struct gsh_parsed *parsed,
 }
 
 bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed,
-		    char **line, struct gsh_state *sh)
+		    char **line)
 {
 	while (parsed->token_n <= GSH_MAX_ARGS &&
 	       gsh_next_tok(params, parsed, line)) {

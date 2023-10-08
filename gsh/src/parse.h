@@ -39,6 +39,6 @@ bool gsh_parse_filename(struct gsh_params *params, struct gsh_parsed *parsed,
  *      Returns true if we need more input to parse an argument,
  *      false if we're done.
  */
-bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed, char **line, struct gsh_state *sh);
+bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed, char **line);
 
 void gsh_free_parsed(struct gsh_parsed *parsed);
