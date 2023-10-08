@@ -5,7 +5,6 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "gsh.h"
 #include "history.h"
 
 #define GSH_MAX_HIST 10
