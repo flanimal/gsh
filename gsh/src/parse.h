@@ -11,7 +11,7 @@ struct gsh_parsed {
 	char **tokens;
 
 	/* The token that is currently being parsed. */
-	char **token_it;
+	char **token_it; // TODO: Or move this outside?
 
 	/* Number of complete tokens so far. */
 	size_t token_n; // TODO: <<< get rid

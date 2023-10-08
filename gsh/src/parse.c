@@ -75,16 +75,16 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 
 		char *const var_name = strndup(fmt_begin + 1, fmt_len - 1);
 
-		char *const value =
-			envz_get(*environ, params->env_len, var_name);
+		char *value = envz_get(*environ, params->env_len, var_name);
 		free(var_name);
 
-		gsh_expand_alloc(parsed, fmt_len,
-				 (size_t)snprintf(NULL, 0, "%s",
-						  (value ? value : "")));
+		if (!value)
+			value = "";
 
-		sprintf(fmt_begin, "%s%s", (value ? value : ""),
-			(tmp ? tmp : ""));
+		gsh_expand_alloc(parsed, fmt_len,
+				 (size_t)snprintf(NULL, 0, "%s", value));
+
+		sprintf(fmt_begin, "%s%s", value, (tmp ? tmp : ""));
 		break;
 	}
 	}
