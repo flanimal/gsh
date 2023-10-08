@@ -30,12 +30,13 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed, size_t fmt_len,
 	if (fmt_len >= expand_len)
 		return;
 
-	const size_t new_len = strlen(*parsed->alloc) + expand_len - fmt_len;
+	if (*parsed->alloc) {
+		const size_t new_len =
+			strlen(*parsed->alloc) + expand_len - fmt_len;
 
-	if (*parsed->alloc)
 		*parsed->alloc = realloc(*parsed->alloc, new_len + 1);
-	else {
-		*parsed->alloc = malloc(new_len + 1);
+	} else {
+		*parsed->alloc = strcpy(malloc(expand_len - fmt_len + 1), *parsed->token_it);
 		*parsed->token_it = *parsed->alloc;
 	}
 }
@@ -79,9 +80,11 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 		free(var_name);
 
 		gsh_expand_alloc(parsed, fmt_len,
-				 (size_t)snprintf(NULL, 0, "%s", value));
+				 (size_t)snprintf(NULL, 0, "%s",
+						  (value ? value : "")));
 
-		sprintf(fmt_begin, "%s%s", value, (tmp ? tmp : ""));
+		sprintf(fmt_begin, "%s%s", (value ? value : ""),
+			(tmp ? tmp : ""));
 		break;
 	}
 	}
