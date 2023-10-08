@@ -45,7 +45,7 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed, size_t fmt_len,
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			  char *const fmt_begin)
 {
-	const size_t fmt_len = strcspn(fmt_begin, "$");
+	const size_t fmt_len = strcspn(fmt_begin + 1, "$") + 1;
 
 	char *tmp = NULL;
 	if (fmt_begin[fmt_len] != '\0')
@@ -131,11 +131,8 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 		break;
 	}
 
-	*fmt_begin = '\0';
 	return true;
 }
-
-// TODO: strtok_r
 
 /*      Returns true while there are still more tokens to collect,
  *	similar to strtok.
@@ -159,18 +156,17 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 		(parsed->need_more || parsed->token_n == 0 ? *line : NULL), " ",
 		&parsed->tok_state);
 
-	*line = next_tok;
-
-	parsed->need_more = false;
-
 	if (!next_tok)
 		// Reached the null byte, meaning there weren't any
 		// continuations. No more tokens available or needed.
 		return false;
 
+	*line = next_tok;
+	*parsed->token_it = next_tok;
+	parsed->need_more = false;
+
 	char *line_cont = strchr(next_tok, '\\');
 	if (line_cont) {
-		*parsed->token_it = next_tok;
 
 		if (!line_cont[1]) {
 			parsed->need_more = true;
