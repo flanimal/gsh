@@ -30,13 +30,13 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed, size_t fmt_len,
 	if (fmt_len >= expand_len)
 		return;
 
-	if (*parsed->alloc) {
-		const size_t new_len =
-			strlen(*parsed->alloc) + expand_len - fmt_len;
+	size_t new_len = expand_len - fmt_len;
 
+	if (*parsed->alloc) {
+		new_len += strlen(*parsed->alloc);
 		*parsed->alloc = realloc(*parsed->alloc, new_len + 1);
 	} else {
-		*parsed->alloc = strcpy(malloc(expand_len - fmt_len + 1), *parsed->token_it);
+		*parsed->alloc = strcpy(malloc(new_len + 1), *parsed->token_it);
 		*parsed->token_it = *parsed->alloc;
 	}
 }
@@ -173,7 +173,6 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 			parsed->need_more = true;
 			return true;
 		}
-
 		// Remove the backslash.
 		for (; *line_cont; ++line_cont)
 			line_cont[0] = line_cont[1];
