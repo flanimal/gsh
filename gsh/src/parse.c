@@ -92,6 +92,31 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 	free(tmp);
 }
 
+static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed, char *const fmt_begin)
+{
+	if (strcmp(*parsed->token_it, "~") == 0) {
+		// Just subsitute the token with a reference to HOME.
+		*parsed->token_it = params->homevar;
+		return;
+	}
+
+	if (*parsed->alloc) {
+		char *tmp;
+		asprintf(&tmp, "%s%s%s", fmt_begin - 1, params->homevar,
+			 fmt_begin + 1);
+
+		free(*parsed->alloc);
+		*parsed->alloc = tmp;
+
+		return;
+	}
+
+	asprintf(parsed->alloc, "%s%s%s", fmt_begin - 1, params->homevar,
+		 fmt_begin + 1);
+
+	*parsed->token_it = *parsed->alloc;
+}
+
 /*      Expand the last token.
  *	Returns true while there are still expansions to be performed.
  */
@@ -109,27 +134,7 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 		gsh_fmt_param(params, parsed, fmt_begin);
 		break;
 	case '~':
-		if (strcmp(*parsed->token_it, "~") == 0) {
-			// Just subsitute the token with a reference to HOME.
-			*parsed->token_it = params->homevar;
-			break;
-		}
-
-		if (*parsed->alloc) {
-			char *tmp;
-			asprintf(&tmp, "%s%s%s", fmt_begin - 1, params->homevar,
-				 fmt_begin + 1);
-
-			free(*parsed->alloc);
-			*parsed->alloc = tmp;
-
-			break;
-		}
-
-		asprintf(parsed->alloc, "%s%s%s", fmt_begin - 1,
-			 params->homevar, fmt_begin + 1);
-
-		*parsed->token_it = *parsed->alloc;
+		gsh_fmt_home(params, parsed, fmt_begin);
 		break;
 	}
 
