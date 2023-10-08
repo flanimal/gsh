@@ -64,7 +64,7 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed, size_t fmt_len,
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			  char *const fmt_begin)
 {
-	const size_t fmt_len = strcspn(fmt_begin + 1, GSH_PARAM_CH) + 1;
+	const size_t fmt_len = strchr(fmt_begin, GSH_PARAM_CH) - fmt_begin;
 
 	char *tmp = NULL;
 	if (fmt_begin[fmt_len] != '\0')
