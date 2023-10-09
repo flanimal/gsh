@@ -1,0 +1,25 @@
+/*
+ *	Special characters.
+ */
+#define SPECIAL_CHARS(X) \
+	X(HOME_CH, '~')  \
+	X(PARAM_CH, '$')
+
+/*
+ *	Special parameters.
+ */
+#define SPECIAL_PARAMS(X) X(STATUS_PARAM, '?')
+
+#define CHAR_ENUM(name, ch) GSH_##name = ch,
+#define CHAR_ARRAY(name, ch) ch,
+
+enum gsh_special_char { SPECIAL_CHARS(CHAR_ENUM) };
+enum gsh_special_param { SPECIAL_PARAMS(CHAR_ENUM) };
+
+const char gsh_special_chars[] = { SPECIAL_CHARS(CHAR_ARRAY) '\0' };
+
+#undef CHAR_ENUM
+#undef CHAR_ARRAY
+
+#undef SPECIAL_CHARS
+#undef SPECIAL_PARAMS

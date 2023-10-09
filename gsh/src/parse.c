@@ -10,23 +10,7 @@
 #include "gsh.h"
 #include "parse.h"
 
-#define PARAM_CH "$"
-#define HOME_CH "~"
-
-#define STATUS_PARAM "?"
-
-#define SPECIAL_CHAR(special) GSH_## special = special[0]
-
-enum gsh_special_char {
-	SPECIAL_CHAR(PARAM_CH),
-	SPECIAL_CHAR(HOME_CH),
-};
-
-const char *gsh_special_chars = PARAM_CH HOME_CH;
-
-enum gsh_special_param {
-	SPECIAL_CHAR(STATUS_PARAM),
-};
+#include "special.def"
 
 void gsh_init_parsed(struct gsh_parsed *parsed)
 {
@@ -64,7 +48,8 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed, size_t fmt_len,
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			  char *const fmt_begin)
 {
-	const size_t fmt_len = strchr(fmt_begin, GSH_PARAM_CH) - fmt_begin;
+	const size_t fmt_len =
+		(size_t)(strchr(fmt_begin, GSH_PARAM_CH) - fmt_begin);
 
 	char *tmp = NULL;
 	if (fmt_begin[fmt_len] != '\0')
@@ -113,7 +98,8 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char *const fmt_begin)
 {
-	if (strcmp(*parsed->token_it, HOME_CH) == 0) {
+	const char home_str[] = { GSH_HOME_CH, '\0' };
+	if (strcmp(*parsed->token_it, home_str) == 0) {
 		// Just subsitute the token with a reference to HOME.
 		*parsed->token_it = params->homevar;
 		return;
@@ -148,7 +134,7 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 	if (!fmt_begin)
 		return false;
 
-	switch ((enum gsh_special_char)*fmt_begin) {
+	switch ((enum gsh_special_char)fmt_begin[0]) {
 	case GSH_PARAM_CH:
 		gsh_fmt_param(params, parsed, fmt_begin);
 		break;

@@ -85,6 +85,7 @@
   <ItemGroup>
     <None Include="Makefile" />
     <None Include="README.md" />
+    <None Include="src\special.def" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\builtin.c" />
