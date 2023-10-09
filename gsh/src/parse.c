@@ -32,36 +32,33 @@ void gsh_init_parsed(struct gsh_parsed *parsed)
 static void gsh_expand_alloc(struct gsh_parsed *parsed, char *const fmt_begin,
 			     size_t fmt_len, const char *fmt_str, ...)
 {
-	va_list fmt_args;
+	va_list fmt_args, tmp_args;
+
 	va_start(fmt_args, fmt_str);
-	
-	va_list tmp_args;
 	va_copy(tmp_args, fmt_args);
+
 	if (fmt_len >= (size_t)vsnprintf(NULL, 0, fmt_str, tmp_args)) {
 		// Don't need to allocate.
 		vsprintf(fmt_begin, fmt_str, fmt_args);
-		
-		va_end(tmp_args);
-		va_end(fmt_args);
-		return;
+		goto out_end;
 	}
-
-	va_end(tmp_args);
 
 	if (*parsed->alloc)
 		free(*parsed->alloc);
-	
+
 	// Copy everything before fmt_begin.
 	*fmt_begin = '\0';
 
 	char *tmp;
 	asprintf(&tmp, "%s%s", *parsed->token_it, fmt_str);
-	
+
 	vasprintf(parsed->alloc, tmp, fmt_args);
 	free(tmp);
 
 	*parsed->token_it = *parsed->alloc;
 
+out_end:
+	va_end(tmp_args);
 	va_end(fmt_args);
 }
 
@@ -135,8 +132,7 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 		return;
 	}
 
-	gsh_expand_alloc(parsed, fmt_begin, 1, "%s%s", homevar,
-			 fmt_begin + 1);
+	gsh_expand_alloc(parsed, fmt_begin, 1, "%s%s", homevar, fmt_begin + 1);
 }
 
 /*      Expand the last token.
