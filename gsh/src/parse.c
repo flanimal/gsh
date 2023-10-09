@@ -26,8 +26,8 @@ void gsh_init_parsed(struct gsh_parsed *parsed)
 	parsed->need_more = false;
 }
 
-static void gsh_expand_alloc(struct gsh_parsed *parsed, size_t fmt_len,
-			     size_t expand_len)
+/*	Allocate or reallocate a buffer for token expansion.
+*/
 {
 	if (fmt_len >= expand_len)
 		return;
@@ -41,8 +41,19 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed, size_t fmt_len,
 		*parsed->alloc = strcpy(malloc(new_len + 1), *parsed->token_it);
 		*parsed->token_it = *parsed->alloc;
 	}
-}
 
+// TODO: Are fmt_begin and parsed->token_it always synonymous/aliased?
+// NO!
+// 
+// TODO: Function for getting value of ANY param from gsh_params?
+
+/*	Substitute a variable reference with its value.
+*	
+*	If the token consists only of the variable reference, it will be
+*	assigned to point to the value of the variable.
+* 
+*	If the variable does not exist, the token will be assigned the empty string.
+*/
 static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 			char *const fmt_begin, size_t fmt_len,
 			char *const fmt_after)
@@ -95,6 +106,11 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 	free(fmt_after);
 }
 
+/*	Substitute the home character with the value of $HOME.
+* 
+	If the token consists only of the home character, it will be
+*	assigned to point to the value of $HOME.
+*/
 static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char *const fmt_begin)
 {
