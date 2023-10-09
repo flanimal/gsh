@@ -26,7 +26,8 @@ static bool g_gsh_initialized = false;
 
 static void gsh_put_prompt(const struct gsh_params *params, const char *cwd)
 {
-	const bool in_home = strncmp(cwd, params->homevar, params->home_len) ==
+	const bool in_home =
+		strncmp(cwd, gsh_getenv(params, "HOME"), params->home_len) ==
 	    0;
 
 	const int status = WIFEXITED(params->last_status) ?
@@ -41,6 +42,14 @@ void gsh_bad_cmd(const char *msg, int err)
 	printf("not a command%s %s %s%s%s\n", (msg ? ":" : ""),
 	       (msg ? msg : ""), (err ? "(" : ""), (err ? strerror(err) : ""),
 	       (err ? ")" : ""));
+}
+
+char *gsh_getenv(const struct gsh_params* params, const char *name)
+{
+	assert(params->env_len > 0);
+
+	char *const value = envz_get(*environ, params->env_len, name);
+	return (value ? value : "");
 }
 
 void gsh_getcwd(struct gsh_workdir *wd)
@@ -81,11 +90,8 @@ static void gsh_init_params(struct gsh_params *params)
 	params->env_len = 0;
 	for (char **env_it = environ; *env_it; ++env_it)
 		params->env_len += strlen(*env_it);
-
-	params->pathvar = envz_get(*environ, params->env_len, "PATH");
-
-	params->homevar = envz_get(*environ, params->env_len, "HOME");
-	params->home_len = strlen(params->homevar);
+	
+	params->home_len = strlen(gsh_getenv(params, "HOME"));
 
 	params->last_status = 0;
 }
@@ -191,7 +197,7 @@ static int gsh_exec(struct gsh_state *sh, char **args)
 	if (sh->parsed->has_pathname)
 		execve(sh->line, (char *const *)args, environ);
 	else
-		gsh_exec_path(sh->params.pathvar, sh->wd, args);
+		gsh_exec_path(gsh_getenv(&sh->params, "PATH"), sh->wd, args);
 
 	// Named program couldn't be executed.
 	gsh_bad_cmd(sh->line, errno);

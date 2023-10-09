@@ -48,11 +48,7 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 			char *const fmt_after)
 {
 	if (strcmp(*parsed->token_it, fmt_begin) == 0) {
-		char *const value = envz_get(*environ,
-					     params->env_len,
-					     fmt_begin + 1);
-
-		*parsed->token_it = (value ? value : "");
+		*parsed->token_it = gsh_getenv(params, fmt_begin + 1);
 		return;
 	}
 
@@ -102,7 +98,7 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char *const fmt_begin)
 {
-	if (strcmp(*parsed->token_it,
+	char *const homevar = gsh_getenv(params, "HOME");
 		   (const char[]) { GSH_HOME_CH, '\0' }) == 0) {
 		// Just subsitute the token with a reference to HOME.
 		*parsed->token_it = params->homevar;

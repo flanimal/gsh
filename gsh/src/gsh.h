@@ -11,11 +11,7 @@ extern char **environ;
 struct gsh_params {
 	size_t env_len;
 
-	/* Null-terminated value of PATH. */
-	char *pathvar;
-
 	/* Null-terminated value of HOME. */
-	char *homevar;
 	size_t home_len;
 
 	int last_status;
@@ -35,6 +31,8 @@ struct gsh_state {
         char *line; 
 	size_t input_len;
 };
+
+char *gsh_getenv(const struct gsh_params *params, const char *name);
 
 /* Set initial values and resources for the shell. */
 void gsh_init(struct gsh_state *sh);
