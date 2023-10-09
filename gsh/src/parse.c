@@ -44,14 +44,13 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed, size_t fmt_len,
 }
 
 static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
-			char *const fmt_begin, char *const fmt_after)
+			char *const fmt_begin, size_t fmt_len,
+			char *const fmt_after)
 {
-	const size_t fmt_len = (size_t)(fmt_after - fmt_begin);
-	// If whole token is a parameter reference, substitute
-	// with pointer to env variable value.
 	if (strcmp(*parsed->token_it, fmt_begin) == 0) {
-		char *const value =
-		    envz_get(*environ, params->env_len, fmt_begin + 1);
+		char *const value = envz_get(*environ,
+					     params->env_len,
+					     fmt_begin + 1);
 
 		*parsed->token_it = (value ? value : "");
 		return;
@@ -60,15 +59,14 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 	char *const var_name = strndup(fmt_begin + 1, fmt_len - 1);
 
 	char *value = envz_get(*environ, params->env_len, var_name);
-	free(var_name);
+	value = (value ? value : "");
 
-	if (!value)
-		value = "";
+	free(var_name);
 
 	gsh_expand_alloc(parsed, fmt_len,
 			 (size_t)snprintf(NULL, 0, "%s", value));
 
-	sprintf(fmt_begin, "%s%s", value, fmt_after);
+	sprintf(fmt_begin, "%s%s", value, (fmt_after ? fmt_after : ""));
 }
 
 /*      Substitute a parameter reference with its value.
@@ -76,12 +74,13 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			  char *const fmt_begin)
 {
-	const size_t fmt_len =
-	    (size_t)(strchr(fmt_begin, GSH_PARAM_CH) - fmt_begin);
-	// FIXME: Use return of strchr as fmt_after.
-	char *fmt_after = NULL;
-	if (fmt_begin[fmt_len] != '\0')
-		fmt_after = strdup(fmt_begin + fmt_len);
+	const size_t fmt_len = strcspn(fmt_begin + 1,
+				       (const char[]) { GSH_PARAM_CH,
+				       '\0' }) + 1;
+
+	char *const fmt_after = (fmt_begin[fmt_len]
+				 ? strdup(fmt_begin + fmt_len)
+				 : NULL);
 
 	switch ((enum gsh_special_param)fmt_begin[1]) {
 	case GSH_STATUS_PARAM:
@@ -93,8 +92,7 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			(fmt_after ? fmt_after : ""));
 		break;
 	default:
-		gsh_fmt_var(params, parsed, fmt_begin,
-			    (fmt_after ? fmt_after : ""));
+		gsh_fmt_var(params, parsed, fmt_begin, fmt_len, fmt_after);
 		break;
 	}
 
@@ -104,8 +102,8 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char *const fmt_begin)
 {
-	const char home_str[] = { GSH_HOME_CH, '\0' };
-	if (strcmp(*parsed->token_it, home_str) == 0) {
+	if (strcmp(*parsed->token_it,
+		   (const char[]) { GSH_HOME_CH, '\0' }) == 0) {
 		// Just subsitute the token with a reference to HOME.
 		*parsed->token_it = params->homevar;
 		return;
