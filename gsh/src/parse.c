@@ -35,9 +35,9 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed, size_t fmt_len,
 	size_t new_len = expand_len - fmt_len;
 
 	if (*parsed->alloc) {
-		new_len += strlen(*parsed->alloc);
-		*parsed->alloc = realloc(*parsed->alloc, new_len + 1);
-	} else {
+		free(*parsed->alloc);
+		*parsed->alloc = NULL;
+	}
 		*parsed->alloc = strcpy(malloc(new_len + 1), *parsed->token_it);
 		*parsed->token_it = *parsed->alloc;
 	}
