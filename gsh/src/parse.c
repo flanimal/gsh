@@ -13,6 +13,13 @@
 
 #include "special.def"
 
+struct gsh_fmt_info {
+	char *begin;
+	size_t len;
+
+	const char *fmt_str;
+};
+
 void gsh_init_parsed(struct gsh_parsed *parsed)
 {
 	parsed->token_it = parsed->tokens =
@@ -27,19 +34,23 @@ void gsh_init_parsed(struct gsh_parsed *parsed)
 	parsed->need_more = false;
 }
 
+// TODO: (?) What happens to fmt_begin after this gets called?
+// After we set *fmt_begin to a null byte?
+// ANSWER: After this is called, we go back up to the while loop in next_tok(),
+// and expand_tok() updates fmt_begin according to token_it.
 /*	Allocate or reallocate a buffer for token expansion.
 */
-static void gsh_expand_alloc(struct gsh_parsed *parsed, char *const fmt_begin,
-			     size_t fmt_len, const char *fmt_str, ...)
+static void gsh_expand_alloc(struct gsh_parsed *parsed,
+			     struct gsh_fmt_info *fmt, ...)
 {
 	va_list fmt_args, tmp_args;
 
-	va_start(fmt_args, fmt_str);
+	va_start(fmt_args, fmt);
 	va_copy(tmp_args, fmt_args);
 
-	if (fmt_len >= (size_t)vsnprintf(NULL, 0, fmt_str, tmp_args)) {
+	if (fmt->len >= (size_t)vsnprintf(NULL, 0, fmt->fmt_str, tmp_args)) {
 		// Don't need to allocate.
-		vsprintf(fmt_begin, fmt_str, fmt_args);
+		vsprintf(fmt->begin, fmt->fmt_str, fmt_args);
 		goto out_end;
 	}
 
@@ -47,10 +58,10 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed, char *const fmt_begin,
 		free(*parsed->alloc);
 
 	// Copy everything before fmt_begin.
-	*fmt_begin = '\0';
+	*fmt->begin = '\0';
 
 	char *tmp;
-	asprintf(&tmp, "%s%s", *parsed->token_it, fmt_str);
+	asprintf(&tmp, "%s%s", *parsed->token_it, fmt->fmt_str);
 
 	vasprintf(parsed->alloc, tmp, fmt_args);
 	free(tmp);
@@ -75,17 +86,17 @@ out_end:
 *	If the variable does not exist, the token will be assigned the empty string.
 */
 static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
-			char *const fmt_begin, size_t fmt_len,
-			char *const fmt_after)
+			struct gsh_fmt_info *fmt, char *const fmt_after)
 {
-	if (strcmp(*parsed->token_it, fmt_begin) == 0) {
-		*parsed->token_it = gsh_getenv(params, fmt_begin + 1);
+	if (strcmp(*parsed->token_it, fmt->begin) == 0) {
+		*parsed->token_it = gsh_getenv(params, fmt->begin + 1);
 		return;
 	}
 
-	char *const var_name = strndup(fmt_begin + 1, fmt_len - 1);
+	char *const var_name = strndup(fmt->begin + 1, fmt->len - 1);
 
-	gsh_expand_alloc(parsed, fmt_begin, fmt_len, "%s%s",
+	fmt->fmt_str = "%s%s";
+	gsh_expand_alloc(parsed, fmt,
 			 gsh_getenv(params, var_name),
 			 (fmt_after ? fmt_after : ""));
 	free(var_name);
@@ -96,20 +107,26 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			  char *const fmt_begin)
 {
-	const size_t fmt_len =
-	    strcspn(fmt_begin + 1, (const char[]) { GSH_PARAM_CH, '\0' }) + 1;
+	struct gsh_fmt_info fmt = {
+		.begin = fmt_begin,
+		.len = strcspn(fmt_begin + 1,
+			       (const char[]) { GSH_PARAM_CH, '\0' }) + 1,
+	};
 
 	char *const fmt_after =
-	    (fmt_begin[fmt_len] ? strdup(fmt_begin + fmt_len) : NULL);
+	    (fmt.begin[fmt.len] ? strdup(fmt.begin + fmt.len) : NULL);
 
 	switch ((enum gsh_special_param)fmt_begin[1]) {
 	case GSH_STATUS_PARAM:
-		gsh_expand_alloc(parsed, fmt_begin, fmt_len, "%d%s",
+		fmt.fmt_str = "%d%s";
+
+		gsh_expand_alloc(parsed,
+				 &fmt,
 				 params->last_status,
 				 (fmt_after ? fmt_after : ""));
 		break;
 	default:
-		gsh_fmt_var(params, parsed, fmt_begin, fmt_len, fmt_after);
+		gsh_fmt_var(params, parsed, &fmt, fmt_after);
 		break;
 	}
 
@@ -132,7 +149,13 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 		return;
 	}
 
-	gsh_expand_alloc(parsed, fmt_begin, 1, "%s%s", homevar, fmt_begin + 1);
+	struct gsh_fmt_info fmt = {
+		.begin = fmt_begin,
+		.len = 1,
+		.fmt_str = "%s%s",
+	};
+
+	gsh_expand_alloc(parsed, &fmt, homevar, fmt_begin + 1);
 }
 
 /*      Expand the last token.
