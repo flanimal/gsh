@@ -15,12 +15,12 @@
 void gsh_init_parsed(struct gsh_parsed *parsed)
 {
 	parsed->token_it = parsed->tokens =
-		calloc(GSH_MAX_ARGS, sizeof(char *));
+	    calloc(GSH_MAX_ARGS, sizeof(char *));
 	parsed->token_n = 0;
 
 	// MAX_ARGS plus sentinel.
 	parsed->alloc = malloc(sizeof(char *) * (GSH_MAX_ARGS + 1));
-	*parsed->alloc++ = NULL; // Set empty sentinel.
+	*parsed->alloc++ = NULL;	// Set empty sentinel.
 
 	parsed->tok_state = NULL;
 	parsed->need_more = false;
@@ -43,56 +43,62 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed, size_t fmt_len,
 	}
 }
 
+static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
+			char *const fmt_begin, char *const fmt_after)
+{
+	const size_t fmt_len = (size_t)(fmt_after - fmt_begin);
+	// If whole token is a parameter reference, substitute
+	// with pointer to env variable value.
+	if (strcmp(*parsed->token_it, fmt_begin) == 0) {
+		char *const value =
+		    envz_get(*environ, params->env_len, fmt_begin + 1);
+
+		*parsed->token_it = (value ? value : "");
+		return;
+	}
+
+	char *const var_name = strndup(fmt_begin + 1, fmt_len - 1);
+
+	char *value = envz_get(*environ, params->env_len, var_name);
+	free(var_name);
+
+	if (!value)
+		value = "";
+
+	gsh_expand_alloc(parsed, fmt_len,
+			 (size_t)snprintf(NULL, 0, "%s", value));
+
+	sprintf(fmt_begin, "%s%s", value, fmt_after);
+}
+
 /*      Substitute a parameter reference with its value.
  */
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			  char *const fmt_begin)
 {
 	const size_t fmt_len =
-		(size_t)(strchr(fmt_begin, GSH_PARAM_CH) - fmt_begin);
-
-	char *tmp = NULL;
+	    (size_t)(strchr(fmt_begin, GSH_PARAM_CH) - fmt_begin);
+	// FIXME: Use return of strchr as fmt_after.
+	char *fmt_after = NULL;
 	if (fmt_begin[fmt_len] != '\0')
-		tmp = strdup(fmt_begin + fmt_len);
+		fmt_after = strdup(fmt_begin + fmt_len);
 
 	switch ((enum gsh_special_param)fmt_begin[1]) {
-	case GSH_STATUS_PARAM: {
+	case GSH_STATUS_PARAM:
 		gsh_expand_alloc(parsed, fmt_len,
 				 (size_t)snprintf(NULL, 0, "%d",
 						  params->last_status));
 
 		sprintf(fmt_begin, "%d%s", params->last_status,
-			(tmp ? tmp : ""));
+			(fmt_after ? fmt_after : ""));
+		break;
+	default:
+		gsh_fmt_var(params, parsed, fmt_begin,
+			    (fmt_after ? fmt_after : ""));
 		break;
 	}
-	default: {
-		// If whole token is a parameter reference, substitute
-		// with pointer to env variable value.
-		if (strcmp(*parsed->token_it, fmt_begin) == 0) {
-			char *const value = envz_get(*environ, params->env_len,
-						     fmt_begin + 1);
 
-			*parsed->token_it = value ? value : "";
-			break;
-		}
-
-		char *const var_name = strndup(fmt_begin + 1, fmt_len - 1);
-
-		char *value = envz_get(*environ, params->env_len, var_name);
-		free(var_name);
-
-		if (!value)
-			value = "";
-
-		gsh_expand_alloc(parsed, fmt_len,
-				 (size_t)snprintf(NULL, 0, "%s", value));
-
-		sprintf(fmt_begin, "%s%s", value, (tmp ? tmp : ""));
-		break;
-	}
-	}
-
-	free(tmp);
+	free(fmt_after);
 }
 
 static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
@@ -164,9 +170,10 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char **const line)
 {
-	char *const next_tok = strtok_r(
-		(parsed->need_more || parsed->token_n == 0 ? *line : NULL), " ",
-		&parsed->tok_state);
+	char *const next_tok = strtok_r((parsed->need_more
+					 || parsed->token_n ==
+					 0 ? *line : NULL), " ",
+					&parsed->tok_state);
 
 	if (!next_tok)
 		// Reached the null byte, meaning there weren't any
@@ -188,8 +195,7 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 			line_cont[0] = line_cont[1];
 	}
 
-	while (gsh_expand_tok(params, parsed))
-		;
+	while (gsh_expand_tok(params, parsed)) ;
 
 	if (*parsed->alloc)
 		++parsed->alloc;

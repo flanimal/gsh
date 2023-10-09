@@ -3,6 +3,9 @@
   <ItemGroup>
     <None Include="Makefile" />
     <None Include="README.md" />
+    <None Include="src\special.def">
+      <Filter>Private</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Private">
