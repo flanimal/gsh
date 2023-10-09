@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <stdarg.h>
 
 #include "gsh.h"
 #include "parse.h"
@@ -28,19 +29,41 @@ void gsh_init_parsed(struct gsh_parsed *parsed)
 
 /*	Allocate or reallocate a buffer for token expansion.
 */
+static void gsh_expand_alloc(struct gsh_parsed *parsed, char *const fmt_begin,
+			     size_t fmt_len, const char *fmt_str, ...)
 {
-	if (fmt_len >= expand_len)
+	va_list fmt_args;
+	va_start(fmt_args, fmt_str);
+	
+	va_list tmp_args;
+	va_copy(tmp_args, fmt_args);
+	if (fmt_len >= (size_t)vsnprintf(NULL, 0, fmt_str, tmp_args)) {
+		// Don't need to allocate.
+		vsprintf(fmt_begin, fmt_str, fmt_args);
+		
+		va_end(tmp_args);
+		va_end(fmt_args);
 		return;
+	}
 
-	size_t new_len = expand_len - fmt_len;
+	va_end(tmp_args);
 
-	if (*parsed->alloc) {
+	if (*parsed->alloc)
 		free(*parsed->alloc);
-		*parsed->alloc = NULL;
-	}
-		*parsed->alloc = strcpy(malloc(new_len + 1), *parsed->token_it);
-		*parsed->token_it = *parsed->alloc;
-	}
+	
+	// Copy everything before fmt_begin.
+	*fmt_begin = '\0';
+
+	char *tmp;
+	asprintf(&tmp, "%s%s", *parsed->token_it, fmt_str);
+	
+	vasprintf(parsed->alloc, tmp, fmt_args);
+	free(tmp);
+
+	*parsed->token_it = *parsed->alloc;
+
+	va_end(fmt_args);
+}
 
 // TODO: Are fmt_begin and parsed->token_it always synonymous/aliased?
 // NO!
@@ -65,15 +88,10 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 
 	char *const var_name = strndup(fmt_begin + 1, fmt_len - 1);
 
-	char *value = envz_get(*environ, params->env_len, var_name);
-	value = (value ? value : "");
-
+	gsh_expand_alloc(parsed, fmt_begin, fmt_len, "%s%s",
+			 gsh_getenv(params, var_name),
+			 (fmt_after ? fmt_after : ""));
 	free(var_name);
-
-	gsh_expand_alloc(parsed, fmt_len,
-			 (size_t)snprintf(NULL, 0, "%s", value));
-
-	sprintf(fmt_begin, "%s%s", value, (fmt_after ? fmt_after : ""));
 }
 
 /*      Substitute a parameter reference with its value.
@@ -81,22 +99,17 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			  char *const fmt_begin)
 {
-	const size_t fmt_len = strcspn(fmt_begin + 1,
-				       (const char[]) { GSH_PARAM_CH,
-				       '\0' }) + 1;
+	const size_t fmt_len =
+	    strcspn(fmt_begin + 1, (const char[]) { GSH_PARAM_CH, '\0' }) + 1;
 
-	char *const fmt_after = (fmt_begin[fmt_len]
-				 ? strdup(fmt_begin + fmt_len)
-				 : NULL);
+	char *const fmt_after =
+	    (fmt_begin[fmt_len] ? strdup(fmt_begin + fmt_len) : NULL);
 
 	switch ((enum gsh_special_param)fmt_begin[1]) {
 	case GSH_STATUS_PARAM:
-		gsh_expand_alloc(parsed, fmt_len,
-				 (size_t)snprintf(NULL, 0, "%d",
-						  params->last_status));
-
-		sprintf(fmt_begin, "%d%s", params->last_status,
-			(fmt_after ? fmt_after : ""));
+		gsh_expand_alloc(parsed, fmt_begin, fmt_len, "%d%s",
+				 params->last_status,
+				 (fmt_after ? fmt_after : ""));
 		break;
 	default:
 		gsh_fmt_var(params, parsed, fmt_begin, fmt_len, fmt_after);
@@ -115,27 +128,15 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char *const fmt_begin)
 {
 	char *const homevar = gsh_getenv(params, "HOME");
-		   (const char[]) { GSH_HOME_CH, '\0' }) == 0) {
-		// Just subsitute the token with a reference to HOME.
-		*parsed->token_it = params->homevar;
+
+	if (strcmp(*parsed->token_it, (const char[]) { GSH_HOME_CH, '\0' }) ==
+	    0) {
+		*parsed->token_it = homevar;
 		return;
 	}
 
-	if (*parsed->alloc) {
-		char *tmp;
-		asprintf(&tmp, "%s%s%s", fmt_begin - 1, params->homevar,
+	gsh_expand_alloc(parsed, fmt_begin, 1, "%s%s", homevar,
 			 fmt_begin + 1);
-
-		free(*parsed->alloc);
-		*parsed->alloc = tmp;
-
-		return;
-	}
-
-	asprintf(parsed->alloc, "%s%s%s", fmt_begin - 1, params->homevar,
-		 fmt_begin + 1);
-
-	*parsed->token_it = *parsed->alloc;
 }
 
 /*      Expand the last token.
