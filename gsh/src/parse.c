@@ -40,8 +40,7 @@ void gsh_init_parsed(struct gsh_parsed *parsed)
 // and expand_tok() updates fmt_begin according to token_it.
 /*	Allocate or reallocate a buffer for token expansion.
 */
-static void p_alloc_fmt(struct gsh_parsed *parsed,
-			     struct p_fmt_info *fmt, ...)
+static void p_alloc_fmt(struct gsh_parsed *parsed, struct p_fmt_info *fmt, ...)
 {
 	va_list fmt_args, tmp_args;
 
@@ -54,16 +53,15 @@ static void p_alloc_fmt(struct gsh_parsed *parsed,
 		goto out_end;
 	}
 
-	if (*parsed->alloc)
-		free(*parsed->alloc);
-
 	// Copy everything before fmt_begin.
 	*fmt->begin = '\0';
 
 	char *tmp;
 	asprintf(&tmp, "%s%s", *parsed->token_it, fmt->fmt_str);
 
+	free(*parsed->alloc);
 	vasprintf(parsed->alloc, tmp, fmt_args);
+
 	free(tmp);
 
 	*parsed->token_it = *parsed->alloc;
@@ -86,7 +84,7 @@ out_end:
 *	If the variable does not exist, the token will be assigned the empty string.
 */
 static void p_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
-			struct p_fmt_info *fmt, char *const fmt_after)
+		      struct p_fmt_info *fmt, char *const fmt_after)
 {
 	if (strcmp(*parsed->token_it, fmt->begin) == 0) {
 		*parsed->token_it = gsh_getenv(params, fmt->begin + 1);
@@ -97,15 +95,14 @@ static void p_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 
 	fmt->fmt_str = "%s%s";
 	p_alloc_fmt(parsed, fmt,
-			 gsh_getenv(params, var_name),
-			 (fmt_after ? fmt_after : ""));
+		    gsh_getenv(params, var_name), (fmt_after ? fmt_after : ""));
 	free(var_name);
 }
 
 /*      Substitute a parameter reference with its value.
  */
 static void p_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
-			  char *const fmt_begin)
+			char *const fmt_begin)
 {
 	struct p_fmt_info fmt = {
 		.begin = fmt_begin,
@@ -121,9 +118,8 @@ static void p_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 		fmt.fmt_str = "%d%s";
 
 		p_alloc_fmt(parsed,
-				 &fmt,
-				 params->last_status,
-				 (fmt_after ? fmt_after : ""));
+			    &fmt,
+			    params->last_status, (fmt_after ? fmt_after : ""));
 		break;
 	default:
 		p_fmt_var(params, parsed, &fmt, fmt_after);
@@ -139,7 +135,7 @@ static void p_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 *	assigned to point to the value of $HOME.
 */
 static void p_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
-			 char *const fmt_begin)
+		       char *const fmt_begin)
 {
 	char *const homevar = gsh_getenv(params, "HOME");
 
@@ -198,7 +194,7 @@ static bool p_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
  *      stopping at spaces.
  */
 static bool p_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
-			 char **const line)
+		       char **const line)
 {
 	char *const next_tok = strtok_r((parsed->need_more
 					 || parsed->token_n ==
