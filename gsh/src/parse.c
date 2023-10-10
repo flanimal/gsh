@@ -40,7 +40,7 @@ void gsh_init_parsed(struct gsh_parsed *parsed)
 // and expand_tok() updates fmt_begin according to token_it.
 /*	Allocate or reallocate a buffer for token expansion.
 */
-static void p_expand_alloc(struct gsh_parsed *parsed,
+static void p_alloc_fmt(struct gsh_parsed *parsed,
 			     struct p_fmt_info *fmt, ...)
 {
 	va_list fmt_args, tmp_args;
@@ -96,7 +96,7 @@ static void p_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 	char *const var_name = strndup(fmt->begin + 1, fmt->len - 1);
 
 	fmt->fmt_str = "%s%s";
-	p_expand_alloc(parsed, fmt,
+	p_alloc_fmt(parsed, fmt,
 			 gsh_getenv(params, var_name),
 			 (fmt_after ? fmt_after : ""));
 	free(var_name);
@@ -120,7 +120,7 @@ static void p_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 	case GSH_STATUS_PARAM:
 		fmt.fmt_str = "%d%s";
 
-		p_expand_alloc(parsed,
+		p_alloc_fmt(parsed,
 				 &fmt,
 				 params->last_status,
 				 (fmt_after ? fmt_after : ""));
@@ -155,7 +155,7 @@ static void p_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 		.fmt_str = "%s%s",
 	};
 
-	p_expand_alloc(parsed, &fmt, homevar, fmt_begin + 1);
+	p_alloc_fmt(parsed, &fmt, homevar, fmt_begin + 1);
 }
 
 /*      Expand the last token.
