@@ -85,7 +85,6 @@ struct gsh_parsed *gsh_init_parsed()
 	
 	// MAX_ARGS plus sentinel.
 	parsed->alloc = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
-	parsed->alloc++; // Skip empty sentinel.
 
 	parsed->tok_state = NULL;
 	parsed->need_more = false;
@@ -117,12 +116,12 @@ static void gsh_alloc_fmt(struct gsh_parsed *parsed, struct p_fmt_info *fmt, ...
 	char *tmp;
 	asprintf(&tmp, "%s%s", *parsed->token_it, fmt->fmt_str);
 
-	free(*parsed->alloc);
-	vasprintf(parsed->alloc, tmp, fmt_args);
+	free(parsed->alloc[1]);
+	vasprintf(parsed->alloc + 1, tmp, fmt_args);
 
 	free(tmp);
 
-	*parsed->token_it = *parsed->alloc;
+	*parsed->token_it = parsed->alloc[1];
 
 out_end:
 	va_end(tmp_args);
@@ -271,7 +270,7 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 
 	while (gsh_expand_tok(params, parsed)) ;
 
-	if (*parsed->alloc)
+	if (parsed->alloc[1])
 		++parsed->alloc;
 
 	++parsed->token_it;
@@ -323,14 +322,14 @@ static bool gsh_parse_cmd_args(struct gsh_params *params, struct gsh_parsed *par
 void gsh_free_parsed(struct gsh_parsed *parsed)
 {
 	// Delete substitution buffers.
-	while (--parsed->alloc) {
+	while (*parsed->alloc) {
 		free(*parsed->alloc);
-		*parsed->alloc = NULL;
+		*parsed->alloc-- = NULL;
 	}
 	
 	// Reset token list.
-	while (--parsed->token_it >= parsed->tokens)
-		*parsed->token_it = NULL;
+	while (parsed->token_it > parsed->tokens)
+		*(--parsed->token_it) = NULL;
 
 	parsed->tok_state = NULL;
 	parsed->need_more = false;
