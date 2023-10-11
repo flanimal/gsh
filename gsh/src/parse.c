@@ -235,33 +235,35 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 	}
 }
 
-/*      Returns true while there are still more tokens to collect,
+/*      Collect and insert a fully-expanded token into the list.
+ *	
+ *	Returns true while there are still more tokens to collect,
  *	similar to strtok.
  *
- *      Increments token_it by 1 for each completed token.
+ *      NOTE: After a token is collected, `parsed->token_it` is incremented and
+ *	`line` is advanced.
  */
 static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
-			 char **const line)
+			 char **const line_it)
 {
-	char *const str = (!parsed->tokens[1]
-			   || parsed->need_more) ? *line : NULL;
+	char *const str = (!parsed->tokens[1] || parsed->need_more) ? *line_it :
+	    NULL;
 	parsed->need_more = false;
 
-	if (!(*line = strtok_r(str, " ", &parsed->tok_state)))
+	if (!(*line_it = strtok_r(str, " ", &parsed->tok_state)))
 		return false;
 
-	*parsed->token_it = *line;
+	*parsed->token_it = *line_it;
 
-	char *line_cont = strchr(*line, '\\');
-	if (line_cont) {
-		if (line_cont[1] == '\0') {
+	char *linebreak = strchr(*line_it, '\\');
+	if (linebreak) {
+		if (linebreak[1] == '\0') {
 			parsed->need_more = true;
 			return true;
 		}
-
 		// Remove the backslash.
-		for (; *line_cont; ++line_cont)
-			line_cont[0] = line_cont[1];
+		for (; *linebreak; ++linebreak)
+			linebreak[0] = linebreak[1];
 	}
 
 	while (gsh_expand_tok(params, parsed)) ;
