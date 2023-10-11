@@ -235,9 +235,9 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 	}
 }
 
-static bool gsh_parse_linebrk(struct gsh_parsed* parsed, char** const line_it)
+static bool gsh_parse_linebrk(struct gsh_parsed* parsed, char *line)
 {
-	char *linebreak = strchr(*line_it, '\\');
+	char *linebreak = strchr(line, '\\');
 	if (linebreak) {
 		if (linebreak[1] == '\0') {
 			parsed->need_more = true;
@@ -265,6 +265,7 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 	{
 		char *const str = (!parsed->tokens[1] || parsed->need_more) ?
 		    *line_it : NULL;
+
 		parsed->need_more = false;
 
 		if (!(*line_it = strtok_r(str, " ", &parsed->tok_state)))
@@ -273,7 +274,7 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 
 	*parsed->token_it = *line_it;
 
-	if (gsh_parse_linebrk(parsed, line_it))
+	if (gsh_parse_linebrk(parsed, *line_it))
 		return true;
 
 	while (gsh_expand_tok(params, parsed)) ;
