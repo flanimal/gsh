@@ -14,6 +14,9 @@
 
 #include "special.def"
 
+/* The maximum number of arguments that can be passed on the command line. */
+#define GSH_MAX_ARGS 64
+
 #define GSH_SECOND_PROMPT "> "
 
 #ifndef NDEBUG

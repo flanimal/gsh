@@ -7,6 +7,7 @@
 
 #include "gsh.h"
 #include "history.h"
+#include "parse.h"
 
 #define GSH_MAX_HIST 10
 
@@ -19,7 +20,6 @@ struct gsh_hist_ent {
 };
 
 void gsh_bad_cmd(const char *msg, int err);
-void gsh_free_parsed(struct gsh_parsed *parsed); // FIXME:
 
 static void new_hist_ent(struct gsh_cmd_hist *sh_hist,
 					 size_t len, const char *line)
