@@ -327,7 +327,7 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 		free(*parsed->alloc);
 		*parsed->alloc = NULL;
 	}
-
+	
 	// Reset token list.
 	while (--parsed->token_it >= parsed->tokens)
 		*parsed->token_it = NULL;
@@ -340,9 +340,15 @@ int gsh_parse_and_run(struct gsh_state *sh)
 {
 	char *line_it = sh->line;
 
-	while (gsh_parse_filename(&sh->params, sh->parsed, sh->line) ||
-	       gsh_parse_cmd_args(&sh->params, sh->parsed, &line_it)) {
-		gsh_read_line(sh);
+	for (;; gsh_read_line(sh))
+	{
+		if (gsh_parse_filename(&sh->params, sh->parsed, sh->line))
+			continue;
+
+		if (gsh_parse_cmd_args(&sh->params, sh->parsed, &line_it))
+			continue;
+
+		break;
 	}
 
 	int status = gsh_switch(sh,
