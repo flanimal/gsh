@@ -5,6 +5,9 @@
 /* The maximum number of arguments that can be passed on the command line. */
 #define GSH_MAX_ARGS 64
 
+#define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
+#define GSH_SECOND_PROMPT "> "
+
 extern char **environ;
 
 /* Parameters. */
@@ -31,6 +34,10 @@ struct gsh_state {
         char *line; 
 	size_t input_len;
 };
+
+size_t gsh_max_input(const struct gsh_state *sh);
+
+void gsh_put_prompt(const struct gsh_state *sh);
 
 char *gsh_getenv(const struct gsh_params *params, const char *name);
 

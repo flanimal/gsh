@@ -13,28 +13,25 @@
 
 #include "gsh.h"
 #include "parse.h"
-#include "builtin.h"
 #include "history.h"
+#include "builtin.h"
 #include "process.h"
 
-#define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
-#define GSH_SECOND_PROMPT "> "
-
 #ifndef NDEBUG
-static bool g_gsh_initialized = false;
+bool g_gsh_initialized = false;
 #endif
 
-static void gsh_put_prompt(const struct gsh_params *params, const char *cwd)
+void gsh_put_prompt(const struct gsh_state *sh)
 {
 	const bool in_home =
-		strncmp(cwd, gsh_getenv(params, "HOME"), params->home_len) ==
+		strncmp(sh->wd->cwd, gsh_getenv(&sh->params, "HOME"), sh->params.home_len) ==
 	    0;
 
-	const int status = WIFEXITED(params->last_status) ?
-	    WEXITSTATUS(params->last_status) : 255;
+	const int status = WIFEXITED(sh->params.last_status) ?
+	    WEXITSTATUS(sh->params.last_status) : 255;
 
 	printf((in_home ? "<%d>" GSH_PROMPT("~%s") : "<%d>" GSH_PROMPT("%s")),
-	       status, cwd + (in_home ? params->home_len : 0));
+	       status, sh->wd->cwd + (in_home ? sh->params.home_len : 0));
 }
 
 void gsh_bad_cmd(const char *msg, int err)
@@ -80,7 +77,7 @@ static void gsh_init_wd(struct gsh_workdir *wd)
  *	that will currently be accepted, not including the newline
  *	or null byte.
  */
-static size_t gsh_max_input(const struct gsh_state *sh)
+size_t gsh_max_input(const struct gsh_state *sh)
 {
 	return (size_t)sh->wd->max_input - sh->input_len;
 }
@@ -100,7 +97,7 @@ void gsh_init(struct gsh_state *sh)
 {
 	gsh_init_params(&sh->params);
 	gsh_init_wd((sh->wd = malloc(sizeof(*sh->wd))));
-	gsh_init_parsed((sh->parsed = malloc(sizeof(*sh->parsed))));
+	sh->parsed = gsh_init_parsed();
 
 	sh->hist = malloc(sizeof(*sh->hist));
 	sh->hist->cmd_history = sh->hist->oldest_cmd = NULL;
@@ -114,35 +111,6 @@ void gsh_init(struct gsh_state *sh)
 #ifndef NDEBUG
 	g_gsh_initialized = true;
 #endif
-}
-
-void gsh_read_line(struct gsh_state *sh)
-{
-	assert(g_gsh_initialized);
-
-	// Check if called to get more input.
-	if (sh->parsed->need_more) {
-		--sh->input_len;
-
-		fputs(GSH_SECOND_PROMPT, stdout);
-	} else {
-		sh->input_len = 0;
-
-		gsh_put_prompt(&sh->params, sh->wd->cwd);
-	}
-
-	if (!fgets(sh->line + sh->input_len,
-		   (int)(gsh_max_input(sh) + 1), stdin)) {
-		if (ferror(stdin))
-			perror("gsh exited");
-
-		exit((feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE));
-	}
-
-	const size_t len = strlen(sh->line + sh->input_len);
-
-	sh->line[sh->input_len + len - 1] = '\0';	// Remove newline.
-	sh->input_len = len - 1;
 }
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
@@ -185,7 +153,7 @@ static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
 }
 
 /* Fork and exec a program. */
-static int gsh_exec(struct gsh_state *sh, char **args)
+int gsh_exec(struct gsh_state *sh, char *pathname, char **args)
 {
 	pid_t cmd_pid = fork();
 
@@ -194,8 +162,8 @@ static int gsh_exec(struct gsh_state *sh, char **args)
 		return sh->params.last_status;
 	}
 
-	if (sh->parsed->has_pathname)
-		execve(sh->line, (char *const *)args, environ);
+	if (pathname)
+		execve(pathname, (char *const *)args, environ);
 	else
 		gsh_exec_path(gsh_getenv(&sh->params, "PATH"), sh->wd, args);
 
@@ -204,41 +172,8 @@ static int gsh_exec(struct gsh_state *sh, char **args)
 	exit(GSH_EXIT_NOTFOUND);
 }
 
-/* Re-run the n-th previous line of input. */
-static int gsh_recall(struct gsh_state *sh, const char *recall_arg)
+int gsh_switch(struct gsh_state *sh, char *pathname, char **args)
 {
-	int n_arg = (recall_arg ? atoi(recall_arg) : 1);
-
-	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
-		gsh_bad_cmd("no matching history entry", 0);
-		return -1;
-	}
-
-	struct gsh_hist_ent *cmd_it = sh->hist->cmd_history;
-
-	while (cmd_it->forw && n_arg-- > 1)
-		cmd_it = cmd_it->forw;
-
-	printf("%s\n", cmd_it->line);
-
-	// Ensure that parse state from recall invocation is not
-	// reused.
-	gsh_free_parsed(sh->parsed);
-
-	// Make a copy so we don't lose it if the history entry
-	// gets deleted.
-	strcpy(sh->line, cmd_it->line);
-	sh->input_len = cmd_it->len;
-
-	gsh_run_cmd(sh);
-
-	return sh->params.last_status;
-}
-
-static int gsh_switch(struct gsh_state *sh)
-{
-	char **args = sh->parsed->tokens;
-
 	// TODO: hash table or something
 	if (strcmp(args[0], "cd") == 0)
 		return gsh_chdir(sh->wd, args[1]);
@@ -247,7 +182,7 @@ static int gsh_switch(struct gsh_state *sh)
 		return gsh_recall(sh, args[1]);
 
 	else if (strcmp(args[0], "hist") == 0)
-		return gsh_list_hist(sh->hist->cmd_history);
+		return gsh_list_hist(sh->hist);
 
 	else if (strcmp(args[0], "echo") == 0)
 		return gsh_echo(args + 1);
@@ -259,7 +194,7 @@ static int gsh_switch(struct gsh_state *sh)
 		exit(EXIT_SUCCESS);
 
 	else
-		return gsh_exec(sh, args);
+		return gsh_exec(sh, pathname, args);
 }
 
 void gsh_run_cmd(struct gsh_state *sh)
@@ -271,13 +206,5 @@ void gsh_run_cmd(struct gsh_state *sh)
 
 	gsh_add_hist(sh->hist, sh->input_len, sh->line);
 
-	char *line_tmp = sh->line;
-	while (gsh_parse_filename(&sh->params, sh->parsed, line_tmp) ||
-	       gsh_parse_args(&sh->params, sh->parsed, &line_tmp)) {
-		gsh_read_line(sh); 
-	}
-
-	sh->params.last_status = gsh_switch(sh);
-
-	gsh_free_parsed(sh->parsed);
+	sh->params.last_status = gsh_parse_and_run(sh);
 }

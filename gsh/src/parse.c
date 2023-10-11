@@ -3,6 +3,7 @@
 #include <envz.h>
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -13,6 +14,29 @@
 
 #include "special.def"
 
+#ifndef NDEBUG
+extern bool g_gsh_initialized;
+#endif
+
+struct gsh_parsed {
+	bool has_pathname;
+	bool need_more;
+
+	/* The tokens gotten from the current input line. */
+	char **tokens;
+
+	/* The token that is currently being parsed. */
+	char **token_it;	// TODO: Or move this outside?
+
+	/* Number of complete tokens so far. */
+	size_t token_n;		// TODO: <<< get rid
+
+	/* Buffers for any substitutions performed on tokens. */
+	char **alloc;
+
+	char *tok_state;
+};
+
 struct p_fmt_info {
 	char *begin;
 	size_t len;
@@ -20,8 +44,39 @@ struct p_fmt_info {
 	const char *fmt_str;
 };
 
-void gsh_init_parsed(struct gsh_parsed *parsed)
+void gsh_read_line(struct gsh_state *sh)
 {
+	assert(g_gsh_initialized);
+
+	// Check if called to get more input.
+	if (sh->parsed->need_more) {
+		--sh->input_len;
+
+		fputs(GSH_SECOND_PROMPT, stdout);
+	} else {
+		sh->input_len = 0;
+
+		gsh_put_prompt(sh);
+	}
+
+	if (!fgets(sh->line + sh->input_len, (int)(gsh_max_input(sh) + 1),
+		   stdin)) {
+		if (ferror(stdin))
+			perror("gsh exited");
+
+		exit((feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE));
+	}
+
+	const size_t len = strlen(sh->line + sh->input_len);
+
+	sh->line[sh->input_len + len - 1] = '\0';	// Remove newline.
+	sh->input_len = len - 1;
+}
+
+struct gsh_parsed *gsh_init_parsed()
+{
+	struct gsh_parsed *parsed = malloc(sizeof(*parsed));
+
 	parsed->token_it = parsed->tokens =
 	    calloc(GSH_MAX_ARGS, sizeof(char *));
 	parsed->token_n = 0;
@@ -32,6 +87,8 @@ void gsh_init_parsed(struct gsh_parsed *parsed)
 
 	parsed->tok_state = NULL;
 	parsed->need_more = false;
+
+	return parsed;
 }
 
 // TODO: (?) What happens to fmt_begin after this gets called?
@@ -52,7 +109,6 @@ static void p_alloc_fmt(struct gsh_parsed *parsed, struct p_fmt_info *fmt, ...)
 		vsprintf(fmt->begin, fmt->fmt_str, fmt_args);
 		goto out_end;
 	}
-
 	// Copy everything before fmt_begin.
 	*fmt->begin = '\0';
 
@@ -232,8 +288,14 @@ static bool p_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 	return true;
 }
 
-bool gsh_parse_filename(struct gsh_params *params, struct gsh_parsed *parsed,
-			char *line)
+/*      Parse the first token in the input line, and place
+ *      the filename in the argument array.
+ *
+ *      Returns true if we need more input to parse a filename,
+ *      false if we're done.
+ */
+static bool gsh_parse_filename(struct gsh_params *params,
+			       struct gsh_parsed *parsed, char *line)
 {
 	// Immediately return if we already got the filename.
 	if (parsed->token_n > 0)
@@ -250,8 +312,14 @@ bool gsh_parse_filename(struct gsh_params *params, struct gsh_parsed *parsed,
 	return false;
 }
 
-bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed,
-		    char **line)
+/*	Parse tokens and place them into the argument array, which is
+ *      then terminated with a NULL pointer.
+ *
+ *      Returns true if we need more input to parse an argument,
+ *      false if we're done.
+ */
+static bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed,
+			   char **line)
 {
 	while (parsed->token_n <= GSH_MAX_ARGS &&
 	       p_next_tok(params, parsed, line)) {
@@ -274,4 +342,21 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 
 	parsed->tok_state = NULL;
 	parsed->need_more = false;
+}
+
+int gsh_parse_and_run(struct gsh_state *sh)
+{
+	char *line_tmp = sh->line;
+
+	while (gsh_parse_filename(&sh->params, sh->parsed, line_tmp) ||
+	       gsh_parse_args(&sh->params, sh->parsed, &line_tmp)) {
+		gsh_read_line(sh);
+	}
+
+	int status = gsh_switch(sh,
+				(sh->parsed->has_pathname ? sh->line : NULL),
+				sh->parsed->tokens);
+	gsh_free_parsed(sh->parsed);
+
+	return status;
 }
