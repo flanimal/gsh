@@ -296,7 +296,7 @@ static bool gsh_parse_filename(struct gsh_params *params,
 
 	char *last_slash = strrchr(line, '/');
 	if (last_slash)
-		*parsed->token_it = last_slash + 1;
+		parsed->token_it[-1] = last_slash + 1;
 
 	parsed->has_pathname = !!last_slash;
 	return false;
