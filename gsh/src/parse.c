@@ -14,7 +14,10 @@
 
 #include "special.def"
 
-/* The maximum number of arguments that can be passed on the command line. */
+/* 
+ *	The maximum number of arguments that can be passed on the command line,
+ * 	including the filename. 
+ */
 #define GSH_MAX_ARGS 64
 
 #define GSH_SECOND_PROMPT "> "
@@ -24,16 +27,16 @@ extern bool g_gsh_initialized;
 #endif
 
 struct gsh_parsed {
-	bool has_pathname;
+	bool has_pathname; // TODO: Do we still need this?
 	bool need_more;
 
 	/* List of tokens to be returned from parsing. */
 	char **tokens;
 
-	/* Pointer to the token currently being constructed. */
+	/* Pointer to the token currently being parsed. */
 	char **token_it;
 
-	/* Buffers for any substitutions performed on tokens. */
+	/* Stack of buffers for tokens that contain substitutions. */
 	char **alloc;
 
 	char *tok_state;
@@ -52,7 +55,7 @@ void gsh_read_line(struct gsh_state *sh)
 
 	// Check if called to get more input.
 	if (sh->parsed->need_more) {
-		--sh->input_len;
+		--sh->input_len; // TODO: Try to make it clear why we do this.
 		fputs(GSH_SECOND_PROMPT, stdout);
 	} else {
 		sh->input_len = 0;
@@ -81,8 +84,8 @@ struct gsh_parsed *gsh_init_parsed()
 	    calloc(GSH_MAX_ARGS, sizeof(char *));
 	
 	// MAX_ARGS plus sentinel.
-	parsed->alloc = malloc(sizeof(char *) * (GSH_MAX_ARGS + 1));
-	*parsed->alloc++ = NULL;	// Set empty sentinel.
+	parsed->alloc = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
+	parsed->alloc++; // Skip empty sentinel.
 
 	parsed->tok_state = NULL;
 	parsed->need_more = false;
@@ -319,13 +322,15 @@ static bool gsh_parse_cmd_args(struct gsh_params *params, struct gsh_parsed *par
 
 void gsh_free_parsed(struct gsh_parsed *parsed)
 {
-	// Delete any token substitution buffers.
-	while (parsed->alloc[-1])
-		free(*parsed->alloc--);
+	// Delete substitution buffers.
+	while (--parsed->alloc) {
+		free(*parsed->alloc);
+		*parsed->alloc = NULL;
+	}
 
-	// Mark tokens as empty.
-	while (parsed->token_it != parsed->tokens)
-		*(--parsed->token_it) = NULL;
+	// Reset token list.
+	while (--parsed->token_it >= parsed->tokens)
+		*parsed->token_it = NULL;
 
 	parsed->tok_state = NULL;
 	parsed->need_more = false;
