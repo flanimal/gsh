@@ -17,21 +17,24 @@
 #include "builtin.h"
 #include "process.h"
 
+#define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
+
 #ifndef NDEBUG
 bool g_gsh_initialized = false;
 #endif
 
 void gsh_put_prompt(const struct gsh_state *sh)
 {
-	const bool in_home =
-		strncmp(sh->wd->cwd, gsh_getenv(&sh->params, "HOME"), sh->params.home_len) ==
-	    0;
+	if (sh->show_status)
+		printf("<%d> ", WIFEXITED(sh->params.last_status) ?
+		       WEXITSTATUS(sh->params.last_status) : 255);
 
-	const int status = WIFEXITED(sh->params.last_status) ?
-	    WEXITSTATUS(sh->params.last_status) : 255;
+	const bool in_home = strncmp(sh->wd->cwd,
+				     gsh_getenv(&sh->params, "HOME"),
+				     sh->params.home_len) == 0;
 
-	printf((in_home ? "<%d>" GSH_PROMPT("~%s") : "<%d>" GSH_PROMPT("%s")),
-	       status, sh->wd->cwd + (in_home ? sh->params.home_len : 0));
+	printf((in_home ? GSH_PROMPT("~%s") : GSH_PROMPT("%s")),
+	       (in_home ? sh->params.home_len : 0) + sh->wd->cwd);
 }
 
 void gsh_bad_cmd(const char *msg, int err)
@@ -41,7 +44,7 @@ void gsh_bad_cmd(const char *msg, int err)
 	       (err ? ")" : ""));
 }
 
-char *gsh_getenv(const struct gsh_params* params, const char *name)
+char *gsh_getenv(const struct gsh_params *params, const char *name)
 {
 	assert(params->env_len > 0);
 
@@ -91,7 +94,7 @@ static void gsh_init_params(struct gsh_params *params)
 	params->env_len = 0;
 	for (char **env_it = environ; *env_it; ++env_it)
 		params->env_len += strlen(*env_it);
-	
+
 	params->home_len = strlen(gsh_getenv(params, "HOME"));
 
 	params->last_status = 0;
@@ -116,6 +119,8 @@ void gsh_init(struct gsh_state *sh)
 #ifndef NDEBUG
 	g_gsh_initialized = true;
 #endif
+
+	sh->show_status = true;
 }
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or

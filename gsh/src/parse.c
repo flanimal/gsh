@@ -14,6 +14,8 @@
 
 #include "special.def"
 
+#define GSH_SECOND_PROMPT "> "
+
 #ifndef NDEBUG
 extern bool g_gsh_initialized;
 #endif
@@ -51,11 +53,9 @@ void gsh_read_line(struct gsh_state *sh)
 	// Check if called to get more input.
 	if (sh->parsed->need_more) {
 		--sh->input_len;
-
 		fputs(GSH_SECOND_PROMPT, stdout);
 	} else {
 		sh->input_len = 0;
-
 		gsh_put_prompt(sh);
 	}
 

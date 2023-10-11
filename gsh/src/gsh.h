@@ -1,12 +1,10 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdbool.h>
 
 /* The maximum number of arguments that can be passed on the command line. */
 #define GSH_MAX_ARGS 64
-
-#define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
-#define GSH_SECOND_PROMPT "> "
 
 extern char **environ;
 
@@ -30,6 +28,8 @@ struct gsh_state {
 	struct gsh_workdir *wd;
 
 	struct gsh_params params;
+
+	bool show_status; // TODO: Put shell options somewhere.
 
         char *line; 
 	size_t input_len;
