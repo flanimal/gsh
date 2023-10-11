@@ -141,7 +141,7 @@ static void gsh_copy_pathname(char **const dest_it, const char **const src_it)
 
 // TODO: (!) Move wd->max_path to parse state?
 static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
-			 char **args)
+			 char *const *args)
 {
 	char *const exec_buf = malloc((size_t)wd->max_path);
 	char *exec_pathname;
@@ -152,7 +152,7 @@ static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
 		gsh_copy_pathname(&exec_pathname, &path_it);
 		sprintf(exec_pathname, "/%s", args[0]);
 
-		execve(exec_buf, (char *const *)args, environ);
+		execve(exec_buf, args, environ);
 	}
 
 	free(exec_buf);
@@ -161,7 +161,7 @@ static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
 }
 
 /* Fork and exec a program. */
-static int gsh_exec(struct gsh_state *sh, char *pathname, char **args)
+static int gsh_exec(struct gsh_state *sh, char *pathname, char *const *args)
 {
 	pid_t cmd_pid = fork();
 
@@ -171,7 +171,7 @@ static int gsh_exec(struct gsh_state *sh, char *pathname, char **args)
 	}
 
 	if (pathname)
-		execve(pathname, (char *const *)args, environ);
+		execve(pathname, args, environ);
 	else
 		gsh_exec_path(gsh_getenv(&sh->params, "PATH"), sh->wd, args);
 
@@ -180,9 +180,9 @@ static int gsh_exec(struct gsh_state *sh, char *pathname, char **args)
 	exit(GSH_EXIT_NOTFOUND);
 }
 
-int gsh_switch(struct gsh_state *sh, char *pathname, char **args)
+int gsh_switch(struct gsh_state *sh, char *pathname, char *const *args)
 {
-	// TODO: hash table or something
+	// TODO: hash table or something, if just for ease of reading
 	if (strcmp(args[0], "cd") == 0)
 		return gsh_chdir(sh->wd, args[1]);
 

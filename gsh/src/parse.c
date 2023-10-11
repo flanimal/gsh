@@ -255,9 +255,6 @@ static bool gsh_parse_linebrk(struct gsh_parsed* parsed, char *line)
  *	
  *	Returns true while there are still more tokens to collect,
  *	similar to strtok.
- *
- *      NOTE: After a token is collected, `parsed->token_it` is incremented and
- *	`line` is advanced.
  */
 static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char **const line_it)
@@ -320,10 +317,10 @@ static bool gsh_parse_filename(struct gsh_params *params,
  *      false if done.
  */
 static bool gsh_parse_cmd_args(struct gsh_params *params,
-			       struct gsh_parsed *parsed, char **line)
+			       struct gsh_parsed *parsed, char **line_it)
 {
 	while ((parsed->token_it - parsed->tokens) <= GSH_MAX_ARGS &&
-	       gsh_next_tok(params, parsed, line)) {
+	       gsh_next_tok(params, parsed, line_it)) {
 		if (parsed->need_more)
 			return true;
 	}

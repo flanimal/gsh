@@ -29,7 +29,7 @@ struct gsh_state {
 	bool show_status; // TODO: Put shell options somewhere.
 
         char *line; 
-	size_t input_len;
+	size_t input_len; // TODO: (!) Replace with line_it?
 };
 
 char *gsh_getenv(const struct gsh_params *params, const char *name);
