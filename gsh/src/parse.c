@@ -235,6 +235,22 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 	}
 }
 
+static bool gsh_parse_linebrk(struct gsh_parsed* parsed, char** const line_it)
+{
+	char *linebreak = strchr(*line_it, '\\');
+	if (linebreak) {
+		if (linebreak[1] == '\0') {
+			parsed->need_more = true;
+			return true;
+		}
+		// Remove the backslash.
+		for (; *linebreak; ++linebreak)
+			linebreak[0] = linebreak[1];
+	}
+
+	return false;
+}
+
 /*      Collect and insert a fully-expanded token into the list.
  *	
  *	Returns true while there are still more tokens to collect,
@@ -246,25 +262,19 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char **const line_it)
 {
-	char *const str = (!parsed->tokens[1] || parsed->need_more) ? *line_it :
-	    NULL;
-	parsed->need_more = false;
+	{
+		char *const str = (!parsed->tokens[1] || parsed->need_more) ?
+		    *line_it : NULL;
+		parsed->need_more = false;
 
-	if (!(*line_it = strtok_r(str, " ", &parsed->tok_state)))
-		return false;
+		if (!(*line_it = strtok_r(str, " ", &parsed->tok_state)))
+			return false;
+	}
 
 	*parsed->token_it = *line_it;
 
-	char *linebreak = strchr(*line_it, '\\');
-	if (linebreak) {
-		if (linebreak[1] == '\0') {
-			parsed->need_more = true;
-			return true;
-		}
-		// Remove the backslash.
-		for (; *linebreak; ++linebreak)
-			linebreak[0] = linebreak[1];
-	}
+	if (gsh_parse_linebrk(parsed, line_it))
+		return true;
 
 	while (gsh_expand_tok(params, parsed)) ;
 
