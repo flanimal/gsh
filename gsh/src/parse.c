@@ -27,14 +27,11 @@ struct gsh_parsed {
 	bool has_pathname;
 	bool need_more;
 
-	/* The tokens gotten from the current input line. */
+	/* List of tokens to be returned from parsing. */
 	char **tokens;
 
-	/* The token that is currently being parsed. */
-	char **token_it;	// TODO: Or move this outside?
-
-	/* Number of complete tokens so far. */
-	size_t token_n;		// TODO: <<< get rid
+	/* Pointer to the token currently being constructed. */
+	char **token_it;
 
 	/* Buffers for any substitutions performed on tokens. */
 	char **alloc;
@@ -82,8 +79,7 @@ struct gsh_parsed *gsh_init_parsed()
 
 	parsed->token_it = parsed->tokens =
 	    calloc(GSH_MAX_ARGS, sizeof(char *));
-	parsed->token_n = 0;
-
+	
 	// MAX_ARGS plus sentinel.
 	parsed->alloc = malloc(sizeof(char *) * (GSH_MAX_ARGS + 1));
 	*parsed->alloc++ = NULL;	// Set empty sentinel.
@@ -242,23 +238,12 @@ static bool gsh_expand_tok(struct gsh_params *params,
  *	similar to strtok.
  *
  *      Increments token_n and token_it by 1 for each completed token.
- *
- *      ***
- *
- *      By default, a backslash \ is the _line continuation character_.
- *
- *      Or, in other words, it concatenates what appears on both sides of it,
- *      skipping null bytes and newlines, but stopping at spaces.
- *
- *      Or, in other *other* words, it means to append to the preceding token,
- *      stopping at spaces.
  */
 static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char **const line)
 {
 	char *const next_tok = strtok_r((parsed->need_more
-					 || parsed->token_n ==
-					 0 ? *line : NULL), " ",
+					 || parsed->token_it == parsed->tokens ? *line : NULL), " ",
 					&parsed->tok_state);
 
 	if (!next_tok)
@@ -287,22 +272,20 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 		++parsed->alloc;
 
 	++parsed->token_it;
-	++parsed->token_n;
-
 	return true;
 }
 
 /*      Parse the first token in the input line, and place
  *      the filename in the argument array.
  *
- *      Returns true if we need more input to parse a filename,
- *      false if we're done.
+ *      Returns true if more input is needed to parse a filename,
+ *      false if done.
  */
-static bool gsh_parse_cmd_name(struct gsh_params *params,
+static bool gsh_parse_filename(struct gsh_params *params,
 			       struct gsh_parsed *parsed, char *line)
 {
-	// Immediately return if we already got the filename.
-	if (parsed->token_n > 0)
+	// Immediately return if filename has already been gotten.
+	if (parsed->token_it != parsed->tokens)
 		return false;
 
 	if (gsh_next_tok(params, parsed, &line) && parsed->need_more)
@@ -319,13 +302,13 @@ static bool gsh_parse_cmd_name(struct gsh_params *params,
 /*	Parse tokens and place them into the argument array, which is
  *      then terminated with a NULL pointer.
  *
- *      Returns true if we need more input to parse an argument,
- *      false if we're done.
+ *      Returns true if more input is needed to parse an argument,
+ *      false if done.
  */
 static bool gsh_parse_cmd_args(struct gsh_params *params, struct gsh_parsed *parsed,
 			   char **line)
 {
-	while (parsed->token_n <= GSH_MAX_ARGS &&
+	while ((parsed->token_it - parsed->tokens) <= GSH_MAX_ARGS &&
 	       gsh_next_tok(params, parsed, line)) {
 		if (parsed->need_more)
 			return true;
@@ -341,7 +324,7 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 		free(*parsed->alloc--);
 
 	// Mark tokens as empty.
-	for (; parsed->token_n > 0; --parsed->token_n)
+	while (parsed->token_it != parsed->tokens)
 		*(--parsed->token_it) = NULL;
 
 	parsed->tok_state = NULL;
@@ -350,10 +333,10 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 
 int gsh_parse_and_run(struct gsh_state *sh)
 {
-	char *line_tmp = sh->line;
+	char *line_it = sh->line;
 
-	while (gsh_parse_cmd_name(&sh->params, sh->parsed, line_tmp) ||
-	       gsh_parse_cmd_args(&sh->params, sh->parsed, &line_tmp)) {
+	while (gsh_parse_filename(&sh->params, sh->parsed, sh->line) ||
+	       gsh_parse_cmd_args(&sh->params, sh->parsed, &line_it)) {
 		gsh_read_line(sh);
 	}
 
