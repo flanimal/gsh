@@ -19,7 +19,25 @@ struct gsh_hist_ent {
 	size_t len;
 };
 
+struct gsh_cmd_hist {
+	/* Tail and head of command history queue. */
+	struct gsh_hist_ent *cmd_history, *oldest_cmd;
+
+	/* Number of commands in history (maximum 10). */
+	int hist_n;
+};
+
 void gsh_bad_cmd(const char *msg, int err);
+
+struct gsh_cmd_hist *gsh_init_hist()
+{
+	struct gsh_cmd_hist *hist = malloc(sizeof(*hist));
+
+	hist->cmd_history = hist->oldest_cmd = NULL;
+	hist->hist_n = 0;
+
+	return hist;
+}
 
 static void new_hist_ent(struct gsh_cmd_hist *sh_hist,
 					 size_t len, const char *line)

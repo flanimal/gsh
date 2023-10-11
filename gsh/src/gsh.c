@@ -89,7 +89,7 @@ size_t gsh_max_input(const struct gsh_state *sh)
 	return (size_t)sh->wd->max_input - sh->input_len;
 }
 
-static void gsh_init_params(struct gsh_params *params)
+static void gsh_set_params(struct gsh_params *params)
 {
 	params->env_len = 0;
 	for (char **env_it = environ; *env_it; ++env_it)
@@ -102,14 +102,11 @@ static void gsh_init_params(struct gsh_params *params)
 
 void gsh_init(struct gsh_state *sh)
 {
-	gsh_init_params(&sh->params);
+	gsh_set_params(&sh->params);
 
 	sh->wd = gsh_init_wd();
 	sh->parsed = gsh_init_parsed();
-
-	sh->hist = malloc(sizeof(*sh->hist));
-	sh->hist->cmd_history = sh->hist->oldest_cmd = NULL;
-	sh->hist->hist_n = 0;
+	sh->hist = gsh_init_hist();
 
 	sh->input_len = 0;
 
