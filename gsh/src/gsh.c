@@ -63,7 +63,7 @@ void gsh_getcwd(struct gsh_workdir *wd)
 	wd->max_path = pathconf(wd->cwd, _PC_PATH_MAX);
 }
 
-static void gsh_init_wd(struct gsh_workdir *wd)
+static void s_init_wd(struct gsh_workdir *wd)
 {
 	// Get working dir and its max path length.
 	wd->cwd = malloc((size_t)(wd->max_path = _POSIX_PATH_MAX));
@@ -82,7 +82,7 @@ size_t gsh_max_input(const struct gsh_state *sh)
 	return (size_t)sh->wd->max_input - sh->input_len;
 }
 
-static void gsh_init_params(struct gsh_params *params)
+static void s_init_params(struct gsh_params *params)
 {
 	params->env_len = 0;
 	for (char **env_it = environ; *env_it; ++env_it)
@@ -95,8 +95,8 @@ static void gsh_init_params(struct gsh_params *params)
 
 void gsh_init(struct gsh_state *sh)
 {
-	gsh_init_params(&sh->params);
-	gsh_init_wd((sh->wd = malloc(sizeof(*sh->wd))));
+	s_init_params(&sh->params);
+	s_init_wd((sh->wd = malloc(sizeof(*sh->wd))));
 	sh->parsed = gsh_init_parsed();
 
 	sh->hist = malloc(sizeof(*sh->hist));
@@ -115,7 +115,7 @@ void gsh_init(struct gsh_state *sh)
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
  * null terminator is encountered. */
-static void copy_path_ent(char **const dest_it, const char **const src_it)
+static void s_copy_path_ent(char **const dest_it, const char **const src_it)
 {
 	for (;; ++(*dest_it), ++(*src_it)) {
 		switch (**src_it) {
@@ -132,7 +132,7 @@ static void copy_path_ent(char **const dest_it, const char **const src_it)
 	}
 }
 
-static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
+static int s_exec_path(const char *pathvar, const struct gsh_workdir *wd,
 			 char **args)
 {
 	char *const exec_buf = malloc((size_t)wd->max_path);
@@ -141,7 +141,7 @@ static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
 	for (const char *path_it = pathvar; *path_it;) {
 		exec_pathname = exec_buf;
 
-		copy_path_ent(&exec_pathname, &path_it);
+		s_copy_path_ent(&exec_pathname, &path_it);
 		sprintf(exec_pathname, "/%s", args[0]);
 
 		execve(exec_buf, (char *const *)args, environ);
@@ -165,7 +165,7 @@ int gsh_exec(struct gsh_state *sh, char *pathname, char **args)
 	if (pathname)
 		execve(pathname, (char *const *)args, environ);
 	else
-		gsh_exec_path(gsh_getenv(&sh->params, "PATH"), sh->wd, args);
+		s_exec_path(gsh_getenv(&sh->params, "PATH"), sh->wd, args);
 
 	// Named program couldn't be executed.
 	gsh_bad_cmd(sh->line, errno);

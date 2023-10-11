@@ -294,7 +294,7 @@ static bool p_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
  *      Returns true if we need more input to parse a filename,
  *      false if we're done.
  */
-static bool gsh_parse_filename(struct gsh_params *params,
+static bool p_parse_filename(struct gsh_params *params,
 			       struct gsh_parsed *parsed, char *line)
 {
 	// Immediately return if we already got the filename.
@@ -318,7 +318,7 @@ static bool gsh_parse_filename(struct gsh_params *params,
  *      Returns true if we need more input to parse an argument,
  *      false if we're done.
  */
-static bool gsh_parse_args(struct gsh_params *params, struct gsh_parsed *parsed,
+static bool p_parse_args(struct gsh_params *params, struct gsh_parsed *parsed,
 			   char **line)
 {
 	while (parsed->token_n <= GSH_MAX_ARGS &&
@@ -348,8 +348,8 @@ int gsh_parse_and_run(struct gsh_state *sh)
 {
 	char *line_tmp = sh->line;
 
-	while (gsh_parse_filename(&sh->params, sh->parsed, line_tmp) ||
-	       gsh_parse_args(&sh->params, sh->parsed, &line_tmp)) {
+	while (p_parse_filename(&sh->params, sh->parsed, line_tmp) ||
+	       p_parse_args(&sh->params, sh->parsed, &line_tmp)) {
 		gsh_read_line(sh);
 	}
 
