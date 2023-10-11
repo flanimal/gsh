@@ -14,9 +14,9 @@
 
 #include "special.def"
 
-/* 
+/*
  *	The maximum number of arguments that can be passed on the command line,
- * 	including the filename. 
+ * 	including the filename.
  */
 #define GSH_MAX_ARGS 64
 
@@ -55,8 +55,7 @@ void gsh_read_line(struct gsh_state *sh)
 
 	// Check if called to get more input.
 	if (sh->parsed->need_more) {
-		--sh->input_len;	// TODO: (!) Try to make it clear why we do
-		// this.
+		--sh->input_len;	// Overwrite backslash.
 		fputs(GSH_SECOND_PROMPT, stdout);
 	} else {
 		sh->input_len = 0;
@@ -83,7 +82,7 @@ struct gsh_parsed *gsh_init_parsed()
 
 	parsed->token_it = parsed->tokens =
 	    calloc(GSH_MAX_ARGS, sizeof(char *));
-	
+
 	// MAX_ARGS plus sentinel.
 	parsed->alloc = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
 
@@ -98,8 +97,9 @@ struct gsh_parsed *gsh_init_parsed()
 // ANSWER: After this is called, we go back up to the while loop in next_tok(),
 // and expand_tok() updates fmt_begin according to token_it.
 /*	(Re)allocate an expansion buffer and format it with args.
-*/
-static void gsh_alloc_fmt(struct gsh_parsed *parsed, struct p_fmt_info *fmt, ...)
+ */
+static void gsh_alloc_fmt(struct gsh_parsed *parsed, struct gsh_fmt_span *fmt,
+			  ...)
 {
 	va_list fmt_args, tmp_args;
 
@@ -131,16 +131,16 @@ out_end:
 
 // TODO: (!) Are fmt_begin and parsed->token_it always synonymous/aliased?
 // NO!
-// 
+//
 
 /*	Substitute a variable reference with its value.
-*	
-*	If the token consists only of the variable reference, it will be
-*	assigned to point to the value of the variable.
-* 
+ *
+ *	If the token consists only of the variable reference, it will be
+ *	assigned to point to the value of the variable.
+ *
  *	If the variable does not exist, the token will be assigned the empty
  *string.
-*/
+ */
 static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 			struct gsh_fmt_span *fmt, char *const fmt_after)
 {
@@ -160,7 +160,7 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 /*      Substitute a parameter reference with its value.
  */
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
-		      char *const fmt_begin)
+			  char *const fmt_begin)
 {
 	struct gsh_fmt_span fmt = {
 		.begin = fmt_begin,
@@ -187,12 +187,12 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 }
 
 /*	Substitute the home character with the value of $HOME.
-* 
+*
 	If the token consists only of the home character, it will be
 *	assigned to point to the value of $HOME.
 */
 static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
-		     char *const fmt_begin)
+			 char *const fmt_begin)
 {
 	char *const homevar = gsh_getenv(params, "HOME");
 
@@ -243,25 +243,22 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char **const line)
 {
-	char *const next_tok = strtok_r((parsed->need_more
-					 || parsed->token_it == parsed->tokens ? *line : NULL), " ",
-					&parsed->tok_state);
-
-	if (!next_tok)
-		// Reached the null byte, meaning there weren't any
-		// continuations. No more tokens available or needed.
-		return false;
-
-	*line = next_tok;
-	*parsed->token_it = next_tok;
+	char *const str = (!parsed->tokens[1]
+			   || parsed->need_more) ? *line : NULL;
 	parsed->need_more = false;
 
-	char *line_cont = strchr(next_tok, '\\');
+	if (!(*line = strtok_r(str, " ", &parsed->tok_state)))
+		return false;
+
+	*parsed->token_it = *line;
+
+	char *line_cont = strchr(*line, '\\');
 	if (line_cont) {
-		if (!line_cont[1]) {
+		if (line_cont[1] == '\0') {
 			parsed->need_more = true;
 			return true;
 		}
+
 		// Remove the backslash.
 		for (; *line_cont; ++line_cont)
 			line_cont[0] = line_cont[1];
@@ -328,7 +325,7 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 		free(*parsed->alloc);
 		*parsed->alloc-- = NULL;
 	}
-	
+
 	// Reset token list.
 	while (parsed->token_it > parsed->tokens)
 		*(--parsed->token_it) = NULL;

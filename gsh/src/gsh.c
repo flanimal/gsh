@@ -113,11 +113,11 @@ void gsh_init(struct gsh_state *sh)
 	// Max input line length + newline + null byte.
 	sh->line = malloc(gsh_max_input(sh) + 2);
 
+	sh->show_status = true;
+
 #ifndef NDEBUG
 	g_gsh_initialized = true;
 #endif
-
-	sh->show_status = true;
 }
 
 /* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
