@@ -139,6 +139,7 @@ static void gsh_copy_pathname(char **const dest_it, const char **const src_it)
 	}
 }
 
+// TODO: (!) Move wd->max_path to parse state?
 static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
 			 char **args)
 {

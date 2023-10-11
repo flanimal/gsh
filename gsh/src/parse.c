@@ -27,7 +27,7 @@ extern bool g_gsh_initialized;
 #endif
 
 struct gsh_parsed {
-	bool has_pathname; // TODO: Do we still need this?
+	bool has_pathname;	// TODO: Do we still need this?
 	bool need_more;
 
 	/* List of tokens to be returned from parsing. */
@@ -42,7 +42,7 @@ struct gsh_parsed {
 	char *tok_state;
 };
 
-struct p_fmt_info {
+struct gsh_fmt_span {
 	char *begin;
 	size_t len;
 
@@ -55,7 +55,8 @@ void gsh_read_line(struct gsh_state *sh)
 
 	// Check if called to get more input.
 	if (sh->parsed->need_more) {
-		--sh->input_len; // TODO: Try to make it clear why we do this.
+		--sh->input_len;	// TODO: (!) Try to make it clear why we do
+		// this.
 		fputs(GSH_SECOND_PROMPT, stdout);
 	} else {
 		sh->input_len = 0;
@@ -96,7 +97,7 @@ struct gsh_parsed *gsh_init_parsed()
 // After we set *fmt_begin to a null byte?
 // ANSWER: After this is called, we go back up to the while loop in next_tok(),
 // and expand_tok() updates fmt_begin according to token_it.
-/*	Allocate or reallocate a buffer for token expansion.
+/*	(Re)allocate an expansion buffer and format it with args.
 */
 static void gsh_alloc_fmt(struct gsh_parsed *parsed, struct p_fmt_info *fmt, ...)
 {
@@ -128,20 +129,20 @@ out_end:
 	va_end(fmt_args);
 }
 
-// TODO: Are fmt_begin and parsed->token_it always synonymous/aliased?
+// TODO: (!) Are fmt_begin and parsed->token_it always synonymous/aliased?
 // NO!
 // 
-// TODO: Function for getting value of ANY param from gsh_params?
 
 /*	Substitute a variable reference with its value.
 *	
 *	If the token consists only of the variable reference, it will be
 *	assigned to point to the value of the variable.
 * 
-*	If the variable does not exist, the token will be assigned the empty string.
+ *	If the variable does not exist, the token will be assigned the empty
+ *string.
 */
 static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
-		    struct p_fmt_info *fmt, char *const fmt_after)
+			struct gsh_fmt_span *fmt, char *const fmt_after)
 {
 	if (strcmp(*parsed->token_it, fmt->begin) == 0) {
 		*parsed->token_it = gsh_getenv(params, fmt->begin + 1);
@@ -151,8 +152,8 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 	char *const var_name = strndup(fmt->begin + 1, fmt->len - 1);
 
 	fmt->fmt_str = "%s%s";
-	gsh_alloc_fmt(parsed, fmt,
-		  gsh_getenv(params, var_name), (fmt_after ? fmt_after : ""));
+	gsh_alloc_fmt(parsed, fmt, gsh_getenv(params, var_name),
+		      (fmt_after ? fmt_after : ""));
 	free(var_name);
 }
 
@@ -161,7 +162,7 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 		      char *const fmt_begin)
 {
-	struct p_fmt_info fmt = {
+	struct gsh_fmt_span fmt = {
 		.begin = fmt_begin,
 		.len = strcspn(fmt_begin + 1,
 			       (const char[]) { GSH_PARAM_CH, '\0' }) + 1,
@@ -174,9 +175,8 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 	case GSH_STATUS_PARAM:
 		fmt.fmt_str = "%d%s";
 
-		gsh_alloc_fmt(parsed,
-			  &fmt,
-			  params->last_status, (fmt_after ? fmt_after : ""));
+		gsh_alloc_fmt(parsed, &fmt, params->last_status,
+			      (fmt_after ? fmt_after : ""));
 		break;
 	default:
 		gsh_fmt_var(params, parsed, &fmt, fmt_after);
@@ -202,7 +202,7 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 		return;
 	}
 
-	struct p_fmt_info fmt = {
+	struct gsh_fmt_span fmt = {
 		.begin = fmt_begin,
 		.len = 1,
 		.fmt_str = "%s%s",
@@ -214,8 +214,7 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 /*      Expand the last token.
  *	Returns true while there are still expansions to be performed.
  */
-static bool gsh_expand_tok(struct gsh_params *params,
-			    struct gsh_parsed *parsed)
+static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 {
 	// TODO: globbing, piping
 
@@ -239,7 +238,7 @@ static bool gsh_expand_tok(struct gsh_params *params,
 /*      Returns true while there are still more tokens to collect,
  *	similar to strtok.
  *
- *      Increments token_n and token_it by 1 for each completed token.
+ *      Increments token_it by 1 for each completed token.
  */
 static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char **const line)
@@ -277,6 +276,9 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 	return true;
 }
 
+// TODO: (!) Move filename getting outside of its own function and into
+// gsh_parse_and_run?
+
 /*      Parse the first token in the input line, and place
  *      the filename in the argument array.
  *
@@ -307,8 +309,8 @@ static bool gsh_parse_filename(struct gsh_params *params,
  *      Returns true if more input is needed to parse an argument,
  *      false if done.
  */
-static bool gsh_parse_cmd_args(struct gsh_params *params, struct gsh_parsed *parsed,
-			   char **line)
+static bool gsh_parse_cmd_args(struct gsh_params *params,
+			       struct gsh_parsed *parsed, char **line)
 {
 	while ((parsed->token_it - parsed->tokens) <= GSH_MAX_ARGS &&
 	       gsh_next_tok(params, parsed, line)) {
@@ -330,17 +332,13 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 	// Reset token list.
 	while (parsed->token_it > parsed->tokens)
 		*(--parsed->token_it) = NULL;
-
-	parsed->tok_state = NULL;
-	parsed->need_more = false;
 }
 
 int gsh_parse_and_run(struct gsh_state *sh)
 {
 	char *line_it = sh->line;
 
-	for (;; gsh_read_line(sh))
-	{
+	for (;; gsh_read_line(sh)) {
 		if (gsh_parse_filename(&sh->params, sh->parsed, sh->line))
 			continue;
 
