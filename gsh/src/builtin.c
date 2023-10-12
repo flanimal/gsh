@@ -16,6 +16,11 @@
 	int name(__attribute_maybe_unused__ struct gsh_state *sh, \
 		 __attribute_maybe_unused__ char *const *args)
 
+struct gsh_builtin {
+	char *cmd;
+	struct gsh_builtin_wrapper func;
+};
+
 GSH_DEF_BUILTIN(gsh_recall, sh, args);
 GSH_DEF_BUILTIN(gsh_list_hist, sh, args);
 
@@ -71,11 +76,6 @@ static GSH_DEF_BUILTIN(gsh_puthelp, sh, args)
 	return 0;
 }
 
-struct gsh_builtin {
-	char *cmd;
-	struct gsh_cb_wrapper cb;
-};
-
 static struct gsh_builtin builtins[] = {
 	{ "echo", { gsh_echo } },    { "r", { gsh_recall } },
 	{ "cd", { gsh_chdir } },     { "hist", { gsh_list_hist } },
@@ -89,16 +89,14 @@ void gsh_set_builtins(struct hsearch_data **builtin_tbl)
 	*builtin_tbl = calloc(1, sizeof(**builtin_tbl));
 	hcreate_r(builtin_n, *builtin_tbl);
 
-	struct gsh_cb_wrapper *callbacks =
-		malloc(sizeof(*callbacks) * builtin_n);
+	struct gsh_builtin_wrapper *funcs = malloc(sizeof(*funcs) * builtin_n);
 
 	ENTRY *retval;
 
 	for (size_t i = 0; i < builtin_n; ++i) {
-		callbacks[i] = builtins[i].cb;
+		funcs[i] = builtins[i].func;
 
-		hsearch_r((ENTRY){ .key = builtins[i].cmd,
-				   .data = callbacks + i },
+		hsearch_r((ENTRY){ .key = builtins[i].cmd, .data = funcs + i },
 			  ENTER, &retval, *builtin_tbl);
 	}
 }

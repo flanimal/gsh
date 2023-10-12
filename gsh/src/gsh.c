@@ -193,10 +193,10 @@ int gsh_switch(struct gsh_state *sh, char *pathname, char *const *args)
 	if (strcmp(args[0], "exit") == 0)
 		exit(EXIT_SUCCESS);
 
-	ENTRY *callback;
-	if (hsearch_r((ENTRY){ .key = args[0] }, FIND, &callback,
+	ENTRY *builtin;
+	if (hsearch_r((ENTRY){ .key = args[0] }, FIND, &builtin,
 		      sh->builtin_tbl))
-		return GSH_BUILTIN_ENTRY(callback)(sh, args);
+		return GSH_BUILTIN_FUNC(builtin)(sh, args);
 	else
 		return gsh_exec(sh, pathname, args);
 }
