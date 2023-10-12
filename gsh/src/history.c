@@ -125,9 +125,9 @@ int gsh_recall(struct gsh_state *sh, char *const *args)
 	// Make a copy so we don't lose it if the history entry
 	// gets deleted.
 	strcpy(sh->line, cmd_it->line);
-	sh->input_len = cmd_it->len;
 
-	gsh_run_cmd(sh);
+	gsh_add_hist(sh->hist, cmd_it->len, sh->line);
+	gsh_parse_and_run(sh);
 
 	return sh->params.last_status;
 }
