@@ -50,7 +50,7 @@ struct gsh_fmt_span {
 	size_t len;
 
 	/* A copy of the token text following the span, if any. */
-	char *const after;
+	char *after;
 
 	const char *fmt_str;
 };
@@ -124,8 +124,10 @@ static void gsh_alloc_fmt(struct gsh_parsed *parsed, const struct gsh_fmt_span *
 	*span->begin = '\0'; // <<< TODO: (!) IMPORTANT (may want to make more
 			     // prominent)
 
+	const size_t before_len = strlen(*parsed->token_it);
+
 	{
-		const size_t new_len = strlen(*parsed->token_it) +
+		const size_t new_len = before_len +
 				       (size_t)print_len + strlen(after);
 
 		if (parsed->alloc[1])
@@ -136,8 +138,8 @@ static void gsh_alloc_fmt(struct gsh_parsed *parsed, const struct gsh_fmt_span *
 			       *parsed->token_it);
 	}
 
-	vsprintf(parsed->alloc[1], span->fmt_str, fmt_args);
-	strcpy(parsed->alloc[1] + print_len, after);
+	vsprintf(parsed->alloc[1] + before_len, span->fmt_str, fmt_args);
+	strcpy(parsed->alloc[1] + before_len + print_len, after); // TODO: Signedness.
 
 	*parsed->token_it = parsed->alloc[1];
 
@@ -173,15 +175,16 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			  char *const fmt_begin)
 {
-	// FIXME: Make sure not undefined to use other member in init.
+	// TODO: Make sure not undefined to use other member in init.
 	struct gsh_fmt_span span = {
 		.begin = fmt_begin,
 		.len = strcspn(fmt_begin + 1,
-			       (const char[]){ GSH_PARAM_CH, '\0' }) +
-		       1,
-		.after = (span.begin[span.len] ? strdup(span.begin + span.len) :
-						 NULL),
+			       (const char[]){ GSH_PARAM_CH, '\0' }) + 1,
 	};
+
+	span.after =
+		(span.begin[span.len] ? strdup(span.begin + span.len) : NULL);
+
 	// TODO: (?) Only dup if we "need" to?
 	switch ((enum gsh_special_param)span.begin[1]) {
 	case GSH_STATUS_PARAM:
@@ -219,7 +222,6 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 		.begin = fmt_begin,
 		.len = 1,
 		.fmt_str = "%s",
-		// FIXME: Are unassigned members zero-initialized?
 	};
 
 	gsh_alloc_fmt(parsed, &fmt, homevar, fmt_begin + 1);
