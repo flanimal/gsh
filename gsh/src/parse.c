@@ -30,7 +30,7 @@ struct gsh_parsed {
 	/* List of tokens to be returned from parsing. */
 	char **tokens;
 
-	/* Pointer to the token currently being parsed. */
+	/* Iterator pointing to the token currently being parsed. */
 	char **token_it;
 
 	/* Stack of buffers for tokens that contain substitutions. */
@@ -120,8 +120,7 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed,
 			     struct gsh_fmt_span *span, size_t print_len,
 			     va_list fmt_args)
 {
-	*span->begin = '\0';	// <<< TODO: (!) IMPORTANT (may want to make more
-	// prominent)
+	*span->begin = '\0';
 
 	const size_t before_len = strlen(*parsed->token_it);
 
@@ -131,7 +130,6 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed,
 	*parsed->token_it = fmtbuf;
 	fmtbuf += before_len;
 
-	// TODO: Signedness.
 	vsprintf(fmtbuf, span->fmt_str, fmt_args);
 	strcpy(fmtbuf + print_len, span->after);
 }
@@ -232,13 +230,13 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 		return;
 	}
 
-	struct gsh_fmt_span fmt = {
+	struct gsh_fmt_span span = {
 		.begin = fmt_begin,
 		.len = 1,
 		.fmt_str = "%s",
 	};
 
-	gsh_expand_span(parsed, &fmt, homevar, fmt_begin + 1);
+	gsh_expand_span(parsed, &span, homevar, fmt_begin + 1);
 }
 
 /*      Expand the last token.
@@ -257,8 +255,6 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 		return true;
 	case GSH_HOME_CH:
 		gsh_fmt_home(params, parsed, fmt_begin);
-		return true;
-	default:
 		return true;
 	}
 }
@@ -288,9 +284,6 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 
 /*      Parse the first token in the input line, and place
  *      the filename in the argument array.
- *
- *      Returns true if more input is needed to parse a filename,
- *      false if done.
  */
 static bool gsh_parse_filename(struct gsh_params *params,
 			       struct gsh_parsed *parsed, char *line)
@@ -308,9 +301,6 @@ static bool gsh_parse_filename(struct gsh_params *params,
 
 /*	Parse tokens and place them into the argument array, which is
  *      then terminated with a NULL pointer.
- *
- *      Returns true if more input is needed to parse an argument,
- *      false if done.
  */
 static void gsh_parse_cmd_args(struct gsh_params *params,
 			       struct gsh_parsed *parsed)
