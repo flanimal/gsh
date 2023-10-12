@@ -270,18 +270,13 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
  *	similar to strtok.
  */
 static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
-			 char **const line_it)
+			 char *line)
 {
-	{
-		char *const str = (!parsed->tokens[0]) ?
-					  *line_it :
-					  NULL;
+	char *next_tok = strtok_r(line, " ", &parsed->tok_state);
+	if (!next_tok)
+		return false;
 
-		if (!(*line_it = strtok_r(str, " ", &parsed->tok_state)))
-			return false;
-	}
-
-	*parsed->token_it = *line_it;
+	*parsed->token_it = next_tok;
 	while (gsh_expand_tok(params, parsed))
 		;
 
@@ -308,7 +303,7 @@ static bool gsh_parse_filename(struct gsh_params *params,
 	if (parsed->token_it != parsed->tokens)
 		return false;
 
-	if (gsh_next_tok(params, parsed, &line))
+	if (gsh_next_tok(params, parsed, line))
 		return true;
 
 	char *last_slash = strrchr(line, '/');
@@ -326,10 +321,10 @@ static bool gsh_parse_filename(struct gsh_params *params,
  *      false if done.
  */
 static void gsh_parse_cmd_args(struct gsh_params *params,
-			       struct gsh_parsed *parsed, char **const line_it)
+			       struct gsh_parsed *parsed)
 {
 	while ((parsed->token_it - parsed->tokens) <= GSH_MAX_ARGS &&
-	       gsh_next_tok(params, parsed, line_it))
+	       gsh_next_tok(params, parsed, NULL))
 		;
 }
 
@@ -348,10 +343,8 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 
 int gsh_parse_and_run(struct gsh_state *sh)
 {
-	char *line_it = sh->line;
-
 	gsh_parse_filename(&sh->params, sh->parsed, sh->line);
-	gsh_parse_cmd_args(&sh->params, sh->parsed, &line_it);
+	gsh_parse_cmd_args(&sh->params, sh->parsed);
 
 	int status = gsh_switch(sh,
 				(sh->parsed->has_pathname ? sh->line : NULL),
