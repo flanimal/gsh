@@ -59,7 +59,8 @@ static void new_hist_ent(struct gsh_cmd_hist *sh_hist, size_t len,
 static void drop_hist_ent(struct gsh_cmd_hist *sh_hist,
 			  struct gsh_hist_ent *dropped_ent)
 {
-	sh_hist->oldest_cmd = dropped_ent->back;
+	if (!(sh_hist->oldest_cmd = dropped_ent->back))
+		sh_hist->cmd_history = NULL;
 
 	remque(dropped_ent);
 
@@ -80,10 +81,18 @@ void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len, const char *line)
 	if (sh_hist->hist_n > GSH_MAX_HIST)
 		drop_hist_ent(sh_hist, sh_hist->oldest_cmd);
 }
-// TODO: Clear history option
+
 int gsh_list_hist(struct gsh_state *sh,
-		  __attribute_maybe_unused__ char *const *_)
+		  __attribute_maybe_unused__ char *const *args)
 {
+	if (args[1] && strcmp(args[1], "-c") == 0) {
+
+		while (sh->hist->hist_n > 0)
+			drop_hist_ent(sh->hist, sh->hist->oldest_cmd);
+		
+		return 0;
+	}
+		
 	// It is not possible for `cmd_history` to be NULL here,
 	// as it will contain at least the `hist` invocation.
 	int cmd_n = 1;
