@@ -12,18 +12,14 @@
 #include "history.h"
 #include "builtin.h"
 
-#define GSH_NUM_BUILTINS 20
-
-#define GSH_DEF_BUILTIN_CB(name, sh, args)                        \
+#define GSH_DEF_BUILTIN(name, sh, args)                           \
 	int name(__attribute_maybe_unused__ struct gsh_state *sh, \
 		 __attribute_maybe_unused__ char *const *args)
 
-#define GSH_ENTER_BUILTIN_CB(cmd, name, callbacks, tbl)                       \
-	*callbacks = (struct gsh_cb_wrapper){ name };                    \
-	hsearch_r((ENTRY){ .key = cmd, .data = callbacks++ }, ENTER, &retval, \
-		  tbl)
+GSH_DEF_BUILTIN(gsh_recall, sh, args);
+GSH_DEF_BUILTIN(gsh_list_hist, sh, args);
 
-GSH_DEF_BUILTIN_CB(gsh_echo, sh, args)
+static GSH_DEF_BUILTIN(gsh_echo, sh, args)
 {
 	for (++args; *args; putchar(' '), ++args)
 		if (fputs(*args, stdout) == EOF)
@@ -34,7 +30,7 @@ GSH_DEF_BUILTIN_CB(gsh_echo, sh, args)
 	return 0;
 }
 
-GSH_DEF_BUILTIN_CB(gsh_chdir, sh, args)
+static GSH_DEF_BUILTIN(gsh_chdir, sh, args)
 {
 	if (chdir(args[1]) == -1) {
 		printf("%s: %s\n", args[1], strerror(errno));
@@ -46,10 +42,7 @@ GSH_DEF_BUILTIN_CB(gsh_chdir, sh, args)
 	return 0;
 }
 
-GSH_DEF_BUILTIN_CB(gsh_recall, sh, args);
-GSH_DEF_BUILTIN_CB(gsh_list_hist, sh, args);
-
-GSH_DEF_BUILTIN_CB(gsh_puthelp, sh, args)
+static GSH_DEF_BUILTIN(gsh_puthelp, sh, args)
 {
 	puts("\ngsh - GNU island shell");
 	puts("\ngsh displays the current working directory in the shell prompt :");
@@ -78,22 +71,34 @@ GSH_DEF_BUILTIN_CB(gsh_puthelp, sh, args)
 	return 0;
 }
 
+struct gsh_builtin {
+	char *cmd;
+	struct gsh_cb_wrapper cb;
+};
+
+static struct gsh_builtin builtins[] = {
+	{ "echo", { gsh_echo } },    { "r", { gsh_recall } },
+	{ "cd", { gsh_chdir } },     { "hist", { gsh_list_hist } },
+	{ "help", { gsh_puthelp } },
+};
+
+static const size_t builtin_n = sizeof(builtins) / sizeof(*builtins);
+
 void gsh_set_builtins(struct hsearch_data **builtin_tbl)
 {
 	*builtin_tbl = calloc(1, sizeof(**builtin_tbl));
-
-	// TODO: Number of builtins.
-	hcreate_r(GSH_NUM_BUILTINS, *builtin_tbl);
+	hcreate_r(builtin_n, *builtin_tbl);
 
 	struct gsh_cb_wrapper *callbacks =
-		malloc(sizeof(*callbacks) * GSH_NUM_BUILTINS);
+		malloc(sizeof(*callbacks) * builtin_n);
 
 	ENTRY *retval;
 
-	GSH_ENTER_BUILTIN_CB("echo", gsh_echo, callbacks, *builtin_tbl);
-	GSH_ENTER_BUILTIN_CB("r", gsh_recall, callbacks, *builtin_tbl);
-	GSH_ENTER_BUILTIN_CB("cd", gsh_chdir, callbacks, *builtin_tbl);
-	GSH_ENTER_BUILTIN_CB("hist", gsh_list_hist, callbacks, *builtin_tbl);
-	// GSH_ENTER_BUILTIN_CB("shopt", gsh_set_opt, *builtin_tbl);
-	GSH_ENTER_BUILTIN_CB("help", gsh_puthelp, callbacks, *builtin_tbl);
+	for (size_t i = 0; i < builtin_n; ++i) {
+		callbacks[i] = builtins[i].cb;
+
+		hsearch_r((ENTRY){ .key = builtins[i].cmd,
+				   .data = callbacks + i },
+			  ENTER, &retval, *builtin_tbl);
+	}
 }
