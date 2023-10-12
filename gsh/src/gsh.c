@@ -216,6 +216,5 @@ void gsh_run_cmd(struct gsh_state *sh)
 		return;
 
 	gsh_add_hist(sh->hist, sh->input_len, sh->line);
-
-	sh->params.last_status = gsh_parse_and_run(sh);
+	gsh_parse_and_run(sh);
 }

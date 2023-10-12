@@ -130,6 +130,7 @@ static void gsh_expand_span(struct gsh_parsed *parsed, const struct gsh_fmt_span
 	va_copy(tmp_args, fmt_args);
 
 	const int print_len = vsnprintf(NULL, 0, span->fmt_str, tmp_args);
+
 	assert(print_len >= 0);
 
 	const char *const after = (span->after ? span->after : "");
@@ -277,6 +278,7 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 		return false;
 
 	*parsed->token_it = next_tok;
+
 	while (gsh_expand_tok(params, parsed))
 		;
 
@@ -341,15 +343,14 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 		*(--parsed->token_it) = NULL;
 }
 
-int gsh_parse_and_run(struct gsh_state *sh)
+void gsh_parse_and_run(struct gsh_state *sh)
 {
 	gsh_parse_filename(&sh->params, sh->parsed, sh->line);
 	gsh_parse_cmd_args(&sh->params, sh->parsed);
 
-	int status = gsh_switch(sh,
+	sh->params.last_status = gsh_switch(sh,
 				(sh->parsed->has_pathname ? sh->line : NULL),
 				sh->parsed->tokens);
-	gsh_free_parsed(sh->parsed);
 
-	return status;
+	gsh_free_parsed(sh->parsed);
 }
