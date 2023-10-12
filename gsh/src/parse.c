@@ -103,8 +103,6 @@ struct gsh_parsed *gsh_init_parsed()
 	// MAX_ARGS plus sentinel.
 	parsed->fmt_bufs = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
 
-	parsed->tok_state = NULL;
-
 	return parsed;
 }
 
