@@ -3,8 +3,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-extern char **environ;
-
 /* Parameters. */
 struct gsh_params {
 	size_t env_len;

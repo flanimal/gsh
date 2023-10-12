@@ -189,7 +189,6 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			  char *const fmt_begin)
 {
-	// TODO: Make sure not undefined to use other member in init.
 	struct gsh_fmt_span span = {
 		.begin = fmt_begin,
 		.len = strcspn(fmt_begin + 1,
@@ -288,9 +287,6 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 	++parsed->token_it;
 	return true;
 }
-
-// TODO: (!) Move filename getting outside of its own function and into
-// gsh_parse_and_run?
 
 /*      Parse the first token in the input line, and place
  *      the filename in the argument array.

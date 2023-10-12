@@ -23,6 +23,8 @@
 bool g_gsh_initialized = false;
 #endif
 
+extern char **environ;
+
 void gsh_put_prompt(const struct gsh_state *sh)
 {
 	if (sh->show_status)
