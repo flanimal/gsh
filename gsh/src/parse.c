@@ -50,7 +50,7 @@ struct gsh_fmt_span {
 	size_t len;
 
 	/* A copy of the token text following the span, if any. */
-	char *after;
+	char *const after;
 
 	const char *fmt_str;
 };
@@ -100,7 +100,7 @@ struct gsh_parsed *gsh_init_parsed()
 
 /*	(Re)allocate an expansion buffer and format it with args.
  */
-static void gsh_alloc_fmt(struct gsh_parsed *parsed, struct gsh_fmt_span *span,
+static void gsh_alloc_fmt(struct gsh_parsed *parsed, const struct gsh_fmt_span *span,
 			  ...)
 {
 	va_list fmt_args, tmp_args;
@@ -111,10 +111,12 @@ static void gsh_alloc_fmt(struct gsh_parsed *parsed, struct gsh_fmt_span *span,
 	const int print_len = vsnprintf(NULL, 0, span->fmt_str, tmp_args);
 	assert(print_len >= 0);
 
+	const char *const after = (span->after ? span->after : "");
+
 	if (span->len >= (size_t)print_len) {
 		// Don't need to allocate.
 		vsprintf(span->begin, span->fmt_str, fmt_args);
-		strcpy(span->begin + print_len, span->after);
+		strcpy(span->begin + print_len, after);
 
 		goto out_end;
 	}
@@ -122,17 +124,20 @@ static void gsh_alloc_fmt(struct gsh_parsed *parsed, struct gsh_fmt_span *span,
 	*span->begin = '\0'; // <<< TODO: (!) IMPORTANT (may want to make more
 			     // prominent)
 
-	const size_t new_len =
-		strlen(*parsed->token_it) + (size_t)print_len + strlen(span->after);
+	{
+		const size_t new_len = strlen(*parsed->token_it) +
+				       (size_t)print_len + strlen(after);
 
-	if (parsed->alloc[1])
-		parsed->alloc[1] = realloc(parsed->alloc[1], new_len + 1);
-	else
-		strcpy((parsed->alloc[1] = malloc(new_len + 1)),
-		       *parsed->token_it);
+		if (parsed->alloc[1])
+			parsed->alloc[1] =
+				realloc(parsed->alloc[1], new_len + 1);
+		else
+			strcpy((parsed->alloc[1] = malloc(new_len + 1)),
+			       *parsed->token_it);
+	}
 
 	vsprintf(parsed->alloc[1], span->fmt_str, fmt_args);
-	strcpy(parsed->alloc[1] + print_len, span->after);
+	strcpy(parsed->alloc[1] + print_len, after);
 
 	*parsed->token_it = parsed->alloc[1];
 
@@ -158,9 +163,6 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 	}
 
 	char *const var_name = strndup(span->begin + 1, span->len - 1);
-
-	span->fmt_str = "%s";
-	span->after = (span->after ? span->after : "");
 
 	gsh_alloc_fmt(parsed, span, gsh_getenv(params, var_name));
 	free(var_name);
@@ -188,6 +190,8 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 		gsh_alloc_fmt(parsed, &span, params->last_status);
 		break;
 	default:
+		span.fmt_str = "%s";
+
 		gsh_fmt_var(params, parsed, &span);
 		break;
 	}
@@ -215,6 +219,7 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 		.begin = fmt_begin,
 		.len = 1,
 		.fmt_str = "%s",
+		// FIXME: Are unassigned members zero-initialized?
 	};
 
 	gsh_alloc_fmt(parsed, &fmt, homevar, fmt_begin + 1);
