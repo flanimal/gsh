@@ -255,8 +255,8 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 		gsh_fmt_home(params, parsed, fmt_begin);
 		return true;
 	}
-
-	assert(false);
+	
+	__builtin_unreachable();
 }
 
 /*      Collect and insert a fully-expanded token into the list.
