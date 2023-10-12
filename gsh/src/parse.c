@@ -233,7 +233,8 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 	struct gsh_fmt_span span = {
 		.begin = fmt_begin,
 		.len = 1,
-		.fmt_str = "%s",
+		.fmt_str = "%s", 
+		.after = "",
 	};
 
 	gsh_expand_span(parsed, &span, homevar, fmt_begin + 1);
