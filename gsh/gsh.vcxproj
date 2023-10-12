@@ -107,7 +107,7 @@
     <ClCompile>
       <CLanguageStandard>gnu11</CLanguageStandard>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalOptions />
+      <AdditionalOptions>-Wextra -pedantic-errors</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

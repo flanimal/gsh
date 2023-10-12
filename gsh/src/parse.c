@@ -111,7 +111,7 @@ static void gsh_alloc_fmt(struct gsh_parsed *parsed, struct gsh_fmt_span *span,
 	const int print_len = vsnprintf(NULL, 0, span->fmt_str, tmp_args);
 	assert(print_len >= 0);
 
-	if (span->len >= print_len) {
+	if (span->len >= (size_t)print_len) {
 		// Don't need to allocate.
 		vsprintf(span->begin, span->fmt_str, fmt_args);
 		strcpy(span->begin + print_len, span->after);
