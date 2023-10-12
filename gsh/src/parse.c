@@ -195,8 +195,7 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 {
 	struct gsh_fmt_span span = {
 		.begin = fmt_begin,
-		.len = strcspn(fmt_begin + 1,
-			       (const char[]) { GSH_PARAM_CH, '\0' }) + 1,
+		.len = strcspn(fmt_begin + 1, gsh_special_chars) + 1,
 	};
 
 	switch ((enum gsh_special_param)span.begin[1]) {
