@@ -37,7 +37,7 @@ struct gsh_parsed {
 	char **token_it;
 
 	/* Stack of buffers for tokens that contain substitutions. */
-	char **alloc;
+	char **fmt_bufs;
 
 	char *tok_state;
 };
@@ -90,7 +90,7 @@ struct gsh_parsed *gsh_init_parsed()
 		calloc(GSH_MAX_ARGS, sizeof(char *));
 
 	// MAX_ARGS plus sentinel.
-	parsed->alloc = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
+	parsed->fmt_bufs = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
 
 	parsed->tok_state = NULL;
 	parsed->need_more = false;
@@ -98,12 +98,12 @@ struct gsh_parsed *gsh_init_parsed()
 	return parsed;
 }
 
-static void gsh_span_alloc(struct gsh_parsed *parsed, size_t new_len)
+static void gsh_alloc_fmtbuf(struct gsh_parsed *parsed, size_t new_len)
 {
-	if (parsed->alloc[1])
-		parsed->alloc[1] = realloc(parsed->alloc[1], new_len + 1);
+	if (parsed->fmt_bufs[1])
+		parsed->fmt_bufs[1] = realloc(parsed->fmt_bufs[1], new_len + 1);
 	else
-		strcpy((parsed->alloc[1] = malloc(new_len + 1)),
+		strcpy((parsed->fmt_bufs[1] = malloc(new_len + 1)),
 		       *parsed->token_it);
 }
 
@@ -135,12 +135,14 @@ static void gsh_expand_span(struct gsh_parsed *parsed, const struct gsh_fmt_span
 
 	const size_t before_len = strlen(*parsed->token_it);
 
-	gsh_span_alloc(parsed, before_len + (size_t)print_len + strlen(after));
+	gsh_alloc_fmtbuf(parsed,
+			 before_len + (size_t)print_len + strlen(after));
 
-	vsprintf(parsed->alloc[1] + before_len, span->fmt_str, fmt_args);
-	strcpy(parsed->alloc[1] + before_len + print_len, after); // TODO: Signedness.
+	vsprintf(parsed->fmt_bufs[1] + before_len, span->fmt_str, fmt_args);
+	strcpy(parsed->fmt_bufs[1] + before_len + print_len,
+	       after); // TODO: Signedness.
 
-	*parsed->token_it = parsed->alloc[1];
+	*parsed->token_it = parsed->fmt_bufs[1];
 
 out_end:
 	va_end(tmp_args);
@@ -292,8 +294,8 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 	while (gsh_expand_tok(params, parsed))
 		;
 
-	if (parsed->alloc[1])
-		++parsed->alloc;
+	if (parsed->fmt_bufs[1])
+		++parsed->fmt_bufs;
 
 	++parsed->token_it;
 	return true;
@@ -347,9 +349,9 @@ static bool gsh_parse_cmd_args(struct gsh_params *params,
 void gsh_free_parsed(struct gsh_parsed *parsed)
 {
 	// Delete substitution buffers.
-	while (*parsed->alloc) {
-		free(*parsed->alloc);
-		*parsed->alloc-- = NULL;
+	while (*parsed->fmt_bufs) {
+		free(*parsed->fmt_bufs);
+		*parsed->fmt_bufs-- = NULL;
 	}
 
 	// Reset token list.
