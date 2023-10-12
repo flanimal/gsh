@@ -80,17 +80,16 @@ bool gsh_read_line(struct gsh_state *sh)
 		exit(feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE);
 	}
 
-	*strchr(sh->line + sh->input_len, '\n') = '\0';
+	char *newline = strchr(sh->line + sh->input_len, '\n');
+	*newline = '\0';
 
-	if (gsh_parse_linebrk(sh->line + sh->input_len)) {
+	bool need_more = gsh_parse_linebrk(sh->line + sh->input_len);
+	
+	if (need_more)
 		fputs(GSH_SECOND_PROMPT, stdout);
 
-		sh->input_len = strlen(sh->line + sh->input_len);
-		return true;
-	}
-
-	sh->input_len = 0;
-	return false;
+	sh->input_len = (size_t)((newline - 1) - (sh->line + sh->input_len));
+	return need_more;
 }
 
 struct gsh_parsed *gsh_init_parsed()
@@ -241,8 +240,6 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
  */
 static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 {
-	// TODO: globbing, piping
-
 	char *const fmt_begin = strpbrk(*parsed->token_it, gsh_special_chars);
 
 	if (!fmt_begin)
@@ -340,5 +337,6 @@ void gsh_parse_and_run(struct gsh_state *sh)
 				(sh->parsed->has_pathname ? sh->line : NULL),
 				sh->parsed->tokens);
 
+	sh->input_len = 0;
 	gsh_free_parsed(sh->parsed);
 }
