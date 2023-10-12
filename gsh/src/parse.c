@@ -28,7 +28,6 @@ extern bool g_gsh_initialized;
 
 struct gsh_parsed {
 	bool has_pathname; // TODO: Do we still need this?
-	bool need_more;
 
 	/* List of tokens to be returned from parsing. */
 	char **tokens;
@@ -93,7 +92,6 @@ struct gsh_parsed *gsh_init_parsed()
 	parsed->fmt_bufs = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
 
 	parsed->tok_state = NULL;
-	parsed->need_more = false;
 
 	return parsed;
 }
@@ -257,7 +255,6 @@ static bool gsh_parse_linebrk(struct gsh_parsed *parsed, char *line)
 	char *linebreak = strchr(line, '\\');
 	if (linebreak) {
 		if (linebreak[1] == '\0') {
-			parsed->need_more = true;
 			return true;
 		}
 		// Remove the backslash.
@@ -277,18 +274,13 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char **const line_it)
 {
 	{
-		char *const str = (!parsed->tokens[0] || parsed->need_more) ?
+		char *const str = (!parsed->tokens[0]) ?
 					  *line_it :
 					  NULL;
-
-		parsed->need_more = false;
 
 		if (!(*line_it = strtok_r(str, " ", &parsed->tok_state)))
 			return false;
 	}
-
-	if (gsh_parse_linebrk(parsed, *line_it))
-		return true;
 
 	*parsed->token_it = *line_it;
 	while (gsh_expand_tok(params, parsed))
@@ -317,7 +309,7 @@ static bool gsh_parse_filename(struct gsh_params *params,
 	if (parsed->token_it != parsed->tokens)
 		return false;
 
-	if (gsh_next_tok(params, parsed, &line) && parsed->need_more)
+	if (gsh_next_tok(params, parsed, &line))
 		return true;
 
 	char *last_slash = strrchr(line, '/');
@@ -339,8 +331,6 @@ static bool gsh_parse_cmd_args(struct gsh_params *params,
 {
 	while ((parsed->token_it - parsed->tokens) <= GSH_MAX_ARGS &&
 	       gsh_next_tok(params, parsed, line_it)) {
-		if (parsed->need_more)
-			return true;
 	}
 
 	return false;
