@@ -127,46 +127,6 @@ void gsh_init(struct gsh_state *sh)
 #endif
 }
 
-/* Copy a null-terminated path from PATH variable, stopping when a colon ':' or
- * null terminator is encountered. */
-static void gsh_copy_pathname(char **const dest_it, const char **const src_it)
-{
-	for (;; ++(*dest_it), ++(*src_it)) {
-		switch (**src_it) {
-		case ':':
-			++(*src_it); // Move to next path following the colon.
-			/* fall through */
-		case '\0':
-			**dest_it = '\0';
-			return;
-		default:
-			**dest_it = **src_it;
-			continue;
-		}
-	}
-}
-
-// TODO: (!) Replace with exec(3).
-static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
-			 char *const *args)
-{
-	char *const exec_buf = malloc((size_t)wd->max_path);
-	char *exec_pathname;
-
-	for (const char *path_it = pathvar; *path_it;) {
-		exec_pathname = exec_buf;
-
-		gsh_copy_pathname(&exec_pathname, &path_it);
-		sprintf(exec_pathname, "/%s", args[0]);
-
-		execve(exec_buf, args, environ);
-	}
-
-	free(exec_buf);
-
-	return -1;
-}
-
 /* Fork and exec a program. */
 static int gsh_exec(struct gsh_state *sh, char *pathname, char *const *args)
 {
@@ -177,10 +137,7 @@ static int gsh_exec(struct gsh_state *sh, char *pathname, char *const *args)
 		return sh->params.last_status;
 	}
 
-	if (pathname)
-		execve(pathname, args, environ);
-	else
-		gsh_exec_path(gsh_getenv(&sh->params, "PATH"), sh->wd, args);
+	execvp(pathname, args);
 
 	// Named program couldn't be executed.
 	gsh_bad_cmd(sh->line, errno);

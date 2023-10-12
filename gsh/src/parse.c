@@ -25,8 +25,6 @@ extern bool g_gsh_initialized;
 #endif
 
 struct gsh_parsed {
-	bool has_pathname;	// TODO: Do we still need this?
-
 	/* List of tokens to be returned from parsing. */
 	char **tokens;
 
@@ -84,11 +82,13 @@ bool gsh_read_line(struct gsh_state *sh)
 	*newline = '\0';
 
 	bool need_more = gsh_parse_linebrk(sh->line + sh->input_len);
+	sh->input_len = (size_t)(newline - (sh->line + sh->input_len));
 
-	if (need_more)
+	if (need_more) {
 		fputs(GSH_SECOND_PROMPT, stdout);
+		--sh->input_len; // Exclude backslash.	
+	}
 
-	sh->input_len = (size_t)((newline - 1) - (sh->line + sh->input_len));
 	return need_more;
 }
 
@@ -257,6 +257,8 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 		gsh_fmt_home(params, parsed, fmt_begin);
 		return true;
 	}
+
+	assert(false);
 }
 
 /*      Collect and insert a fully-expanded token into the list.
@@ -295,7 +297,6 @@ static bool gsh_parse_filename(struct gsh_params *params,
 	if (last_slash)
 		parsed->token_it[-1] = last_slash + 1;
 
-	parsed->has_pathname = !!last_slash;
 	return false;
 }
 
@@ -327,9 +328,7 @@ void gsh_parse_and_run(struct gsh_state *sh)
 	gsh_parse_filename(&sh->params, sh->parsed, sh->line);
 	gsh_parse_cmd_args(&sh->params, sh->parsed);
 
-	sh->params.last_status =
-	    gsh_switch(sh, (sh->parsed->has_pathname ? sh->line : NULL),
-		       sh->parsed->tokens);
+	sh->params.last_status = gsh_switch(sh, sh->line, sh->parsed->tokens);
 
 	sh->input_len = 0;
 	gsh_free_parsed(sh->parsed);
