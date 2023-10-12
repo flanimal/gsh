@@ -27,7 +27,7 @@ extern bool g_gsh_initialized;
 #endif
 
 struct gsh_parsed {
-	bool has_pathname;	// TODO: Do we still need this?
+	bool has_pathname; // TODO: Do we still need this?
 	bool need_more;
 
 	/* List of tokens to be returned from parsing. */
@@ -43,11 +43,13 @@ struct gsh_parsed {
 };
 
 struct gsh_fmt_span {
-	/* Beginning of format span within token. */
+	/* Beginning of format span within the current token. */
 	char *begin;
+
+	/* Length of the span, up to either the NUL byte or the next special char. */
 	size_t len;
 
-	/* Token text following the span, if any. */
+	/* A copy of the token text following the span, if any. */
 	char *after;
 
 	const char *fmt_str;
@@ -59,7 +61,7 @@ void gsh_read_line(struct gsh_state *sh)
 
 	// Check if called to get more input.
 	if (sh->parsed->need_more) {
-		--sh->input_len;	// Overwrite backslash.
+		--sh->input_len; // Overwrite backslash.
 		fputs(GSH_SECOND_PROMPT, stdout);
 	} else {
 		sh->input_len = 0;
@@ -76,7 +78,7 @@ void gsh_read_line(struct gsh_state *sh)
 
 	const size_t len = strlen(sh->line + sh->input_len);
 
-	sh->line[sh->input_len + len - 1] = '\0';	// Remove newline.
+	sh->line[sh->input_len + len - 1] = '\0'; // Remove newline.
 	sh->input_len = len - 1;
 }
 
@@ -85,7 +87,7 @@ struct gsh_parsed *gsh_init_parsed()
 	struct gsh_parsed *parsed = malloc(sizeof(*parsed));
 
 	parsed->token_it = parsed->tokens =
-	    calloc(GSH_MAX_ARGS, sizeof(char *));
+		calloc(GSH_MAX_ARGS, sizeof(char *));
 
 	// MAX_ARGS plus sentinel.
 	parsed->alloc = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
@@ -96,10 +98,6 @@ struct gsh_parsed *gsh_init_parsed()
 	return parsed;
 }
 
-// TODO: (?) What happens to fmt_begin after this gets called?
-// After we set *fmt_begin to a null byte?
-// ANSWER: After this is called, we go back up to the while loop in next_tok(),
-// and expand_tok() updates fmt_begin according to token_it.
 /*	(Re)allocate an expansion buffer and format it with args.
  */
 static void gsh_alloc_fmt(struct gsh_parsed *parsed, struct gsh_fmt_span *span,
@@ -110,26 +108,31 @@ static void gsh_alloc_fmt(struct gsh_parsed *parsed, struct gsh_fmt_span *span,
 	va_start(fmt_args, span);
 	va_copy(tmp_args, fmt_args);
 
-	const int printed_len = vsnprintf(NULL, 0, span->fmt_str, tmp_args);
-	assert(printed_len >= 0);
+	const int print_len = vsnprintf(NULL, 0, span->fmt_str, tmp_args);
+	assert(print_len >= 0);
 
-	if (span->len >= printed_len) {
+	if (span->len >= print_len) {
 		// Don't need to allocate.
 		vsprintf(span->begin, span->fmt_str, fmt_args);
-		sprintf(span->begin + printed_len, "%s", span->after);
+		strcpy(span->begin + print_len, span->after);
+
 		goto out_end;
 	}
-	// Copy everything before fmt_begin.
-	*span->begin = '\0';
 
-	// TODO: (!) Simplify the allocations here if possible.
-	char *tmp;
-	asprintf(&tmp, "%s%s%s", *parsed->token_it, span->fmt_str, span->after);
+	*span->begin = '\0'; // <<< TODO: (!) IMPORTANT (may want to make more
+			     // prominent)
 
-	free(parsed->alloc[1]);
-	vasprintf(parsed->alloc + 1, tmp, fmt_args);
+	const size_t new_len =
+		strlen(*parsed->token_it) + (size_t)print_len + strlen(span->after);
 
-	free(tmp);
+	if (parsed->alloc[1])
+		parsed->alloc[1] = realloc(parsed->alloc[1], new_len + 1);
+	else
+		strcpy((parsed->alloc[1] = malloc(new_len + 1)),
+		       *parsed->token_it);
+
+	vsprintf(parsed->alloc[1], span->fmt_str, fmt_args);
+	strcpy(parsed->alloc[1] + print_len, span->after);
 
 	*parsed->token_it = parsed->alloc[1];
 
@@ -172,11 +175,12 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 	struct gsh_fmt_span span = {
 		.begin = fmt_begin,
 		.len = strcspn(fmt_begin + 1,
-			       (const char[]) { GSH_PARAM_CH, '\0' }) + 1,
+			       (const char[]){ GSH_PARAM_CH, '\0' }) +
+		       1,
 		.after = (span.begin[span.len] ? strdup(span.begin + span.len) :
-					       NULL),
+						 NULL),
 	};
-
+	// TODO: (?) Only dup if we "need" to?
 	switch ((enum gsh_special_param)span.begin[1]) {
 	case GSH_STATUS_PARAM:
 		span.fmt_str = "%d";
@@ -201,8 +205,8 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 {
 	char *const homevar = gsh_getenv(params, "HOME");
 
-	if (strcmp(*parsed->token_it,
-		   (const char[]) { GSH_HOME_CH, '\0' }) == 0) {
+	if (strcmp(*parsed->token_it, (const char[]){ GSH_HOME_CH, '\0' }) ==
+	    0) {
 		*parsed->token_it = homevar;
 		return;
 	}
@@ -257,7 +261,7 @@ static bool gsh_parse_linebrk(struct gsh_parsed *parsed, char *line)
 }
 
 /*      Collect and insert a fully-expanded token into the list.
- *	
+ *
  *	Returns true while there are still more tokens to collect,
  *	similar to strtok.
  */
@@ -266,7 +270,8 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 {
 	{
 		char *const str = (!parsed->tokens[1] || parsed->need_more) ?
-		    *line_it : NULL;
+					  *line_it :
+					  NULL;
 
 		parsed->need_more = false;
 
@@ -279,7 +284,8 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 	if (gsh_parse_linebrk(parsed, *line_it))
 		return true;
 
-	while (gsh_expand_tok(params, parsed)) ;
+	while (gsh_expand_tok(params, parsed))
+		;
 
 	if (parsed->alloc[1])
 		++parsed->alloc;
