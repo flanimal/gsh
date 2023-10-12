@@ -148,6 +148,9 @@ static void gsh_expand_span(struct gsh_parsed *parsed,
 
 	assert(print_len >= 0);
 
+	span->after =
+		(span->begin[span->len] ? strdup(span->begin + span->len) : "");
+
 	if (span->len >= (size_t)print_len) {
 		// Don't need to allocate.
 		vsprintf(span->begin, span->fmt_str, fmt_args);
@@ -158,6 +161,9 @@ static void gsh_expand_span(struct gsh_parsed *parsed,
 
 	va_end(tmp_args);
 	va_end(fmt_args);
+
+	if (span->after[0] != '\0')
+		free(span->after);
 }
 
 /*	Substitute a variable reference with its value.
@@ -193,10 +199,6 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			       (const char[]) { GSH_PARAM_CH, '\0' }) + 1,
 	};
 
-	// TODO: (?) Only dup if we "need" to?
-	span.after =
-	    (span.begin[span.len] ? strdup(span.begin + span.len) : "");
-
 	switch ((enum gsh_special_param)span.begin[1]) {
 	case GSH_STATUS_PARAM:
 		span.fmt_str = "%d";
@@ -209,9 +211,6 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 		gsh_fmt_var(params, parsed, &span);
 		break;
 	}
-
-	if (span.after[0] != '\0')
-		free(span.after);
 }
 
 /*	Substitute the home character with the value of $HOME.
@@ -235,10 +234,6 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 		.len = 1,
 		.fmt_str = "%s", 
 	};
-
-		// TODO: (?) Only dup if we "need" to?
-	span.after =
-		(span.begin[span.len] ? strdup(span.begin + span.len) : "");
 
 	gsh_expand_span(parsed, &span, homevar);
 }
