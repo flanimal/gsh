@@ -209,7 +209,10 @@ void gsh_run_cmd(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);
 
-	if (sh->input_len == 0)
+	while (gsh_read_line(sh))
+		;
+
+	if (sh->line[0] == '\0')
 		return;
 
 	gsh_add_hist(sh->hist, sh->input_len, sh->line);

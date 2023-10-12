@@ -38,8 +38,10 @@ char *gsh_getenv(const struct gsh_params *params, const char *name);
 void gsh_init(struct gsh_state *sh);
 
 /* Get a null-terminated line of input from the terminal. */
-void gsh_read_line(struct gsh_state *sh);
+bool gsh_read_line(struct gsh_state *sh);
 
 /* Execute a null-terminated line of input.
  * The line will be modified by calls to `strtok`. */
 void gsh_run_cmd(struct gsh_state *sh);
+
+void gsh_put_prompt(const struct gsh_state *sh);

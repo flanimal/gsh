@@ -54,31 +54,45 @@ struct gsh_fmt_span {
 	const char *fmt_str;
 };
 
-void gsh_read_line(struct gsh_state *sh)
+static bool gsh_parse_linebrk(char *line)
+{
+	char *linebreak = strchr(line, '\\');
+	if (linebreak) {
+		if (linebreak[1] == '\0') {
+			*linebreak = '\0';
+			return true;
+		}
+		// Remove the backslash.
+		for (; *linebreak; ++linebreak)
+			linebreak[0] = linebreak[1];
+	}
+
+	return false;
+}
+
+bool gsh_read_line(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);
 
-	// Check if called to get more input.
-	if (sh->parsed->need_more) {
-		--sh->input_len; // Overwrite backslash.
-		fputs(GSH_SECOND_PROMPT, stdout);
-	} else {
-		sh->input_len = 0;
-		gsh_put_prompt(sh);
-	}
-
-	if (!fgets(sh->line + sh->input_len, (int)(gsh_max_input(sh) + 1),
+	if (!fgets(sh->line + sh->input_len, (int)gsh_max_input(sh) + 1,
 		   stdin)) {
 		if (ferror(stdin))
 			perror("gsh exited");
 
-		exit((feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE));
+		exit(feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE);
 	}
 
-	const size_t len = strlen(sh->line + sh->input_len);
+	*strchr(sh->line + sh->input_len, '\n') = '\0';
 
-	sh->line[sh->input_len + len - 1] = '\0'; // Remove newline.
-	sh->input_len = len - 1;
+	if (gsh_parse_linebrk(sh->line + sh->input_len)) {
+		fputs(GSH_SECOND_PROMPT, stdout);
+
+		sh->input_len = strlen(sh->line + sh->input_len);
+		return true;
+	}
+
+	sh->input_len = 0;
+	return false;
 }
 
 struct gsh_parsed *gsh_init_parsed()
@@ -250,21 +264,6 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 	}
 }
 
-static bool gsh_parse_linebrk(struct gsh_parsed *parsed, char *line)
-{
-	char *linebreak = strchr(line, '\\');
-	if (linebreak) {
-		if (linebreak[1] == '\0') {
-			return true;
-		}
-		// Remove the backslash.
-		for (; *linebreak; ++linebreak)
-			linebreak[0] = linebreak[1];
-	}
-
-	return false;
-}
-
 /*      Collect and insert a fully-expanded token into the list.
  *
  *	Returns true while there are still more tokens to collect,
@@ -326,14 +325,12 @@ static bool gsh_parse_filename(struct gsh_params *params,
  *      Returns true if more input is needed to parse an argument,
  *      false if done.
  */
-static bool gsh_parse_cmd_args(struct gsh_params *params,
+static void gsh_parse_cmd_args(struct gsh_params *params,
 			       struct gsh_parsed *parsed, char **const line_it)
 {
 	while ((parsed->token_it - parsed->tokens) <= GSH_MAX_ARGS &&
-	       gsh_next_tok(params, parsed, line_it)) {
-	}
-
-	return false;
+	       gsh_next_tok(params, parsed, line_it))
+		;
 }
 
 void gsh_free_parsed(struct gsh_parsed *parsed)
@@ -353,15 +350,8 @@ int gsh_parse_and_run(struct gsh_state *sh)
 {
 	char *line_it = sh->line;
 
-	for (;; gsh_read_line(sh)) {
-		if (gsh_parse_filename(&sh->params, sh->parsed, sh->line))
-			continue;
-
-		if (gsh_parse_cmd_args(&sh->params, sh->parsed, &line_it))
-			continue;
-
-		break;
-	}
+	gsh_parse_filename(&sh->params, sh->parsed, sh->line);
+	gsh_parse_cmd_args(&sh->params, sh->parsed, &line_it);
 
 	int status = gsh_switch(sh,
 				(sh->parsed->has_pathname ? sh->line : NULL),
