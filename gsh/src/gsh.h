@@ -46,3 +46,5 @@ void gsh_init(struct gsh_state *sh);
 void gsh_run_cmd(struct gsh_state *sh);
 
 void gsh_put_prompt(const struct gsh_state *sh);
+
+void gsh_bad_cmd(const char *msg, int err);

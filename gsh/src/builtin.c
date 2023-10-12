@@ -12,9 +12,9 @@
 #include "history.h"
 #include "builtin.h"
 
-#define GSH_DEF_BUILTIN(name, sh, args)                           \
-	int name(__attribute_maybe_unused__ struct gsh_state *sh, \
-		 __attribute_maybe_unused__ char *const *args)
+#define GSH_DEF_BUILTIN(name, sh_param, args_param)                     \
+	int name(__attribute_maybe_unused__ struct gsh_state *sh_param, \
+		 __attribute_maybe_unused__ char *const *args_param)
 
 struct gsh_builtin {
 	char *cmd;
@@ -24,7 +24,7 @@ struct gsh_builtin {
 GSH_DEF_BUILTIN(gsh_recall, sh, args);
 GSH_DEF_BUILTIN(gsh_list_hist, sh, args);
 
-static GSH_DEF_BUILTIN(gsh_echo, sh, args)
+static GSH_DEF_BUILTIN(gsh_echo, _, args)
 {
 	for (++args; *args; putchar(' '), ++args)
 		if (fputs(*args, stdout) == EOF)
@@ -47,7 +47,7 @@ static GSH_DEF_BUILTIN(gsh_chdir, sh, args)
 	return 0;
 }
 
-static GSH_DEF_BUILTIN(gsh_puthelp, sh, args)
+static GSH_DEF_BUILTIN(gsh_puthelp, _, __)
 {
 	puts("\ngsh - GNU island shell");
 	puts("\ngsh displays the current working directory in the shell prompt :");

@@ -27,8 +27,6 @@ struct gsh_cmd_hist {
 	int hist_n;
 };
 
-void gsh_bad_cmd(const char *msg, int err);
-
 struct gsh_cmd_hist *gsh_init_hist()
 {
 	struct gsh_cmd_hist *hist = malloc(sizeof(*hist));
@@ -82,8 +80,7 @@ void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len, const char *line)
 		drop_hist_ent(sh_hist, sh_hist->oldest_cmd);
 }
 
-int gsh_list_hist(struct gsh_state *sh,
-		  __attribute_maybe_unused__ char *const *args)
+int gsh_list_hist(struct gsh_state *sh, char *const *args)
 {
 	if (args[1] && strcmp(args[1], "-c") == 0) {
 
