@@ -1,10 +1,10 @@
 #define _GNU_SOURCE // for reentrant hashtables
+#include <search.h>
 
 #include <unistd.h>
 #include <limits.h>
 #include <envz.h>
 #include <sys/wait.h>
-#include <search.h>
 
 #include <stddef.h>
 #include <stdlib.h>

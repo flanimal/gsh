@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-
 #include <envz.h>
 
 #include <stdlib.h>

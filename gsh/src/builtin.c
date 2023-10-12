@@ -1,4 +1,4 @@
-#define _GNU_SOURCE
+#define _GNU_SOURCE // for reentrant hashtables
 #include <search.h>
 
 #include <unistd.h>

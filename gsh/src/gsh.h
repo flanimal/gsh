@@ -1,8 +1,5 @@
 #pragma once
 
-#define _GNU_SOURCE
-#include <search.h>
-
 #include <stddef.h>
 #include <stdbool.h>
 
