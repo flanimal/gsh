@@ -31,7 +31,7 @@ struct gsh_state {
 	struct gsh_shopts shopts;
 
         char *line; 
-	size_t input_len; // TODO: (!) Replace with line_it? Even move line into parse state?
+	size_t input_len;
 
 	struct hsearch_data *builtin_tbl;
 };

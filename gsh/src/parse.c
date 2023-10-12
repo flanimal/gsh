@@ -25,7 +25,7 @@ extern bool g_gsh_initialized;
 #endif
 
 struct gsh_parsed {
-	bool has_pathname; // TODO: Do we still need this?
+	bool has_pathname;	// TODO: Do we still need this?
 
 	/* List of tokens to be returned from parsing. */
 	char **tokens;
@@ -43,7 +43,8 @@ struct gsh_fmt_span {
 	/* Beginning of format span within the current token. */
 	char *begin;
 
-	/* Length of the span, up to either the NUL byte or the next special char. */
+	/* Length of the span, up to either the NUL byte or the next special
+	 * char. */
 	size_t len;
 
 	/* A copy of the token text following the span, if any. */
@@ -72,8 +73,7 @@ bool gsh_read_line(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);
 
-	if (!fgets(sh->line + sh->input_len, (int)gsh_max_input(sh) + 1,
-		   stdin)) {
+	if (!fgets(sh->line + sh->input_len, (int)gsh_max_input(sh) + 1, stdin)) {
 		if (ferror(stdin))
 			perror("gsh exited");
 
@@ -84,7 +84,7 @@ bool gsh_read_line(struct gsh_state *sh)
 	*newline = '\0';
 
 	bool need_more = gsh_parse_linebrk(sh->line + sh->input_len);
-	
+
 	if (need_more)
 		fputs(GSH_SECOND_PROMPT, stdout);
 
@@ -97,7 +97,7 @@ struct gsh_parsed *gsh_init_parsed()
 	struct gsh_parsed *parsed = malloc(sizeof(*parsed));
 
 	parsed->token_it = parsed->tokens =
-		calloc(GSH_MAX_ARGS, sizeof(char *));
+	    calloc(GSH_MAX_ARGS, sizeof(char *));
 
 	// MAX_ARGS plus sentinel.
 	parsed->fmt_bufs = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
@@ -105,19 +105,41 @@ struct gsh_parsed *gsh_init_parsed()
 	return parsed;
 }
 
-static void gsh_alloc_fmtbuf(struct gsh_parsed *parsed, size_t new_len)
+static char *gsh_alloc_fmtbuf(struct gsh_parsed *parsed, size_t new_len)
 {
 	if (parsed->fmt_bufs[1])
 		parsed->fmt_bufs[1] = realloc(parsed->fmt_bufs[1], new_len + 1);
 	else
 		strcpy((parsed->fmt_bufs[1] = malloc(new_len + 1)),
 		       *parsed->token_it);
+
+	return parsed->fmt_bufs[1];
+}
+
+static void gsh_expand_alloc(struct gsh_parsed *parsed,
+			     struct gsh_fmt_span *span, size_t print_len,
+			     va_list fmt_args)
+{
+	*span->begin = '\0';	// <<< TODO: (!) IMPORTANT (may want to make more
+	// prominent)
+
+	const size_t before_len = strlen(*parsed->token_it);
+
+	char *fmtbuf = gsh_alloc_fmtbuf(parsed, before_len + print_len +
+					strlen(span->after));
+
+	*parsed->token_it = fmtbuf;
+	fmtbuf += before_len;
+
+	// TODO: Signedness.
+	vsprintf(fmtbuf, span->fmt_str, fmt_args);
+	strcpy(fmtbuf + print_len, span->after);
 }
 
 /*	(Re)allocate an expansion buffer and format it with args.
  */
-static void gsh_expand_span(struct gsh_parsed *parsed, const struct gsh_fmt_span *span,
-			  ...)
+static void gsh_expand_span(struct gsh_parsed *parsed,
+			    struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args, tmp_args;
 
@@ -128,31 +150,14 @@ static void gsh_expand_span(struct gsh_parsed *parsed, const struct gsh_fmt_span
 
 	assert(print_len >= 0);
 
-	const char *const after = (span->after ? span->after : "");
-
 	if (span->len >= (size_t)print_len) {
 		// Don't need to allocate.
 		vsprintf(span->begin, span->fmt_str, fmt_args);
-		strcpy(span->begin + print_len, after);
-
-		goto out_end;
+		strcpy(span->begin + print_len, span->after);
+	} else {
+		gsh_expand_alloc(parsed, span, (size_t)print_len, fmt_args);
 	}
 
-	*span->begin = '\0'; // <<< TODO: (!) IMPORTANT (may want to make more
-			     // prominent)
-
-	const size_t before_len = strlen(*parsed->token_it);
-
-	gsh_alloc_fmtbuf(parsed,
-			 before_len + (size_t)print_len + strlen(after));
-
-	vsprintf(parsed->fmt_bufs[1] + before_len, span->fmt_str, fmt_args);
-	strcpy(parsed->fmt_bufs[1] + before_len + print_len,
-	       after); // TODO: Signedness.
-
-	*parsed->token_it = parsed->fmt_bufs[1];
-
-out_end:
 	va_end(tmp_args);
 	va_end(fmt_args);
 }
@@ -187,12 +192,12 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 	struct gsh_fmt_span span = {
 		.begin = fmt_begin,
 		.len = strcspn(fmt_begin + 1,
-			       (const char[]){ GSH_PARAM_CH, '\0' }) + 1,
+			       (const char[]) { GSH_PARAM_CH, '\0' }) + 1,
 	};
 
 	// TODO: (?) Only dup if we "need" to?
 	span.after =
-		(span.begin[span.len] ? strdup(span.begin + span.len) : NULL);
+	    (span.begin[span.len] ? strdup(span.begin + span.len) : "");
 
 	switch ((enum gsh_special_param)span.begin[1]) {
 	case GSH_STATUS_PARAM:
@@ -207,7 +212,8 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 		break;
 	}
 
-	free(span.after);
+	if (span.after[0] != '\0')
+		free(span.after);
 }
 
 /*	Substitute the home character with the value of $HOME.
@@ -220,7 +226,7 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 {
 	char *const homevar = gsh_getenv(params, "HOME");
 
-	if (strcmp(*parsed->token_it, (const char[]){ GSH_HOME_CH, '\0' }) ==
+	if (strcmp(*parsed->token_it, (const char[]) { GSH_HOME_CH, '\0' }) ==
 	    0) {
 		*parsed->token_it = homevar;
 		return;
@@ -271,8 +277,7 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 
 	*parsed->token_it = next_tok;
 
-	while (gsh_expand_tok(params, parsed))
-		;
+	while (gsh_expand_tok(params, parsed)) ;
 
 	if (parsed->fmt_bufs[1])
 		++parsed->fmt_bufs;
@@ -311,8 +316,7 @@ static void gsh_parse_cmd_args(struct gsh_params *params,
 			       struct gsh_parsed *parsed)
 {
 	while ((parsed->token_it - parsed->tokens) <= GSH_MAX_ARGS &&
-	       gsh_next_tok(params, parsed, NULL))
-		;
+	       gsh_next_tok(params, parsed, NULL)) ;
 }
 
 void gsh_free_parsed(struct gsh_parsed *parsed)
@@ -333,9 +337,9 @@ void gsh_parse_and_run(struct gsh_state *sh)
 	gsh_parse_filename(&sh->params, sh->parsed, sh->line);
 	gsh_parse_cmd_args(&sh->params, sh->parsed);
 
-	sh->params.last_status = gsh_switch(sh,
-				(sh->parsed->has_pathname ? sh->line : NULL),
-				sh->parsed->tokens);
+	sh->params.last_status =
+	    gsh_switch(sh, (sh->parsed->has_pathname ? sh->line : NULL),
+		       sh->parsed->tokens);
 
 	sh->input_len = 0;
 	gsh_free_parsed(sh->parsed);
