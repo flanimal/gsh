@@ -35,9 +35,6 @@ char *gsh_getenv(const struct gsh_params *params, const char *name);
 /* Set initial values and resources for the shell. */
 void gsh_init(struct gsh_state *sh);
 
-/* Get a null-terminated line of input from the terminal. */
-bool gsh_read_line(struct gsh_state *sh);
-
 /* Execute a null-terminated line of input.
  * The line will be modified by calls to `strtok`. */
 void gsh_run_cmd(struct gsh_state *sh);
