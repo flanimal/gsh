@@ -89,14 +89,10 @@ void gsh_set_builtins(struct hsearch_data **builtin_tbl)
 	*builtin_tbl = calloc(1, sizeof(**builtin_tbl));
 	hcreate_r(builtin_n, *builtin_tbl);
 
-	struct gsh_builtin_wrapper *funcs = malloc(sizeof(*funcs) * builtin_n);
-
 	ENTRY *retval;
 
-	for (size_t i = 0; i < builtin_n; ++i) {
-		funcs[i] = builtins[i].func;
-
-		hsearch_r((ENTRY){ .key = builtins[i].cmd, .data = funcs + i },
+	for (size_t i = 0; i < builtin_n; ++i)
+		hsearch_r((ENTRY){ .key = builtins[i].cmd,
+				   .data = &builtins[i].func },
 			  ENTER, &retval, *builtin_tbl);
-	}
 }
