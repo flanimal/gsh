@@ -2,8 +2,13 @@
 
 #include "process.h"
 
-int gsh_puthelp();
+typedef int (*gsh_builtin_callback)(struct gsh_state *, char *const *);
 
-int gsh_chdir(struct gsh_workdir *wd, const char *pathname);
+struct gsh_cb_wrapper {
+	gsh_builtin_callback cb;
+};
 
-int gsh_echo(char *const *args);
+#define GSH_BUILTIN_ENTRY(callback) \
+	((struct gsh_cb_wrapper *)callback->data)->cb
+
+void gsh_set_builtins(struct hsearch_data **builtin_tbl);

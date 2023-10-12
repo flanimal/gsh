@@ -1,5 +1,8 @@
 #pragma once
 
+#define _GNU_SOURCE
+#include <search.h>
+
 #include <stddef.h>
 #include <stdbool.h>
 
@@ -13,6 +16,11 @@ struct gsh_params {
 	int last_status;
 };
 
+struct gsh_shopts
+{
+	bool prompt_status;
+};
+
 struct gsh_state {
 	/* Line history. */
 	struct gsh_cmd_hist *hist;
@@ -23,11 +31,12 @@ struct gsh_state {
 	struct gsh_workdir *wd;
 
 	struct gsh_params params;
-
-	bool show_status; // TODO: Put shell options somewhere.
+	struct gsh_shopts shopts;
 
         char *line; 
 	size_t input_len; // TODO: (!) Replace with line_it? Even move line into parse state?
+
+	struct hsearch_data *builtin_tbl;
 };
 
 char *gsh_getenv(const struct gsh_params *params, const char *name);

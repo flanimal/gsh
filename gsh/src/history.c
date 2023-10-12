@@ -39,8 +39,8 @@ struct gsh_cmd_hist *gsh_init_hist()
 	return hist;
 }
 
-static void new_hist_ent(struct gsh_cmd_hist *sh_hist,
-					 size_t len, const char *line)
+static void new_hist_ent(struct gsh_cmd_hist *sh_hist, size_t len,
+			 const char *line)
 {
 	struct gsh_hist_ent *last_cmd = malloc(sizeof(*last_cmd));
 
@@ -50,7 +50,7 @@ static void new_hist_ent(struct gsh_cmd_hist *sh_hist,
 	last_cmd->line = strcpy(malloc(len + 1), line);
 	last_cmd->len = len;
 
-        if (sh_hist->hist_n == 0)
+	if (sh_hist->hist_n == 0)
 		sh_hist->oldest_cmd = last_cmd;
 
 	++sh_hist->hist_n;
@@ -69,8 +69,7 @@ static void drop_hist_ent(struct gsh_cmd_hist *sh_hist,
 	--sh_hist->hist_n;
 }
 
-void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len,
-			 const char *line)
+void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len, const char *line)
 {
 	// The recall command `r` itself should NOT be added to history.
 	if (line[0] == 'r' && (!line[1] || isspace(line[1])))
@@ -82,22 +81,24 @@ void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len,
 		drop_hist_ent(sh_hist, sh_hist->oldest_cmd);
 }
 // TODO: Clear history option
-int gsh_list_hist(const struct gsh_cmd_hist *sh_hist)
+int gsh_list_hist(struct gsh_state *sh,
+		  __attribute_maybe_unused__ char *const *_)
 {
 	// It is not possible for `cmd_history` to be NULL here,
 	// as it will contain at least the `hist` invocation.
 	int cmd_n = 1;
 
-	for (struct gsh_hist_ent *cmd_it = sh_hist->cmd_history; cmd_it; cmd_it = cmd_it->forw)
+	for (struct gsh_hist_ent *cmd_it = sh->hist->cmd_history; cmd_it;
+	     cmd_it = cmd_it->forw)
 		printf("%d: %s\n", cmd_n++, cmd_it->line);
 
 	return 0;
 }
 
 /* Re-run the n-th previous line of input. */
-int gsh_recall(struct gsh_state *sh, const char *recall_arg)
+int gsh_recall(struct gsh_state *sh, char *const *args)
 {
-	int n_arg = (recall_arg ? atoi(recall_arg) : 1);
+	int n_arg = (args[1] ? atoi(args[1]) : 1);
 
 	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
 		gsh_bad_cmd("no matching history entry", 0);

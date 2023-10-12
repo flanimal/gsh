@@ -1,7 +1,10 @@
+#define _GNU_SOURCE // for reentrant hashtables
+
 #include <unistd.h>
 #include <limits.h>
 #include <envz.h>
 #include <sys/wait.h>
+#include <search.h>
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -27,9 +30,10 @@ extern char **environ;
 
 void gsh_put_prompt(const struct gsh_state *sh)
 {
-	if (sh->show_status)
+	if (sh->shopts.prompt_status)
 		printf("<%d> ", WIFEXITED(sh->params.last_status) ?
-		       WEXITSTATUS(sh->params.last_status) : 255);
+					WEXITSTATUS(sh->params.last_status) :
+					255);
 
 	const bool in_home = strncmp(sh->wd->cwd,
 				     gsh_getenv(&sh->params, "HOME"),
@@ -104,6 +108,7 @@ static void gsh_set_params(struct gsh_params *params)
 
 void gsh_init(struct gsh_state *sh)
 {
+	gsh_set_builtins(&sh->builtin_tbl);
 	gsh_set_params(&sh->params);
 
 	sh->wd = gsh_init_wd();
@@ -115,7 +120,7 @@ void gsh_init(struct gsh_state *sh)
 	// Max input line length + newline + null byte.
 	sh->line = malloc(gsh_max_input(sh) + 2);
 
-	sh->show_status = true;
+	sh->shopts = (struct gsh_shopts){ 0 };
 
 #ifndef NDEBUG
 	g_gsh_initialized = true;
@@ -129,7 +134,7 @@ static void gsh_copy_pathname(char **const dest_it, const char **const src_it)
 	for (;; ++(*dest_it), ++(*src_it)) {
 		switch (**src_it) {
 		case ':':
-			++(*src_it);	// Move to next path following the colon.
+			++(*src_it); // Move to next path following the colon.
 			/* fall through */
 		case '\0':
 			**dest_it = '\0';
@@ -141,6 +146,7 @@ static void gsh_copy_pathname(char **const dest_it, const char **const src_it)
 	}
 }
 
+// TODO: (!) Replace with exec(3).
 // TODO: (!) Move wd->max_path to parse state?
 static int gsh_exec_path(const char *pathvar, const struct gsh_workdir *wd,
 			 char *const *args)
@@ -184,25 +190,13 @@ static int gsh_exec(struct gsh_state *sh, char *pathname, char *const *args)
 
 int gsh_switch(struct gsh_state *sh, char *pathname, char *const *args)
 {
-	// TODO: hash table or something, if just for ease of reading
-	if (strcmp(args[0], "cd") == 0)
-		return gsh_chdir(sh->wd, args[1]);
-
-	else if (strcmp(args[0], "r") == 0)
-		return gsh_recall(sh, args[1]);
-
-	else if (strcmp(args[0], "hist") == 0)
-		return gsh_list_hist(sh->hist);
-
-	else if (strcmp(args[0], "echo") == 0)
-		return gsh_echo(args + 1);
-
-	else if (strcmp(args[0], "help") == 0)
-		return gsh_puthelp();
-
-	else if (strcmp(args[0], "exit") == 0)
+	if (strcmp(args[0], "exit") == 0)
 		exit(EXIT_SUCCESS);
 
+	ENTRY *callback;
+	if (hsearch_r((ENTRY){ .key = args[0] }, FIND, &callback,
+		      sh->builtin_tbl))
+		return GSH_BUILTIN_ENTRY(callback)(sh, args);
 	else
 		return gsh_exec(sh, pathname, args);
 }
