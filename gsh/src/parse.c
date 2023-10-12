@@ -269,7 +269,7 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char **const line_it)
 {
 	{
-		char *const str = (!parsed->tokens[1] || parsed->need_more) ?
+		char *const str = (!parsed->tokens[0] || parsed->need_more) ?
 					  *line_it :
 					  NULL;
 
@@ -279,11 +279,10 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 			return false;
 	}
 
-	*parsed->token_it = *line_it;
-
 	if (gsh_parse_linebrk(parsed, *line_it))
 		return true;
 
+	*parsed->token_it = *line_it;
 	while (gsh_expand_tok(params, parsed))
 		;
 
