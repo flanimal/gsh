@@ -293,10 +293,6 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 static bool gsh_parse_filename(struct gsh_params *params,
 			       struct gsh_parsed *parsed, char *line)
 {
-	// Immediately return if filename has already been gotten.
-	if (parsed->token_it != parsed->tokens)
-		return false;
-
 	if (gsh_next_tok(params, parsed, line))
 		return true;
 

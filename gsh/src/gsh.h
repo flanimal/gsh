@@ -22,7 +22,7 @@ struct gsh_state {
 	/* Line history. */
 	struct gsh_cmd_hist *hist;
 
-        /* Line parse state. */
+        /* The buffers used for parsing. */
         struct gsh_parsed *parsed;
 
 	struct gsh_workdir *wd;
