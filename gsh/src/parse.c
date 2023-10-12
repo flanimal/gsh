@@ -98,9 +98,18 @@ struct gsh_parsed *gsh_init_parsed()
 	return parsed;
 }
 
+static void gsh_span_alloc(struct gsh_parsed *parsed, size_t new_len)
+{
+	if (parsed->alloc[1])
+		parsed->alloc[1] = realloc(parsed->alloc[1], new_len + 1);
+	else
+		strcpy((parsed->alloc[1] = malloc(new_len + 1)),
+		       *parsed->token_it);
+}
+
 /*	(Re)allocate an expansion buffer and format it with args.
  */
-static void gsh_alloc_fmt(struct gsh_parsed *parsed, const struct gsh_fmt_span *span,
+static void gsh_expand_span(struct gsh_parsed *parsed, const struct gsh_fmt_span *span,
 			  ...)
 {
 	va_list fmt_args, tmp_args;
@@ -126,17 +135,7 @@ static void gsh_alloc_fmt(struct gsh_parsed *parsed, const struct gsh_fmt_span *
 
 	const size_t before_len = strlen(*parsed->token_it);
 
-	{
-		const size_t new_len = before_len +
-				       (size_t)print_len + strlen(after);
-
-		if (parsed->alloc[1])
-			parsed->alloc[1] =
-				realloc(parsed->alloc[1], new_len + 1);
-		else
-			strcpy((parsed->alloc[1] = malloc(new_len + 1)),
-			       *parsed->token_it);
-	}
+	gsh_span_alloc(parsed, before_len + (size_t)print_len + strlen(after));
 
 	vsprintf(parsed->alloc[1] + before_len, span->fmt_str, fmt_args);
 	strcpy(parsed->alloc[1] + before_len + print_len, after); // TODO: Signedness.
@@ -166,7 +165,7 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 
 	char *const var_name = strndup(span->begin + 1, span->len - 1);
 
-	gsh_alloc_fmt(parsed, span, gsh_getenv(params, var_name));
+	gsh_expand_span(parsed, span, gsh_getenv(params, var_name));
 	free(var_name);
 }
 
@@ -182,15 +181,15 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 			       (const char[]){ GSH_PARAM_CH, '\0' }) + 1,
 	};
 
+	// TODO: (?) Only dup if we "need" to?
 	span.after =
 		(span.begin[span.len] ? strdup(span.begin + span.len) : NULL);
 
-	// TODO: (?) Only dup if we "need" to?
 	switch ((enum gsh_special_param)span.begin[1]) {
 	case GSH_STATUS_PARAM:
 		span.fmt_str = "%d";
 
-		gsh_alloc_fmt(parsed, &span, params->last_status);
+		gsh_expand_span(parsed, &span, params->last_status);
 		break;
 	default:
 		span.fmt_str = "%s";
@@ -224,7 +223,7 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 		.fmt_str = "%s",
 	};
 
-	gsh_alloc_fmt(parsed, &fmt, homevar, fmt_begin + 1);
+	gsh_expand_span(parsed, &fmt, homevar, fmt_begin + 1);
 }
 
 /*      Expand the last token.
