@@ -234,10 +234,13 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 		.begin = fmt_begin,
 		.len = 1,
 		.fmt_str = "%s", 
-		.after = "",
 	};
 
-	gsh_expand_span(parsed, &span, homevar, fmt_begin + 1);
+		// TODO: (?) Only dup if we "need" to?
+	span.after =
+		(span.begin[span.len] ? strdup(span.begin + span.len) : "");
+
+	gsh_expand_span(parsed, &span, homevar);
 }
 
 /*      Expand the last token.
