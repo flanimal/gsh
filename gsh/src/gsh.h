@@ -19,7 +19,7 @@ struct gsh_state {
 	/* Line history. */
 	struct gsh_cmd_hist *hist;
 
-        /* The buffers used for parsing input lines. */
+        /* Line parse state. */
         struct gsh_parsed *parsed;
 
 	struct gsh_workdir *wd;
@@ -29,7 +29,7 @@ struct gsh_state {
 	bool show_status; // TODO: Put shell options somewhere.
 
         char *line; 
-	size_t input_len; // TODO: (!) Replace with line_it?
+	size_t input_len; // TODO: (!) Replace with line_it? Even move line into parse state?
 };
 
 char *gsh_getenv(const struct gsh_params *params, const char *name);
