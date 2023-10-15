@@ -33,8 +33,6 @@ struct gsh_parsed {
 
 	/* Stack of buffers for tokens that contain substitutions. */
 	char **fmt_bufs;
-
-	char *tok_state;
 };
 
 struct gsh_fmt_span {
@@ -274,9 +272,9 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
  *	similar to strtok.
  */
 static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
-			 char *line)
+			 char *line, char **tok_state)
 {
-	char *next_tok = strtok_r(line, " ", &parsed->tok_state);
+	char *next_tok = strtok_r(line, " ", tok_state);
 	if (!next_tok)
 		return false;
 
@@ -295,9 +293,9 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
  *      the filename in the argument array.
  */
 static bool gsh_parse_filename(struct gsh_params *params,
-			       struct gsh_parsed *parsed, char *line)
+			       struct gsh_parsed *parsed, char *line, char **tok_state)
 {
-	if (gsh_next_tok(params, parsed, line))
+	if (gsh_next_tok(params, parsed, line, tok_state))
 		return true;
 
 	char *last_slash = strrchr(line, '/');
@@ -311,10 +309,10 @@ static bool gsh_parse_filename(struct gsh_params *params,
  *      then terminated with a NULL pointer.
  */
 static void gsh_parse_cmd_args(struct gsh_params *params,
-			       struct gsh_parsed *parsed)
+			       struct gsh_parsed *parsed, char **tok_state)
 {
 	while ((parsed->token_it - parsed->tokens) <= GSH_MAX_ARGS &&
-	       gsh_next_tok(params, parsed, NULL)) ;
+	       gsh_next_tok(params, parsed, NULL, tok_state)) ;
 }
 
 void gsh_free_parsed(struct gsh_parsed *parsed)
@@ -332,8 +330,10 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 
 void gsh_parse_and_run(struct gsh_state *sh)
 {
-	gsh_parse_filename(&sh->params, sh->parsed, sh->line);
-	gsh_parse_cmd_args(&sh->params, sh->parsed);
+	char *tok_state;
+
+	gsh_parse_filename(&sh->params, sh->parsed, sh->line, &tok_state);
+	gsh_parse_cmd_args(&sh->params, sh->parsed, &tok_state);
 
 	sh->params.last_status = gsh_switch(sh, sh->line, sh->parsed->tokens);
 
