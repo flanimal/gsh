@@ -92,7 +92,7 @@ static struct gsh_workdir *gsh_init_wd()
  */
 size_t gsh_max_input(const struct gsh_state *sh)
 {
-	return (size_t)sh->wd->max_input - sh->input_len;
+	return (size_t)sh->wd->max_input;
 }
 
 static void gsh_set_params(struct gsh_params *params)
@@ -114,8 +114,6 @@ void gsh_init(struct gsh_state *sh)
 	sh->wd = gsh_init_wd();
 	sh->parsed = gsh_init_parsed();
 	sh->hist = gsh_init_hist();
-
-	sh->input_len = 0;
 
 	// Max input line length + newline + null byte.
 	sh->line = malloc(gsh_max_input(sh) + 2);
@@ -140,7 +138,7 @@ static int gsh_exec(char *pathname, char *const *args)
 	}
 
 	execvp(pathname, args);
-
+	
 	// Named program couldn't be executed.
 	gsh_bad_cmd(pathname, errno);
 	exit(GSH_EXIT_NOTFOUND);
@@ -163,12 +161,13 @@ void gsh_run_cmd(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);
 
-	while (gsh_read_line(sh))
+	size_t input_len = 0;
+	while (gsh_read_line(sh, &input_len))
 		;
 
 	if (sh->line[0] == '\0')
 		return;
 
-	gsh_add_hist(sh->hist, sh->input_len, sh->line);
+	gsh_add_hist(sh->hist, input_len, sh->line);
 	gsh_parse_and_run(sh);
 }

@@ -67,26 +67,26 @@ static bool gsh_parse_linebrk(char *line)
 	return false;
 }
 
-bool gsh_read_line(struct gsh_state *sh)
+bool gsh_read_line(struct gsh_state *sh, size_t *input_len)
 {
 	assert(g_gsh_initialized);
 
-	if (!fgets(sh->line + sh->input_len, (int)gsh_max_input(sh) + 1, stdin)) {
+	if (!fgets(sh->line + *input_len, (int)(gsh_max_input(sh) - *input_len) + 1, stdin)) {
 		if (ferror(stdin))
 			perror("gsh exited");
 
 		exit(feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE);
 	}
 
-	char *newline = strchr(sh->line + sh->input_len, '\n');
+	char *newline = strchr(sh->line + *input_len, '\n');
 	*newline = '\0';
 
-	bool need_more = gsh_parse_linebrk(sh->line + sh->input_len);
-	sh->input_len = (size_t)(newline - (sh->line + sh->input_len));
+	bool need_more = gsh_parse_linebrk(sh->line + *input_len);
+	*input_len = (size_t)(newline - (sh->line + *input_len));
 
 	if (need_more) {
 		fputs(GSH_SECOND_PROMPT, stdout);
-		--sh->input_len; // Exclude backslash.	
+		--(*input_len); // Exclude backslash.	
 	}
 
 	return need_more;
@@ -105,17 +105,23 @@ struct gsh_parsed *gsh_init_parsed()
 	return parsed;
 }
 
+/*	Allocate and return a new format buffer.
+ */
 static char *gsh_alloc_fmtbuf(struct gsh_parsed *parsed, size_t new_len)
 {
-	if (parsed->fmt_bufs[1])
+	if (parsed->fmt_bufs[1]) {
 		parsed->fmt_bufs[1] = realloc(parsed->fmt_bufs[1], new_len + 1);
-	else
-		strcpy((parsed->fmt_bufs[1] = malloc(new_len + 1)),
-		       *parsed->token_it);
+	} else {
+		parsed->fmt_bufs[1] = malloc(new_len + 1);
+
+		strcpy(parsed->fmt_bufs[1], *parsed->token_it);
+	}
 
 	return parsed->fmt_bufs[1];
 }
 
+/*	Allocate an expansion buffer and format it using reference to args.
+ */
 static void gsh_expand_alloc(struct gsh_parsed *parsed,
 			     struct gsh_fmt_span *span, size_t print_len,
 			     va_list fmt_args)
@@ -134,7 +140,7 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed,
 	strcpy(fmtbuf + print_len, span->after);
 }
 
-/*	(Re)allocate an expansion buffer and format it with args.
+/*	Format a span with the given args, allocating a buffer if necessary.
  */
 static void gsh_expand_span(struct gsh_parsed *parsed,
 			    struct gsh_fmt_span *span, ...)
@@ -254,6 +260,9 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 	case GSH_HOME_CH:
 		gsh_fmt_home(params, parsed, fmt_begin);
 		return true;
+	case GSH_SHOPT_CH:
+		//gsh_set_opt();
+		return true;
 	}
 	
 	__builtin_unreachable();
@@ -328,6 +337,5 @@ void gsh_parse_and_run(struct gsh_state *sh)
 
 	sh->params.last_status = gsh_switch(sh, sh->line, sh->parsed->tokens);
 
-	sh->input_len = 0;
 	gsh_free_parsed(sh->parsed);
 }

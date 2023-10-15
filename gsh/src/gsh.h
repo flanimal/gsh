@@ -31,7 +31,6 @@ struct gsh_state {
 	struct gsh_shopts shopts;
 
         char *line; 
-	size_t input_len;
 
 	struct hsearch_data *builtin_tbl;
 };
