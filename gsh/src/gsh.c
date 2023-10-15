@@ -128,19 +128,21 @@ void gsh_init(struct gsh_state *sh)
 }
 
 /* Fork and exec a program. */
-static int gsh_exec(struct gsh_state *sh, char *pathname, char *const *args)
+static int gsh_exec(char *pathname, char *const *args)
 {
 	pid_t cmd_pid = fork();
 
 	if (cmd_pid != 0) {
-		waitpid(cmd_pid, &sh->params.last_status, 0);
-		return sh->params.last_status;
+		int status;
+		waitpid(cmd_pid, &status, 0);
+
+		return status;
 	}
 
 	execvp(pathname, args);
 
 	// Named program couldn't be executed.
-	gsh_bad_cmd(sh->line, errno);
+	gsh_bad_cmd(pathname, errno);
 	exit(GSH_EXIT_NOTFOUND);
 }
 
@@ -154,7 +156,7 @@ int gsh_switch(struct gsh_state *sh, char *pathname, char *const *args)
 		      sh->builtin_tbl))
 		return GSH_BUILTIN_FUNC(builtin)(sh, args);
 	else
-		return gsh_exec(sh, pathname, args);
+		return gsh_exec(pathname, args);
 }
 
 void gsh_run_cmd(struct gsh_state *sh)
