@@ -114,6 +114,11 @@ static char *gsh_alloc_fmtbuf(struct gsh_parsed *parsed, size_t new_len)
 
 		strcpy(parsed->fmt_bufs[1], *parsed->token_it);
 	}
+	// There is currently no way to know whether to allocate
+	// or reallocate the buffer unless we increment fmt_bufs OUTSIDE of 
+	// expand_tok().
+	// I think a confusion came from the fact that only ONE buffer
+	// will ever exist for a token/"word". There will never be multiple.
 
 	return parsed->fmt_bufs[1];
 }
@@ -311,8 +316,9 @@ static bool gsh_parse_filename(struct gsh_params *params,
 static void gsh_parse_cmd_args(struct gsh_params *params,
 			       struct gsh_parsed *parsed, char **tok_state)
 {
-	while ((parsed->token_it - parsed->tokens) <= GSH_MAX_ARGS &&
-	       gsh_next_tok(params, parsed, NULL, tok_state)) ;
+	while ((parsed->token_it - parsed->tokens) <= GSH_MAX_ARGS)
+		if (!gsh_next_tok(params, parsed, NULL, tok_state))
+			break;
 }
 
 void gsh_free_parsed(struct gsh_parsed *parsed)
