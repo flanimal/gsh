@@ -1,4 +1,4 @@
-#define _GNU_SOURCE // for reentrant hashtables
+#define _GNU_SOURCE		// for reentrant hashtables
 #include <search.h>
 
 #include <unistd.h>
@@ -15,11 +15,6 @@
 #define GSH_DEF_BUILTIN(name, sh_param, args_param)                     \
 	int name(__attribute_maybe_unused__ struct gsh_state *sh_param, \
 		 __attribute_maybe_unused__ char *const *args_param)
-
-struct gsh_builtin {
-	char *cmd;
-	struct gsh_builtin_wrapper func;
-};
 
 GSH_DEF_BUILTIN(gsh_recall, sh, args);
 GSH_DEF_BUILTIN(gsh_list_hist, sh, args);
@@ -77,22 +72,20 @@ static GSH_DEF_BUILTIN(gsh_puthelp, _, __)
 }
 
 static struct gsh_builtin builtins[] = {
-	{ "echo", { gsh_echo } },    { "r", { gsh_recall } },
-	{ "cd", { gsh_chdir } },     { "hist", { gsh_list_hist } },
-	{ "help", { gsh_puthelp } },
+	{ "echo", gsh_echo }, { "r", gsh_recall }, { "cd", gsh_chdir },
+	{ "hist", gsh_list_hist }, { "help", gsh_puthelp },
 };
 
 static const size_t builtin_n = sizeof(builtins) / sizeof(*builtins);
 
 void gsh_set_builtins(struct hsearch_data **builtin_tbl)
 {
-	*builtin_tbl = calloc(1, sizeof(**builtin_tbl));
-	hcreate_r(builtin_n, *builtin_tbl);
+	hcreate_r(builtin_n, (*builtin_tbl = calloc(1, sizeof(**builtin_tbl))));
 
 	ENTRY *retval;
 
 	for (size_t i = 0; i < builtin_n; ++i)
-		hsearch_r((ENTRY){ .key = builtins[i].cmd,
-				   .data = &builtins[i].func },
+		hsearch_r((ENTRY) {
+			  .key = builtins[i].cmd,.data = builtins + i},
 			  ENTER, &retval, *builtin_tbl);
 }
