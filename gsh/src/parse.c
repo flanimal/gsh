@@ -148,17 +148,19 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed,
 static void gsh_expand_span(struct gsh_parsed *parsed,
 			    struct gsh_fmt_span *span, ...)
 {
-	va_list fmt_args, tmp_args;
-
+	va_list fmt_args;
 	va_start(fmt_args, span);
-	va_copy(tmp_args, fmt_args);
 
-	const int print_len = vsnprintf(NULL, 0, span->fmt_str, tmp_args);
+	va_list args_cpy;
+	va_copy(args_cpy, fmt_args);
+
+	const int print_len = vsnprintf(NULL, 0, span->fmt_str, args_cpy);
+	va_end(args_cpy);
 
 	assert(print_len >= 0);
 
-	span->after =
-		(span->begin[span->len] ? strdup(span->begin + span->len) : "");
+	span->after = span->begin[span->len] ? strdup(span->begin + span->len) :
+					       "";
 
 	if (span->len >= (size_t)print_len) {
 		// Don't need to allocate.
@@ -168,10 +170,9 @@ static void gsh_expand_span(struct gsh_parsed *parsed,
 		gsh_expand_alloc(parsed, span, (size_t)print_len, fmt_args);
 	}
 
-	va_end(tmp_args);
 	va_end(fmt_args);
 
-	if (span->after[0] != '\0')
+	if (strcmp(span->after, "") != 0)
 		free(span->after);
 }
 
