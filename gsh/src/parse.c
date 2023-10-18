@@ -39,8 +39,8 @@ struct gsh_fmt_span {
 	/* Beginning of format span within the current token. */
 	char *begin;
 
-	/* Length of the span, up to either the NUL byte or the next special
-	 * char. */
+	/* Length of the unformatted span, up to either the NUL byte or the next
+	 * special char. */
 	size_t len;
 
 	/* A copy of the token text following the span, if any. */
@@ -123,11 +123,10 @@ static char *gsh_alloc_fmtbuf(struct gsh_parsed *parsed, size_t new_len)
 	return parsed->fmt_bufs[1];
 }
 
-/*	Allocate an expansion buffer and format it using reference to args.
+/*	Copy the token to a buffer for expansion.
  */
-static void gsh_expand_alloc(struct gsh_parsed *parsed,
-			     struct gsh_fmt_span *span, size_t print_len,
-			     va_list fmt_args)
+static char *gsh_expand_alloc(struct gsh_parsed *parsed,
+			     struct gsh_fmt_span *span, size_t print_len)
 {
 	span->begin[0] = '\0';
 
@@ -139,8 +138,7 @@ static void gsh_expand_alloc(struct gsh_parsed *parsed,
 	*parsed->token_it = fmtbuf;
 	fmtbuf += before_len;
 
-	vsprintf(fmtbuf, span->fmt_str, fmt_args);
-	strcpy(fmtbuf + print_len, span->after);
+	return fmtbuf;
 }
 
 /*	Format a span with the given args, allocating a buffer if necessary.
@@ -163,13 +161,14 @@ static void gsh_expand_span(struct gsh_parsed *parsed,
 	span->after = span->begin[span->len] ? strdup(span->begin + span->len) :
 					       "";
 
-	if (span->len >= (size_t)print_len)
-		// Don't need to allocate.
-		strcpy(span->begin + print_len, span->after);
-	else
-		gsh_expand_alloc(parsed, span, (size_t)print_len, fmt_args);
+	if (span->len < (size_t)print_len) {
+		// Need to allocate.
+		span->begin = gsh_expand_alloc(parsed, span, (size_t)print_len);
+		vsprintf(span->begin, span->fmt_str, fmt_args);
+	}
 
 	va_end(fmt_args);
+	strcpy(span->begin + print_len, span->after);
 
 	if (strcmp(span->after, "") != 0)
 		free(span->after);
