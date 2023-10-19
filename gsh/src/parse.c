@@ -186,11 +186,11 @@ static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
 			struct gsh_fmt_span *span)
 {
 	if (strcmp(*parsed->token_it, span->begin) == 0) {
-		*parsed->token_it = gsh_getenv(params, span->begin + 1);
+		*parsed->token_it = (char *)gsh_getenv(params, span->begin + 1);
 		return;
 	}
 
-	char *const var_name = strndup(span->begin + 1, span->len - 1);
+	char *var_name = strndup(span->begin + 1, span->len - 1);
 
 	gsh_expand_span(parsed, span, gsh_getenv(params, var_name));
 	free(var_name);
@@ -228,11 +228,11 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 			 char *const fmt_begin)
 {
-	char *const homevar = gsh_getenv(params, "HOME");
+	const char *homevar = gsh_getenv(params, "HOME");
 
 	if (strcmp(*parsed->token_it, (const char[]) { GSH_HOME_CH, '\0' }) ==
 	    0) {
-		*parsed->token_it = homevar;
+		*parsed->token_it = (char *)homevar;
 		return;
 	}
 
@@ -250,7 +250,7 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
  */
 static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 {
-	char *const fmt_begin = strpbrk(*parsed->token_it, gsh_special_chars);
+	char *fmt_begin = strpbrk(*parsed->token_it, gsh_special_chars);
 
 	if (!fmt_begin)
 		return false;

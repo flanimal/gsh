@@ -35,7 +35,7 @@ struct gsh_state {
 	struct hsearch_data *builtin_tbl;
 };
 
-char *gsh_getenv(const struct gsh_params *params, const char *name);
+const char *gsh_getenv(const struct gsh_params *params, const char *name);
 
 /* Set initial values and resources for the shell. */
 void gsh_init(struct gsh_state *sh);

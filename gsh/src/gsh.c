@@ -50,11 +50,11 @@ void gsh_bad_cmd(const char *msg, int err)
 	       (err ? ")" : ""));
 }
 
-char *gsh_getenv(const struct gsh_params *params, const char *name)
+const char *gsh_getenv(const struct gsh_params *params, const char *name)
 {
 	assert(params->env_len > 0);
 
-	char *const value = envz_get(*environ, params->env_len, name);
+	const char *value = envz_get(*environ, params->env_len, name);
 	return (value ? value : "");
 }
 
