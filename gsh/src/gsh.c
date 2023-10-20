@@ -39,8 +39,10 @@ void gsh_put_prompt(const struct gsh_state *sh)
 				     gsh_getenv(&sh->params, "HOME"),
 				     sh->params.home_len) == 0;
 
-	printf((in_home ? GSH_PROMPT("~%s") : GSH_PROMPT("%s")),
-	       (in_home ? sh->params.home_len : 0) + sh->wd->cwd);
+	printf((in_home) ? GSH_PROMPT("~%s") : GSH_PROMPT("%s"),
+	       (sh->shopts & GSH_OPT_PROMPT_WORKDIR) ?
+		       ((in_home) ? sh->params.home_len : 0) + sh->wd->cwd :
+		       "");
 }
 
 void gsh_bad_cmd(const char *msg, int err)
