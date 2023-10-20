@@ -165,7 +165,7 @@ static int gsh_exec(char *pathname, char *const *args)
 	}
 
 	execvp(pathname, args);
-	
+
 	// Named program couldn't be executed.
 	gsh_bad_cmd(pathname, errno);
 	exit(GSH_EXIT_NOTFOUND);
@@ -192,7 +192,10 @@ void gsh_run_cmd(struct gsh_state *sh)
 	while (gsh_read_line(sh, &input_len))
 		;
 
-	if (sh->line[0] == '\0')
+	// NOTE: Don't run the command if it's just whitespace, either.
+	// Otherwise no pathname will be found, and a NULL pointer will
+	// eventually be deref'd.
+	if (sh->line[strcspn(sh->line, " ")] == '\0')
 		return;
 
 	gsh_add_hist(sh->hist, input_len, sh->line);
