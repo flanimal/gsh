@@ -363,9 +363,9 @@ static void gsh_parse_opts(struct gsh_state* sh)
 
 		free(shopt_name);
 
-		char *const after = shopt_value + strcspn(shopt_value, " ") + 1;
+		char *const after = shopt_value + strcspn(shopt_value, " ");
 		for (ptrdiff_t i = 0; (after - shopt_it) > i; ++i)
-			shopt_it[i] = after[i];
+			shopt_it[i] = ' ';
 
 		shopt_it = after;
 	}
@@ -384,11 +384,11 @@ void gsh_parse_and_run(struct gsh_state *sh)
 	// format expansion to stop early).
 	gsh_parse_opts(sh);
 
-	if (sh->line[0] == '\0')
-		return;
-
 	gsh_parse_filename(&sh->params, sh->parsed, sh->line, &tok_state);
 	gsh_parse_cmd_args(&sh->params, sh->parsed, &tok_state);
+
+	if (!sh->parsed->tokens[0])
+		return;
 
 	sh->params.last_status = gsh_switch(sh, sh->line, sh->parsed->tokens);
 
