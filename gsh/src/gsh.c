@@ -30,7 +30,7 @@ extern char **environ;
 
 void gsh_put_prompt(const struct gsh_state *sh)
 {
-	if (sh->shopts.prompt_status)
+	if (sh->shopts & GSH_OPT_PROMPT_STATUS)
 		printf("<%d> ", WIFEXITED(sh->params.last_status) ?
 					WEXITSTATUS(sh->params.last_status) :
 					255);
@@ -106,9 +106,34 @@ static void gsh_set_params(struct gsh_params *params)
 	params->last_status = 0;
 }
 
+struct gsh_shopt {
+	char *cmd;
+	enum gsh_shopt_flags flag;
+};
+
+static void gsh_set_shopts(struct hsearch_data **shopt_tbl)
+{
+	static struct gsh_shopt shopts[] = {
+		{ "prompt_workdir", GSH_OPT_PROMPT_WORKDIR },
+		{ "prompt_status", GSH_OPT_PROMPT_STATUS },
+		{ "echo", GSH_OPT_ECHO },
+	};
+
+	const size_t shopt_n = sizeof(shopts) / sizeof(*shopts);
+	// TODO: Hashtable creation function.
+	hcreate_r(shopt_n, (*shopt_tbl = calloc(1, sizeof(**shopt_tbl))));
+
+	ENTRY *result;
+	for (size_t i = 0; i < shopt_n; ++i)
+		hsearch_r((ENTRY){ .key = shopts[i].cmd,
+				   .data = &shopts[i].flag },
+			  ENTER, &result, *shopt_tbl);
+}
+
 void gsh_init(struct gsh_state *sh)
 {
 	gsh_set_builtins(&sh->builtin_tbl);
+	gsh_set_shopts(&sh->shopt_tbl);
 	gsh_set_params(&sh->params);
 
 	sh->wd = gsh_init_wd();
@@ -118,7 +143,7 @@ void gsh_init(struct gsh_state *sh)
 	// Max input line length + newline + null byte.
 	sh->line = malloc(gsh_max_input(sh) + 2);
 
-	sh->shopts = (struct gsh_shopts){ 0 };
+	sh->shopts = GSH_OPT_DEFAULTS;
 
 #ifndef NDEBUG
 	g_gsh_initialized = true;

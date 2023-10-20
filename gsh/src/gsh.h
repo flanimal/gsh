@@ -13,9 +13,12 @@ struct gsh_params {
 	int last_status;
 };
 
-struct gsh_shopts
-{
-	bool prompt_status;
+/* Shell option bitflags. */
+enum gsh_shopt_flags {
+	GSH_OPT_PROMPT_WORKDIR = 1,
+	GSH_OPT_PROMPT_STATUS = 2,
+	GSH_OPT_ECHO = 4,
+	GSH_OPT_DEFAULTS = GSH_OPT_PROMPT_WORKDIR | GSH_OPT_ECHO,
 };
 
 struct gsh_state {
@@ -28,7 +31,9 @@ struct gsh_state {
 	struct gsh_workdir *wd;
 
 	struct gsh_params params;
-	struct gsh_shopts shopts;
+	
+	enum gsh_shopt_flags shopts;
+	struct hsearch_data *shopt_tbl;
 
         char *line; 
 
