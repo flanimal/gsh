@@ -1,4 +1,5 @@
-#include <envz.h>
+#define _GNU_SOURCE
+#include <search.h>
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -262,9 +263,6 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 	case GSH_HOME_CH:
 		gsh_fmt_home(params, parsed, fmt_begin);
 		return true;
-	case GSH_SHOPT_CH:
-		//gsh_set_opt();
-		return true;
 	}
 	
 	__builtin_unreachable();
@@ -333,9 +331,61 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 		*(--parsed->token_it) = NULL;
 }
 
+static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
+{
+	ENTRY *result;
+	hsearch_r((ENTRY){ .key = name }, FIND, &result, sh->shopt_tbl);
+
+	const enum gsh_shopt_flags flag =
+		(*(enum gsh_shopt_flags *)result->data);
+
+	if (value)
+		sh->shopts |= flag;
+	else
+		sh->shopts &= ~flag;
+}
+
+static void gsh_parse_opts(struct gsh_state* sh)
+{
+	// TODO: Move loop outside of function?
+	for (char *shopt_it = sh->line; (shopt_it = strpbrk(shopt_it, "@"));) {
+		const size_t shopt_len = strcspn(shopt_it + 1, "@ ");
+		char *shopt_name = strndup(shopt_it + 1, shopt_len);
+
+		char *const shopt_value = shopt_it + 1 + shopt_len + 1;
+
+		if (strncmp(shopt_value, "on", 2) == 0)
+			gsh_set_opt(sh, shopt_name, true);
+		else if (strncmp(shopt_value, "off", 3) == 0)
+			gsh_set_opt(sh, shopt_name, false);
+		else
+			continue;
+
+		free(shopt_name);
+
+		char *const after = shopt_value + strcspn(shopt_value, " ") + 1;
+		for (ptrdiff_t i = 0; (after - shopt_it) > i; ++i)
+			shopt_it[i] = after[i];
+
+		shopt_it = after;
+	}
+}
+
 void gsh_parse_and_run(struct gsh_state *sh)
 {
 	char *tok_state;
+
+	// Change shell options first.
+	// TODO: Because this occurs before any other parsing or tokenizing,
+	// it means that "@" characters will be interpreted as shell options
+	// even inside quotes.
+
+	// Also consider that "@" is considered a "special" char (and thus will cause
+	// format expansion to stop early).
+	gsh_parse_opts(sh);
+
+	if (sh->line[0] == '\0')
+		return;
 
 	gsh_parse_filename(&sh->params, sh->parsed, sh->line, &tok_state);
 	gsh_parse_cmd_args(&sh->params, sh->parsed, &tok_state);
