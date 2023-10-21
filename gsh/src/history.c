@@ -7,7 +7,7 @@
 #include "history.h"
 #include "parse.h"
 
-#define GSH_MAX_HIST 10
+#define GSH_MAX_HIST 20
 
 /* Line history entry. */
 struct gsh_hist_ent {
