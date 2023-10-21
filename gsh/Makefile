@@ -1,6 +1,6 @@
 objects = $(addprefix obj/, main.o gsh.o builtin.o history.o parse.o)
 
-CFLAGS = -O0 -Werror -Wall -Wextra -pedantic-errors -fno-omit-frame-pointer -std=gnu11
+CFLAGS = -O0 -Werror -Wall -Wextra -pedantic-errors -fno-omit-frame-pointer -std=gnu11 -D _GNU_SOURCE
 
 gsh : $(objects)
 	gcc -o gsh $(objects)
