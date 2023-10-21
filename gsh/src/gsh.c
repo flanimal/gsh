@@ -185,9 +185,6 @@ void gsh_run_cmd(struct gsh_state *sh)
 	while (gsh_read_line(sh, &input_len))
 		;
 
-	// NOTE: Don't run the command if it's just whitespace, either.
-	// Otherwise no pathname will be found, and a NULL pointer will
-	// eventually be deref'd.
 	if (strcspn(sh->line, " ") == 0)
 		return;
 

@@ -262,8 +262,8 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 		gsh_fmt_home(params, parsed, fmt_begin);
 		return true;
 	}
-
-	__builtin_unreachable();
+	
+	unreachable();
 }
 
 /*      Collect and insert a fully-expanded token into the list.
@@ -382,7 +382,6 @@ void gsh_parse_and_run(struct gsh_state *sh)
 	// Also consider that "@" is considered a "special" char (and thus will cause
 	// format expansion to stop early).
 
-	// TODO: Move loop outside of parse_opts()?
 	gsh_parse_opts(sh);
 
 	gsh_parse_filename(&sh->params, sh->parsed, sh->line, &tok_state);

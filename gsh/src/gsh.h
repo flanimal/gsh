@@ -5,6 +5,12 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#if defined(__GNUC__)
+	#define unreachable() __builtin_unreachable()
+#elif defined(_MSC_VER)
+	#define unreachable() __assume(0)
+#endif
+
 /*	Allocates and creates a hashtable, filling it with
  *	elements from `elems`.
  */
@@ -12,7 +18,9 @@
 	do {                                                                   \
 		hcreate_r(sizeof(elems) / sizeof(*elems),                      \
 			  (tbl = calloc(1, sizeof(*tbl))));                    \
+                                                                               \
 		ENTRY *_result;                                                \
+                                                                               \
 		for (size_t _i = 0; _i < sizeof(elems) / sizeof(*elems); ++_i) \
 			hsearch_r((ENTRY){ .key = elems[_i] m_key,             \
 					   .data = &elems[_i] m_data },        \
@@ -48,17 +56,17 @@ struct gsh_state {
 	// Or, we might move gsh_state's definition
 	// out of the public header entirely.
 
-        /* The buffers used for parsing. */
-        struct gsh_parsed *parsed;
+	/* The buffers used for parsing. */
+	struct gsh_parsed *parsed;
 
 	struct gsh_workdir *wd;
 
 	struct gsh_params params;
-	
+
 	enum gsh_shopt_flags shopts;
 	struct hsearch_data *shopt_tbl;
 
-        char *line; 
+	char *line;
 
 	struct hsearch_data *builtin_tbl;
 };
