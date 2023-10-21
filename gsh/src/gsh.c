@@ -20,7 +20,8 @@
 #include "builtin.h"
 #include "process.h"
 
-#define GSH_PROMPT(cwd) "\033[46m" cwd "\033[49m@ "
+#define GSH_PROMPT "@ "
+#define GSH_WORKDIR_PROMPT(cwd) "\033[46m" cwd "\033[49m" GSH_PROMPT
 
 #ifndef NDEBUG
 bool g_gsh_initialized = false;
@@ -31,18 +32,21 @@ extern char **environ;
 void gsh_put_prompt(const struct gsh_state *sh)
 {
 	if (sh->shopts & GSH_OPT_PROMPT_STATUS)
-		printf("<%d> ", WIFEXITED(sh->params.last_status) ?
+		printf("<%d> ", (WIFEXITED(sh->params.last_status)) ?
 					WEXITSTATUS(sh->params.last_status) :
 					255);
+
+	if (!(sh->shopts & GSH_OPT_PROMPT_WORKDIR)) {
+		printf(GSH_PROMPT);
+		return;
+	}
 
 	const bool in_home = strncmp(sh->wd->cwd,
 				     gsh_getenv(&sh->params, "HOME"),
 				     sh->params.home_len) == 0;
 
-	printf((in_home) ? GSH_PROMPT("~%s") : GSH_PROMPT("%s"),
-	       (sh->shopts & GSH_OPT_PROMPT_WORKDIR) ?
-		       ((in_home) ? sh->params.home_len : 0) + sh->wd->cwd :
-		       "");
+	printf((in_home) ? GSH_WORKDIR_PROMPT("~%s") : GSH_WORKDIR_PROMPT("%s"),
+	       &sh->wd->cwd[(in_home) ? sh->params.home_len : 0]);
 }
 
 void gsh_bad_cmd(const char *msg, int err)
