@@ -1,6 +1,3 @@
-#define _GNU_SOURCE		// for reentrant hashtables
-#include <search.h>
-
 #include <unistd.h>
 
 #include <stdlib.h>
@@ -71,21 +68,13 @@ static GSH_DEF_BUILTIN(gsh_puthelp, _, __)
 	return 0;
 }
 
-static struct gsh_builtin builtins[] = {
-	{ "echo", gsh_echo }, { "r", gsh_recall }, { "cd", gsh_chdir },
-	{ "hist", gsh_list_hist }, { "help", gsh_puthelp },
-};
-
-static const size_t builtin_n = sizeof(builtins) / sizeof(*builtins);
-
 void gsh_set_builtins(struct hsearch_data **builtin_tbl)
 {
-	hcreate_r(builtin_n, (*builtin_tbl = calloc(1, sizeof(**builtin_tbl))));
+	static struct gsh_builtin builtins[] = {
+		{ "echo", gsh_echo },	 { "r", gsh_recall },
+		{ "cd", gsh_chdir },	 { "hist", gsh_list_hist },
+		{ "help", gsh_puthelp },
+	};
 
-	ENTRY *retval;
-
-	for (size_t i = 0; i < builtin_n; ++i)
-		hsearch_r((ENTRY) {
-			  .key = builtins[i].cmd,.data = builtins + i},
-			  ENTER, &retval, *builtin_tbl);
+	create_hashtable(builtins, .cmd, , *builtin_tbl);
 }

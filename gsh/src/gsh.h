@@ -1,7 +1,23 @@
 #pragma once
 
+#include <search.h>
+
 #include <stddef.h>
 #include <stdbool.h>
+
+/*	Allocates and creates a hashtable, filling it with
+ *	elements from `elems`.
+ */
+#define create_hashtable(elems, m_key, m_data, tbl)                            \
+	do {                                                                   \
+		hcreate_r(sizeof(elems) / sizeof(*elems),                      \
+			  (tbl = calloc(1, sizeof(*tbl))));                    \
+		ENTRY *_result;                                                \
+		for (size_t _i = 0; _i < sizeof(elems) / sizeof(*elems); ++_i) \
+			hsearch_r((ENTRY){ .key = elems[_i] m_key,             \
+					   .data = &elems[_i] m_data },        \
+				  ENTER, &_result, tbl);                       \
+	} while (0)
 
 /* Parameters. */
 struct gsh_params {
@@ -22,8 +38,15 @@ enum gsh_shopt_flags {
 };
 
 struct gsh_state {
-	/* Line history. */
+	/* Command history. */
 	struct gsh_cmd_hist *hist;
+
+	// TODO: We might have two structs,
+	// struct gsh_parse_bufs
+	// and
+	// struct gsh_parse_state.
+	// Or, we might move gsh_state's definition
+	// out of the public header entirely.
 
         /* The buffers used for parsing. */
         struct gsh_parsed *parsed;

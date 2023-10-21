@@ -109,6 +109,7 @@
       <CLanguageStandard>gnu11</CLanguageStandard>
       <TreatWarningAsError>true</TreatWarningAsError>
       <AdditionalOptions>-Wextra -pedantic-errors</AdditionalOptions>
+      <PreprocessorDefinitions>_GNU_SOURCE</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

@@ -1,6 +1,3 @@
-#define _GNU_SOURCE
-#include <search.h>
-
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -52,16 +49,17 @@ struct gsh_fmt_span {
 
 static bool gsh_parse_linebrk(char *line)
 {
-	char *linebreak = strchr(line, '\\');
-	if (linebreak) {
-		if (linebreak[1] == '\0') {
-			*linebreak = '\0';
-			return true;
-		}
-		// Remove the backslash.
-		for (; *linebreak; ++linebreak)
-			linebreak[0] = linebreak[1];
+	char *linebrk = strchr(line, '\\');
+	if (!linebrk)
+		return false;
+
+	if (linebrk[1] == '\0') {
+		*linebrk = '\0';
+		return true;
 	}
+	// Remove the backslash.
+	for (; *linebrk; ++linebrk)
+		linebrk[0] = linebrk[1];
 
 	return false;
 }
@@ -70,7 +68,8 @@ bool gsh_read_line(struct gsh_state *sh, size_t *input_len)
 {
 	assert(g_gsh_initialized);
 
-	if (!fgets(sh->line + *input_len, (int)(gsh_max_input(sh) - *input_len) + 1, stdin)) {
+	if (!fgets(sh->line + *input_len,
+		   (int)(gsh_max_input(sh) - *input_len) + 1, stdin)) {
 		if (ferror(stdin))
 			perror("gsh exited");
 
@@ -79,13 +78,13 @@ bool gsh_read_line(struct gsh_state *sh, size_t *input_len)
 
 	char *newline = strchr(sh->line + *input_len, '\n');
 	*newline = '\0';
-
+	
 	bool need_more = gsh_parse_linebrk(sh->line + *input_len);
 	*input_len = (size_t)(newline - (sh->line + *input_len));
 
 	if (need_more) {
 		fputs(GSH_SECOND_PROMPT, stdout);
-		--(*input_len); // Exclude backslash.	
+		--(*input_len); // Exclude backslash.
 	}
 
 	return need_more;
@@ -96,7 +95,7 @@ struct gsh_parsed *gsh_init_parsed()
 	struct gsh_parsed *parsed = malloc(sizeof(*parsed));
 
 	parsed->token_it = parsed->tokens =
-	    calloc(GSH_MAX_ARGS, sizeof(char *));
+		calloc(GSH_MAX_ARGS, sizeof(char *));
 
 	// MAX_ARGS plus sentinel.
 	parsed->fmt_bufs = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
@@ -116,7 +115,7 @@ static char *gsh_alloc_fmtbuf(struct gsh_parsed *parsed, size_t new_len)
 		strcpy(parsed->fmt_bufs[1], *parsed->token_it);
 	}
 	// There is currently no way to know whether to allocate
-	// or reallocate the buffer unless we increment fmt_bufs OUTSIDE of 
+	// or reallocate the buffer unless we increment fmt_bufs OUTSIDE of
 	// expand_tok().
 	// I think a confusion came from the fact that only ONE buffer
 	// will ever exist for a token/"word". There will never be multiple.
@@ -134,7 +133,7 @@ static char *gsh_expand_alloc(struct gsh_parsed *parsed,
 	const size_t before_len = strlen(*parsed->token_it);
 
 	char *fmtbuf = gsh_alloc_fmtbuf(parsed, before_len + print_len +
-					strlen(span->after));
+							strlen(span->after));
 
 	*parsed->token_it = fmtbuf;
 	fmtbuf += before_len;
@@ -231,8 +230,7 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 {
 	const char *homevar = gsh_getenv(params, "HOME");
 
-	if (strcmp(*parsed->token_it, (const char[]) { GSH_HOME_CH, '\0' }) ==
-	    0) {
+	if (strcmp(*parsed->token_it, (char[]){ GSH_HOME_CH, '\0' }) == 0) {
 		*parsed->token_it = (char *)homevar;
 		return;
 	}
@@ -240,7 +238,7 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 	struct gsh_fmt_span span = {
 		.begin = fmt_begin,
 		.len = 1,
-		.fmt_str = "%s", 
+		.fmt_str = "%s",
 	};
 
 	gsh_expand_span(parsed, &span, homevar);
@@ -264,7 +262,7 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 		gsh_fmt_home(params, parsed, fmt_begin);
 		return true;
 	}
-	
+
 	__builtin_unreachable();
 }
 
@@ -282,7 +280,8 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 
 	*parsed->token_it = next_tok;
 
-	while (gsh_expand_tok(params, parsed)) ;
+	while (gsh_expand_tok(params, parsed))
+		;
 
 	if (parsed->fmt_bufs[1])
 		++parsed->fmt_bufs;
@@ -295,7 +294,8 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
  *      the filename in the argument array.
  */
 static bool gsh_parse_filename(struct gsh_params *params,
-			       struct gsh_parsed *parsed, char *line, char **tok_state)
+			       struct gsh_parsed *parsed, char *line,
+			       char **tok_state)
 {
 	if (gsh_next_tok(params, parsed, line, tok_state))
 		return true;
@@ -303,7 +303,7 @@ static bool gsh_parse_filename(struct gsh_params *params,
 	char *last_slash = strrchr(line, '/');
 	if (last_slash)
 		parsed->token_it[-1] = last_slash + 1;
-
+	
 	return false;
 }
 
@@ -337,8 +337,7 @@ static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
 	if (!hsearch_r((ENTRY){ .key = name }, FIND, &result, sh->shopt_tbl))
 		return;
 
-	const enum gsh_shopt_flags flag =
-		(*(enum gsh_shopt_flags *)result->data);
+	const enum gsh_shopt_flags flag = *(enum gsh_shopt_flags *)result->data;
 
 	if (value)
 		sh->shopts |= flag;
@@ -353,7 +352,7 @@ static void gsh_parse_opts(struct gsh_state* sh)
 
 		char *const shopt_value = strchr(shopt_it, ' ') + 1;
 		shopt_value[-1] = '\0';
-
+		
 		if (strncmp(shopt_value, "on", 2) == 0)
 			gsh_set_opt(sh, shopt_it, true);
 		else if (strncmp(shopt_value, "off", 3) == 0)
@@ -370,6 +369,7 @@ static void gsh_parse_opts(struct gsh_state* sh)
 	}
 }
 
+// TODO: "while" builtin.
 void gsh_parse_and_run(struct gsh_state *sh)
 {
 	char *tok_state;
@@ -383,7 +383,6 @@ void gsh_parse_and_run(struct gsh_state *sh)
 	// format expansion to stop early).
 
 	// TODO: Move loop outside of parse_opts()?
-
 	gsh_parse_opts(sh);
 
 	gsh_parse_filename(&sh->params, sh->parsed, sh->line, &tok_state);

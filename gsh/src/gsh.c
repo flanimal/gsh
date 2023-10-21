@@ -1,6 +1,3 @@
-#define _GNU_SOURCE // for reentrant hashtables
-#include <search.h>
-
 #include <unistd.h>
 #include <limits.h>
 #include <envz.h>
@@ -112,28 +109,20 @@ static void gsh_set_params(struct gsh_params *params)
 	params->last_status = 0;
 }
 
-struct gsh_shopt {
-	char *cmd;
-	enum gsh_shopt_flags flag;
-};
-
 static void gsh_set_shopts(struct hsearch_data **shopt_tbl)
 {
+	struct gsh_shopt {
+		char *cmd;
+		enum gsh_shopt_flags flag;
+	};
+
 	static struct gsh_shopt shopts[] = {
 		{ "prompt_workdir", GSH_OPT_PROMPT_WORKDIR },
 		{ "prompt_status", GSH_OPT_PROMPT_STATUS },
 		{ "echo", GSH_OPT_ECHO },
 	};
 
-	const size_t shopt_n = sizeof(shopts) / sizeof(*shopts);
-	// TODO: Hashtable creation function.
-	hcreate_r(shopt_n, (*shopt_tbl = calloc(1, sizeof(**shopt_tbl))));
-
-	ENTRY *result;
-	for (size_t i = 0; i < shopt_n; ++i)
-		hsearch_r((ENTRY){ .key = shopts[i].cmd,
-				   .data = &shopts[i].flag },
-			  ENTER, &result, *shopt_tbl);
+	create_hashtable(shopts, .cmd, .flag, *shopt_tbl);
 }
 
 void gsh_init(struct gsh_state *sh)
