@@ -334,7 +334,8 @@ void gsh_free_parsed(struct gsh_parsed *parsed)
 static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
 {
 	ENTRY *result;
-	hsearch_r((ENTRY){ .key = name }, FIND, &result, sh->shopt_tbl);
+	if (!hsearch_r((ENTRY){ .key = name }, FIND, &result, sh->shopt_tbl))
+		return;
 
 	const enum gsh_shopt_flags flag =
 		(*(enum gsh_shopt_flags *)result->data);
