@@ -393,6 +393,9 @@ void gsh_parse_and_run(struct gsh_state *sh)
 	if (!sh->parsed->tokens[0])
 		return;
 
+	// Skip any whitespace preceding pathname.
+	sh->line += strspn(sh->line, " ");
+
 	sh->params.last_status = gsh_switch(sh, sh->line, sh->parsed->tokens);
 
 	gsh_free_parsed(sh->parsed);
