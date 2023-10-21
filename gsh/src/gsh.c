@@ -195,7 +195,7 @@ void gsh_run_cmd(struct gsh_state *sh)
 	// NOTE: Don't run the command if it's just whitespace, either.
 	// Otherwise no pathname will be found, and a NULL pointer will
 	// eventually be deref'd.
-	if (sh->line[strcspn(sh->line, " ")] == '\0')
+	if (strcspn(sh->line, " ") == 0)
 		return;
 
 	gsh_add_hist(sh->hist, input_len, sh->line);
