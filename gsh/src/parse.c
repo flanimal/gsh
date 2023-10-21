@@ -348,11 +348,15 @@ static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
 static void gsh_parse_opts(struct gsh_state* sh)
 {
 	// TODO: Move loop outside of function?
-	for (char *shopt_it = sh->line; (shopt_it = strpbrk(shopt_it, "@"));) {
-		const size_t shopt_len = strcspn(shopt_it + 1, "@ ");
-		char *shopt_name = strndup(shopt_it + 1, shopt_len);
+	// TODO: Duping vs. inserting a temporary NUL byte?
 
-		char *const shopt_value = shopt_it + 1 + shopt_len + 1;
+	for (char *shopt_it = sh->line; (shopt_it = strchr(shopt_it, '@'));) {
+		
+		*shopt_it++ = ' ';
+
+		char *shopt_name = strndup(shopt_it, strcspn(shopt_it, "@ "));
+
+		char *const shopt_value = strchr(shopt_it, ' ') + 1;
 
 		if (strncmp(shopt_value, "on", 2) == 0)
 			gsh_set_opt(sh, shopt_name, true);
@@ -363,11 +367,9 @@ static void gsh_parse_opts(struct gsh_state* sh)
 
 		free(shopt_name);
 
-		char *const after = shopt_value + strcspn(shopt_value, " ");
-		for (ptrdiff_t i = 0; (after - shopt_it) > i; ++i)
-			shopt_it[i] = ' ';
-
-		shopt_it = after;
+		for (char *const after = strchr(shopt_value, ' ');
+		     *shopt_it && shopt_it != after; )
+			*shopt_it++ = ' ';
 	}
 }
 
