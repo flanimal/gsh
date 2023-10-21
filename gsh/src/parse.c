@@ -4,6 +4,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 #include "gsh.h"
 #include "parse.h"
@@ -78,7 +79,7 @@ bool gsh_read_line(struct gsh_state *sh, size_t *input_len)
 
 	char *newline = strchr(sh->line + *input_len, '\n');
 	*newline = '\0';
-	
+
 	bool need_more = gsh_parse_linebrk(sh->line + *input_len);
 	*input_len = (size_t)(newline - (sh->line + *input_len));
 
@@ -126,7 +127,7 @@ static char *gsh_alloc_fmtbuf(struct gsh_parsed *parsed, size_t new_len)
 /*	Copy the token to a buffer for expansion.
  */
 static char *gsh_expand_alloc(struct gsh_parsed *parsed,
-			     struct gsh_fmt_span *span, size_t print_len)
+			      struct gsh_fmt_span *span, size_t print_len)
 {
 	span->begin[0] = '\0';
 
@@ -262,7 +263,7 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
 		gsh_fmt_home(params, parsed, fmt_begin);
 		return true;
 	}
-	
+
 	unreachable();
 }
 
@@ -303,7 +304,7 @@ static bool gsh_parse_filename(struct gsh_params *params,
 	char *last_slash = strrchr(line, '/');
 	if (last_slash)
 		parsed->token_it[-1] = last_slash + 1;
-	
+
 	return false;
 }
 
@@ -345,44 +346,71 @@ static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
 		sh->shopts &= ~flag;
 }
 
-static void gsh_parse_opts(struct gsh_state* sh)
+/*
+	You don't want to have to specify explicitly what to do if
+	a token or part of token isn't found. It's verbose and clumsy.
+
+	*** For our purposes, a "word" is a contiguous sequence of characters
+		NOT containing whitespace.
+
+	Steps:
+	For each '@' character in the line:
+		1. Get shopt name if found.
+			This will be the text starting one forward from
+   shopt_it.
+		2. Get shopt value if found.
+			May NOT include whitespace or the '@' character,
+   naturally.
+		3. If value is valid, set the option.
+		4. Replace all things found with whitespace.
+*/
+static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 {
-	for (char *shopt_it = sh->line; (shopt_it = strchr(shopt_it, '@'));) {
-		*shopt_it++ = ' ';
-
-		char *const shopt_value = strchr(shopt_it, ' ') + 1;
-		shopt_value[-1] = '\0';
-		
-		if (strncmp(shopt_value, "on", 2) == 0)
-			gsh_set_opt(sh, shopt_it, true);
-		else if (strncmp(shopt_value, "off", 3) == 0)
-			gsh_set_opt(sh, shopt_it, false);
-
-		char *const after = strchr(shopt_value, ' ');
-		if (!after) {
-			*shopt_it = '\0';
-			return;	
-		}
-
-		while (shopt_it != after)
-			*shopt_it++ = ' ';
+	if (!isalnum(shopt_ch[1])) {
+		// There wasn't a name following the '@' character,
+		// so remove the '@' and continue.
+		*shopt_ch = ' ';
+		return;
 	}
+
+	// Find next word.
+	char *shopt_value = strchr(shopt_ch + 1, ' ');
+	char *after = shopt_value;
+
+	if (shopt_value && isalpha(shopt_value[1])) {
+		*shopt_value++ = '\0';
+
+		const int val =
+			(strncmp(shopt_value, "on", 2) == 0)  ? true :
+			(strncmp(shopt_value, "off", 3) == 0) ? false :
+								-1;
+		if (val != -1) {
+			after = strchr(shopt_value, ' ');
+			gsh_set_opt(sh, shopt_ch + 1, val);
+		}
+	}
+
+	if (!after) {
+		*shopt_ch = '\0';
+		return;
+	}
+
+	while (shopt_ch != after + 1)
+		*shopt_ch++ = ' ';
 }
 
 // TODO: "while" builtin.
 void gsh_parse_and_run(struct gsh_state *sh)
 {
-	char *tok_state;
-
 	// Change shell options first.
+	// 
 	// TODO: Because this occurs before any other parsing or tokenizing,
 	// it means that "@" characters will be interpreted as shell options
 	// even inside quotes.
+	for (char *shopt_ch = sh->line; (shopt_ch = strchr(shopt_ch, '@'));)
+		gsh_process_opt(sh, shopt_ch);
 
-	// Also consider that "@" is considered a "special" char (and thus will cause
-	// format expansion to stop early).
-
-	gsh_parse_opts(sh);
+	char *tok_state;
 
 	gsh_parse_filename(&sh->params, sh->parsed, sh->line, &tok_state);
 	gsh_parse_cmd_args(&sh->params, sh->parsed, &tok_state);
