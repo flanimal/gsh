@@ -348,25 +348,24 @@ static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
 
 static void gsh_parse_opts(struct gsh_state* sh)
 {
-	// TODO: Move loop outside of function?
-	// TODO: Duping vs. inserting a temporary NUL byte?
-
 	for (char *shopt_it = sh->line; (shopt_it = strchr(shopt_it, '@'));) {
 		*shopt_it++ = ' ';
 
-		char *shopt_name = strndup(shopt_it, strcspn(shopt_it, "@ "));
-
 		char *const shopt_value = strchr(shopt_it, ' ') + 1;
+		shopt_value[-1] = '\0';
 
 		if (strncmp(shopt_value, "on", 2) == 0)
-			gsh_set_opt(sh, shopt_name, true);
+			gsh_set_opt(sh, shopt_it, true);
 		else if (strncmp(shopt_value, "off", 3) == 0)
-			gsh_set_opt(sh, shopt_name, false);
+			gsh_set_opt(sh, shopt_it, false);
 
-		free(shopt_name);
+		char *const after = strchr(shopt_value, ' ');
+		if (!after) {
+			*shopt_it = '\0';
+			return;	
+		}
 
-		for (char *const after = strchr(shopt_value, ' ');
-		     *shopt_it && shopt_it != after; )
+		while (shopt_it != after)
 			*shopt_it++ = ' ';
 	}
 }
@@ -382,6 +381,9 @@ void gsh_parse_and_run(struct gsh_state *sh)
 
 	// Also consider that "@" is considered a "special" char (and thus will cause
 	// format expansion to stop early).
+
+	// TODO: Move loop outside of parse_opts()?
+
 	gsh_parse_opts(sh);
 
 	gsh_parse_filename(&sh->params, sh->parsed, sh->line, &tok_state);
