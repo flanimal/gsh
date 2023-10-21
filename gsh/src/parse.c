@@ -352,7 +352,6 @@ static void gsh_parse_opts(struct gsh_state* sh)
 	// TODO: Duping vs. inserting a temporary NUL byte?
 
 	for (char *shopt_it = sh->line; (shopt_it = strchr(shopt_it, '@'));) {
-		
 		*shopt_it++ = ' ';
 
 		char *shopt_name = strndup(shopt_it, strcspn(shopt_it, "@ "));
@@ -363,8 +362,6 @@ static void gsh_parse_opts(struct gsh_state* sh)
 			gsh_set_opt(sh, shopt_name, true);
 		else if (strncmp(shopt_value, "off", 3) == 0)
 			gsh_set_opt(sh, shopt_name, false);
-		else
-			continue;
 
 		free(shopt_name);
 
