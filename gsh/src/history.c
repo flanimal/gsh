@@ -116,10 +116,6 @@ int gsh_recall(struct gsh_state *sh, char *const *args)
 
 	printf("%s\n", cmd_it->line);
 
-	// Ensure that parse state from recall invocation is not
-	// reused.
-	gsh_free_parsed(sh->parsed);
-
 	// Make a copy so we don't lose it if the history entry
 	// gets deleted.
 	strcpy(sh->input->line, cmd_it->line);
