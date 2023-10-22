@@ -34,7 +34,7 @@ static GSH_DEF_BUILTIN(gsh_chdir, sh, args)
 		return -1;
 	}
 
-	gsh_getcwd(sh->wd);
+	gsh_getcwd(sh);
 
 	return 0;
 }

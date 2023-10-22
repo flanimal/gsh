@@ -65,27 +65,27 @@ static bool gsh_parse_linebrk(char *line)
 	return false;
 }
 
-bool gsh_read_line(struct gsh_state *sh, size_t *input_len)
+bool gsh_read_line(struct gsh_input_buf *input)
 {
 	assert(g_gsh_initialized);
-
-	if (!fgets(sh->line + *input_len,
-		   (int)(gsh_max_input(sh) - *input_len) + 1, stdin)) {
+	// FIXME: Reimplement gsh_max_input().
+	if (!fgets(input->line + input->input_len,
+		   (int)input->max_input - (int)input->input_len + 1, stdin)) {
 		if (ferror(stdin))
 			perror("gsh exited");
 
 		exit(feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE);
 	}
 
-	char *newline = strchr(sh->line + *input_len, '\n');
+	char *newline = strchr(input->line + input->input_len, '\n');
 	*newline = '\0';
 
-	bool need_more = gsh_parse_linebrk(sh->line + *input_len);
-	*input_len = (size_t)(newline - (sh->line + *input_len));
+	bool need_more = gsh_parse_linebrk(input->line + input->input_len);
+	input->input_len = (size_t)(newline - (input->line + input->input_len));
 
 	if (need_more) {
 		fputs(GSH_SECOND_PROMPT, stdout);
-		--(*input_len); // Exclude backslash.
+		--input->input_len; // Exclude backslash.
 	}
 
 	return need_more;
@@ -352,17 +352,6 @@ static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
 
 	*** For our purposes, a "word" is a contiguous sequence of characters
 		NOT containing whitespace.
-
-	Steps:
-	For each '@' character in the line:
-		1. Get shopt name if found.
-			This will be the text starting one forward from
-   shopt_it.
-		2. Get shopt value if found.
-			May NOT include whitespace or the '@' character,
-   naturally.
-		3. If value is valid, set the option.
-		4. Replace all things found with whitespace.
 */
 static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 {
@@ -373,15 +362,13 @@ static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 		return;
 	}
 
-	// Find next word.
 	char *shopt_value = strchr(shopt_ch + 1, ' ');
 	char *after = shopt_value;
 
 	if (shopt_value && isalpha(shopt_value[1])) {
 		*shopt_value++ = '\0';
 
-		const int val =
-			(strncmp(shopt_value, "on", 2) == 0)  ? true :
+		const int val = (strncmp(shopt_value, "on", 2) == 0)  ? true :
 			(strncmp(shopt_value, "off", 3) == 0) ? false :
 								-1;
 		if (val != -1) {
@@ -407,8 +394,11 @@ void gsh_parse_and_run(struct gsh_state *sh)
 	// TODO: Because this occurs before any other parsing or tokenizing,
 	// it means that "@" characters will be interpreted as shell options
 	// even inside quotes.
-	for (char *shopt_ch = sh->line; (shopt_ch = strchr(shopt_ch, '@'));)
-		gsh_process_opt(sh, shopt_ch);
+	for (char *shopt = sh->input->line; (shopt = strchr(shopt, '@'));)
+		gsh_process_opt(sh, shopt);
+
+	if (sh->input->line[0] == '\0')
+		return;
 
 	char *tok_state;
 
@@ -419,9 +409,10 @@ void gsh_parse_and_run(struct gsh_state *sh)
 		return;
 
 	// Skip any whitespace preceding pathname.
-	sh->line += strspn(sh->line, " ");
+	sh->input->line += strspn(sh->input->line, " ");
 
-	sh->params.last_status = gsh_switch(sh, sh->line, sh->parsed->tokens);
+	sh->params.last_status =
+		gsh_switch(sh, sh->input->line, sh->parse_bufs->tokens);
 
 	gsh_free_parsed(sh->parsed);
 }

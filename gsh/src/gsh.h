@@ -45,6 +45,16 @@ enum gsh_shopt_flags {
 	GSH_OPT_DEFAULTS = GSH_OPT_PROMPT_WORKDIR | GSH_OPT_ECHO,
 };
 
+struct gsh_input_buf {
+	// Buffer and size for getting terminal input.
+	char *line;
+	size_t input_len;
+
+	// Constants relating to terminal input.
+	long max_input;
+	long max_path; // (?)
+};
+
 struct gsh_state {
 	/* Command history. */
 	struct gsh_cmd_hist *hist;
@@ -58,15 +68,15 @@ struct gsh_state {
 
 	/* The buffers used for parsing. */
 	struct gsh_parsed *parsed;
+	struct gsh_input_buf *input;
 
-	struct gsh_workdir *wd;
+	/* Current working directory of the shell process. */
+	char *cwd;
 
 	struct gsh_params params;
 
 	enum gsh_shopt_flags shopts;
 	struct hsearch_data *shopt_tbl;
-
-	char *line;
 
 	struct hsearch_data *builtin_tbl;
 };
@@ -83,3 +93,5 @@ void gsh_run_cmd(struct gsh_state *sh);
 void gsh_put_prompt(const struct gsh_state *sh);
 
 void gsh_bad_cmd(const char *msg, int err);
+
+void gsh_getcwd(struct gsh_state *sh);

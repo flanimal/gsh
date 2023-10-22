@@ -38,12 +38,12 @@ void gsh_put_prompt(const struct gsh_state *sh)
 		return;
 	}
 
-	const bool in_home = strncmp(sh->wd->cwd,
+	const bool in_home = strncmp(sh->cwd,
 				     gsh_getenv(&sh->params, "HOME"),
 				     sh->params.home_len) == 0;
 
 	printf((in_home) ? GSH_WORKDIR_PROMPT("~%s") : GSH_WORKDIR_PROMPT("%s"),
-	       &sh->wd->cwd[(in_home) ? sh->params.home_len : 0]);
+	       &sh->cwd[(in_home) ? sh->params.home_len : 0]);
 }
 
 void gsh_bad_cmd(const char *msg, int err)
@@ -61,32 +61,18 @@ const char *gsh_getenv(const struct gsh_params *params, const char *name)
 	return (value ? value : "");
 }
 
-void gsh_getcwd(struct gsh_workdir *wd)
+void gsh_getcwd(struct gsh_state *sh)
 {
-	if (getcwd(wd->cwd, (size_t)wd->max_path))
+	if (getcwd(sh->cwd, (size_t)sh->input->max_path))
 		return;
 
 	/* Current working path longer than max_path chars. */
-	free(wd->cwd);
+	free(sh->cwd);
 
 	// We will use the buffer allocated by `getcwd`
 	// to store the working directory from now on.
-	wd->cwd = getcwd(NULL, 0);
-	wd->max_path = pathconf(wd->cwd, _PC_PATH_MAX);
-}
-
-static struct gsh_workdir *gsh_init_wd()
-{
-	struct gsh_workdir *wd = malloc(sizeof(*wd));
-
-	// Get working dir and its max path length.
-	wd->cwd = malloc((size_t)(wd->max_path = _POSIX_PATH_MAX));
-	gsh_getcwd(wd);
-
-	// Get maximum length of terminal input line.
-	wd->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
-
-	return wd;
+	sh->cwd = getcwd(NULL, 0);
+	sh->input->max_path = pathconf(sh->cwd, _PC_PATH_MAX);
 }
 
 /*	The maximum length of an input line on the terminal
@@ -95,7 +81,7 @@ static struct gsh_workdir *gsh_init_wd()
  */
 size_t gsh_max_input(const struct gsh_state *sh)
 {
-	return (size_t)sh->wd->max_input;
+	return (size_t)sh->input->max_input;
 }
 
 static void gsh_set_params(struct gsh_params *params)
@@ -125,18 +111,32 @@ static void gsh_set_shopts(struct hsearch_data **shopt_tbl)
 	create_hashtable(shopts, .cmd, .flag, *shopt_tbl);
 }
 
+static struct gsh_input_buf *gsh_init_inputbuf()
+{
+	struct gsh_input_buf *input = malloc(sizeof(*input));
+	// Get maximum length of terminal input line.
+	input->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
+
+	// Max input line length + newline + null byte.
+	input->line = malloc((size_t)input->max_input + 2);
+
+	return input;
+}
+
 void gsh_init(struct gsh_state *sh)
 {
 	gsh_set_builtins(&sh->builtin_tbl);
 	gsh_set_shopts(&sh->shopt_tbl);
 	gsh_set_params(&sh->params);
 
-	sh->wd = gsh_init_wd();
-	sh->parsed = gsh_init_parsed();
+	// Get working dir and its max path length.
+	sh->cwd = malloc((size_t)(sh->input->max_path = _POSIX_PATH_MAX));
+	gsh_getcwd(sh);
+
+	sh->input = gsh_init_inputbuf();
 	sh->hist = gsh_init_hist();
 
-	// Max input line length + newline + null byte.
-	sh->line = malloc(gsh_max_input(sh) + 2);
+	sh->shopts = GSH_OPT_DEFAULTS;
 
 	sh->shopts = GSH_OPT_DEFAULTS;
 
@@ -181,13 +181,16 @@ void gsh_run_cmd(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);
 
-	size_t input_len = 0;
-	while (gsh_read_line(sh, &input_len))
+	// TODO: Move this outside of run_cmd()
+	// so that we can also use run_cmd() for recalls?
+	while (gsh_read_line(sh->input))
 		;
 
-	if (strcspn(sh->line, " ") == 0)
+	if (strcspn(sh->input->line, " ") == 0)
 		return;
 
-	gsh_add_hist(sh->hist, input_len, sh->line);
+	gsh_add_hist(sh->hist, sh->input->input_len, sh->input->line);
 	gsh_parse_and_run(sh);
+
+	sh->input->input_len = 0;
 }

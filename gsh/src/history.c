@@ -102,7 +102,7 @@ int gsh_list_hist(struct gsh_state *sh, char *const *args)
 /* Re-run the n-th previous line of input. */
 int gsh_recall(struct gsh_state *sh, char *const *args)
 {
-	int n_arg = (args[1] ? atoi(args[1]) : 1);
+	int n_arg = (args[1]) ? atoi(args[1]) : 1;
 
 	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
 		gsh_bad_cmd("no matching history entry", 0);
@@ -122,9 +122,9 @@ int gsh_recall(struct gsh_state *sh, char *const *args)
 
 	// Make a copy so we don't lose it if the history entry
 	// gets deleted.
-	strcpy(sh->line, cmd_it->line);
+	strcpy(sh->input->line, cmd_it->line);
 
-	gsh_add_hist(sh->hist, cmd_it->len, sh->line);
+	gsh_add_hist(sh->hist, cmd_it->len, sh->input->line);
 	gsh_parse_and_run(sh);
 
 	return sh->params.last_status;
