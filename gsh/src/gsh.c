@@ -10,6 +10,7 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <ctype.h>
 
 #include "gsh.h"
 #include "parse.h"
@@ -209,8 +210,9 @@ static int gsh_exec(char *pathname, char *const *args)
 	exit(GSH_EXIT_NOTFOUND);
 }
 
-int gsh_switch(struct gsh_state *sh, char *pathname, char *const *args)
+static void gsh_switch(struct gsh_state *sh, char *pathname, char *const *args)
 {
+	// TODO: Should check for atl one argument be done in here?
 	if (strcmp(args[0], "exit") == 0)
 		exit(EXIT_SUCCESS);
 
@@ -296,6 +298,6 @@ void gsh_run_cmd(struct gsh_state *sh)
 	char **args = gsh_parse_cmd(&sh->params, sh->parse_state, &sh->input->line);
 	if (args)
 		gsh_switch(sh, sh->input->line, args);
-
+	
 	sh->input->input_len = 0;
 }
