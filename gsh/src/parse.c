@@ -316,7 +316,7 @@ static void gsh_free_parsed(struct gsh_parse_state *state)
 	}
 
 	// Reset token list.
-	while (state->token_n-- > 0)
+	for (; state->token_n > 0; --state->token_n)
 		*(--state->token_it) = NULL;
 }
 
