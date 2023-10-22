@@ -139,7 +139,7 @@ void gsh_init(struct gsh_state *sh)
 	sh->shopts = GSH_OPT_DEFAULTS;
 
 	sh->parse_bufs = gsh_init_parsebufs();
-	sh->parse_state = NULL;
+	gsh_set_parse_state(sh->parse_bufs, &sh->parse_state);
 
 #ifndef NDEBUG
 	g_gsh_initialized = true;
