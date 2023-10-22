@@ -326,22 +326,6 @@ static void gsh_parse_cmd_args(struct gsh_params *params,
 			return;
 }
 
-static void gsh_free_parsed(struct gsh_parse_state *state)
-{
-	if (!state)
-		return;
-
-	// Delete substitution buffers.
-	while (*state->fmt_bufs) {
-		free(*state->fmt_bufs);
-		*state->fmt_bufs-- = NULL;
-	}
-
-	// Reset token list.
-	while (state->token_n-- > 0)
-		*(--state->token_it) = NULL;
-}
-
 static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
 {
 	ENTRY *result;
@@ -396,6 +380,22 @@ static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 		*shopt_ch++ = ' ';
 }
 
+static void gsh_free_parsed(struct gsh_parse_state *state)
+{
+	if (!state)
+		return;
+
+	// Delete substitution buffers.
+	while (*state->fmt_bufs) {
+		free(*state->fmt_bufs);
+		*state->fmt_bufs-- = NULL;
+	}
+
+	// Reset token list.
+	while (state->token_n-- > 0)
+		*(--state->token_it) = NULL;
+}
+
 // TODO: "while" builtin.
 void gsh_parse_and_run(struct gsh_state *sh)
 {
@@ -418,8 +418,10 @@ void gsh_parse_and_run(struct gsh_state *sh)
 		.lineptr = sh->input->line,
 	};
 
-	if (!gsh_parse_filename(&sh->params, sh->parse_state))
+	if (!gsh_parse_filename(&sh->params, sh->parse_state)) {
+		sh->parse_state = NULL;
 		return;
+	}
 
 	gsh_parse_cmd_args(&sh->params, sh->parse_state);
 
@@ -428,6 +430,4 @@ void gsh_parse_and_run(struct gsh_state *sh)
 
 	sh->params.last_status =
 		gsh_switch(sh, sh->input->line, sh->parse_bufs->tokens);
-
-	sh->parse_state = NULL;
 }
