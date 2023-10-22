@@ -5,12 +5,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#if defined(__GNUC__)
-	#define unreachable() __builtin_unreachable()
-#elif defined(_MSC_VER)
-	#define unreachable() __assume(0)
-#endif
-
 /*	Allocates and creates a hashtable, filling it with
  *	elements from `elems`.
  */
@@ -139,3 +133,8 @@ void gsh_put_prompt(const struct gsh_state *sh);
 void gsh_bad_cmd(const char *msg, int err);
 
 void gsh_getcwd(struct gsh_state *sh);
+
+/*	Get a zero-terminated line of input from the terminal,
+ *	excluding the newline.
+ */
+bool gsh_read_line(struct gsh_input_buf *input);

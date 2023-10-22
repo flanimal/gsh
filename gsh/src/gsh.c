@@ -19,12 +19,56 @@
 
 #define GSH_PROMPT "@ "
 #define GSH_WORKDIR_PROMPT(cwd) "\033[46m" cwd "\033[49m" GSH_PROMPT
+#define GSH_SECOND_PROMPT "> "
 
 #ifndef NDEBUG
 bool g_gsh_initialized = false;
 #endif
 
 extern char **environ;
+
+static bool gsh_replace_linebrk(char *line)
+{
+	char *linebrk = strchr(line, '\\');
+	if (!linebrk)
+		return false;
+
+	if (linebrk[1] == '\0') {
+		*linebrk = '\0';
+		return true;
+	}
+	// Remove the backslash.
+	for (; *linebrk; ++linebrk)
+		linebrk[0] = linebrk[1];
+
+	return false;
+}
+
+bool gsh_read_line(struct gsh_input_buf *input)
+{
+	assert(g_gsh_initialized);
+	// FIXME: Reimplement gsh_max_input().
+	if (!fgets(input->line + input->input_len,
+		   (int)input->max_input - (int)input->input_len + 1, stdin)) {
+		if (ferror(stdin))
+			perror("gsh exited");
+
+		exit(feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE);
+	}
+
+	char *newline = strchr(input->line + input->input_len, '\n');
+	*newline = '\0';
+
+	bool need_more = gsh_replace_linebrk(input->line + input->input_len);
+	input->input_len = (size_t)(newline - (input->line + input->input_len));
+
+	if (need_more) {
+		fputs(GSH_SECOND_PROMPT, stdout);
+		--input->input_len; // Exclude backslash.
+	}
+
+	return need_more;
+}
 
 void gsh_put_prompt(const struct gsh_state *sh)
 {
@@ -173,9 +217,63 @@ int gsh_switch(struct gsh_state *sh, char *pathname, char *const *args)
 	ENTRY *builtin;
 	if (hsearch_r((ENTRY){ .key = args[0] }, FIND, &builtin,
 		      sh->builtin_tbl))
-		return GSH_BUILTIN_FUNC(builtin)(sh, args);
+		sh->params.last_status = GSH_BUILTIN_FUNC(builtin)(sh, args);
 	else
-		return gsh_exec(pathname, args);
+		sh->params.last_status = gsh_exec(pathname, args);
+}
+
+static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
+{
+	ENTRY *result;
+	if (!hsearch_r((ENTRY){ .key = name }, FIND, &result, sh->shopt_tbl))
+		return;
+
+	const enum gsh_shopt_flags flag = *(enum gsh_shopt_flags *)result->data;
+
+	if (value)
+		sh->shopts |= flag;
+	else
+		sh->shopts &= ~flag;
+}
+
+/*
+	You don't want to have to specify explicitly what to do if
+	a token or part of token isn't found. It's verbose and clumsy.
+
+	*** For our purposes, a "word" is a contiguous sequence of characters
+		NOT containing whitespace.
+*/
+static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
+{
+	if (!isalnum(shopt_ch[1])) {
+		// There wasn't a name following the '@' character,
+		// so remove the '@' and continue.
+		*shopt_ch = ' ';
+		return;
+	}
+
+	char *shopt_value = strchr(shopt_ch + 1, ' ');
+	char *after = shopt_value;
+
+	if (shopt_value && isalpha(shopt_value[1])) {
+		*shopt_value++ = '\0';
+
+		const int val = (strncmp(shopt_value, "on", 2) == 0)  ? true :
+				(strncmp(shopt_value, "off", 3) == 0) ? false :
+									-1;
+		if (val != -1) {
+			after = strchr(shopt_value, ' ');
+			gsh_set_opt(sh, shopt_ch + 1, val);
+		}
+	}
+
+	if (!after) {
+		*shopt_ch = '\0';
+		return;
+	}
+
+	while (shopt_ch != after + 1)
+		*shopt_ch++ = ' ';
 }
 
 void gsh_run_cmd(struct gsh_state *sh)
@@ -191,7 +289,18 @@ void gsh_run_cmd(struct gsh_state *sh)
 		return;
 
 	gsh_add_hist(sh->hist, sh->input->input_len, sh->input->line);
-	gsh_parse_and_run(sh);
+
+	// Change shell options first.
+	//
+	// TODO: Because this occurs before any other parsing or tokenizing,
+	// it means that "@" characters will be interpreted as shell options
+	// even inside quotes.
+	for (char *shopt = sh->input->line; (shopt = strchr(shopt, '@'));)
+		gsh_process_opt(sh, shopt);
+
+	char **args = gsh_parse_cmd(&sh->params, sh->parse_state, &sh->input->line);
+	if (args)
+		gsh_switch(sh, sh->input->line, args);
 
 	sh->input->input_len = 0;
 }
