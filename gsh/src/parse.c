@@ -141,7 +141,7 @@ static char *gsh_expand_alloc(struct gsh_parse_state *state,
 	const size_t before_len = strlen(*state->token_it);
 
 	char *fmtbuf = gsh_alloc_fmtbuf(state, before_len + print_len +
-							strlen(span->after));
+						       strlen(span->after));
 
 	*state->token_it = fmtbuf;
 	fmtbuf += before_len;
@@ -278,15 +278,14 @@ static bool gsh_expand_tok(struct gsh_params *params,
 
 /*      Collect and insert a fully-expanded token into the list.
  *
- *	Returns true while there are still more tokens to collect,
- *	similar to strtok.
+ *	Returns next token or NULL if no next token, similar to strtok().
  */
-static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
+static char *gsh_next_tok(struct gsh_params *params,
 			  struct gsh_parse_state *state, char *line)
 {
 	char *next_tok = strtok_r(line, " ", &state->lineptr);
 	if (!next_tok)
-		return false;
+		return NULL;
 
 	*state->token_it = next_tok;
 
@@ -298,6 +297,7 @@ static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
 
 	++state->token_it;
 	++state->token_n;
+	return next_tok;
 }
 
 /*      Parse the first token in the input line, and place
@@ -312,7 +312,7 @@ static bool gsh_parse_filename(struct gsh_params *params,
 	if (last_slash)
 		state->token_it[-1] = last_slash + 1;
 
-	return false;
+	return !!state->token_it[-1];
 }
 
 /*	Parse tokens and place them into the argument array, which is
@@ -379,8 +379,8 @@ static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 		*shopt_value++ = '\0';
 
 		const int val = (strncmp(shopt_value, "on", 2) == 0)  ? true :
-			(strncmp(shopt_value, "off", 3) == 0) ? false :
-								-1;
+				(strncmp(shopt_value, "off", 3) == 0) ? false :
+									-1;
 		if (val != -1) {
 			after = strchr(shopt_value, ' ');
 			gsh_set_opt(sh, shopt_ch + 1, val);
@@ -400,7 +400,7 @@ static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 void gsh_parse_and_run(struct gsh_state *sh)
 {
 	// Change shell options first.
-	// 
+	//
 	// TODO: Because this occurs before any other parsing or tokenizing,
 	// it means that "@" characters will be interpreted as shell options
 	// even inside quotes.
@@ -418,7 +418,7 @@ void gsh_parse_and_run(struct gsh_state *sh)
 		.lineptr = sh->input->line,
 	};
 
-	if (!sh->parsed->tokens[0])
+	if (!gsh_parse_filename(&sh->params, sh->parse_state))
 		return;
 
 	gsh_parse_cmd_args(&sh->params, sh->parse_state);
