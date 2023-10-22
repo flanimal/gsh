@@ -1,8 +1,6 @@
 #pragma once
 
-struct gsh_parsed *gsh_init_parsed();
-
-void gsh_free_parsed(struct gsh_parsed *parsed);
+struct gsh_parse_bufs *gsh_init_parsebufs();
 
 size_t gsh_max_input(const struct gsh_state *sh);
 

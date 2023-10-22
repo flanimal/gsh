@@ -23,23 +23,31 @@
 extern bool g_gsh_initialized;
 #endif
 
-struct gsh_parsed {
+struct gsh_parse_bufs {
 	/* List of tokens to be returned from parsing. */
 	char **tokens;
 
+	/* Stack of buffers for tokens that contain substitutions. */
+	char **fmt_bufs;
+};
+
+struct gsh_parse_state {
 	/* Iterator pointing to the token currently being parsed. */
 	char **token_it;
 
-	/* Stack of buffers for tokens that contain substitutions. */
+	size_t token_n;
+
 	char **fmt_bufs;
+
+	char *lineptr;
 };
 
 struct gsh_fmt_span {
 	/* Beginning of format span within the current token. */
 	char *begin;
 
-	/* Length of the unformatted span, up to either the NUL byte or the next
-	 * special char. */
+	/* Length of the unformatted span, up to either the zero byte or the
+	 * next special char. */
 	size_t len;
 
 	/* A copy of the token text following the span, if any. */
@@ -91,12 +99,11 @@ bool gsh_read_line(struct gsh_input_buf *input)
 	return need_more;
 }
 
-struct gsh_parsed *gsh_init_parsed()
+struct gsh_parse_bufs *gsh_init_parsebufs()
 {
-	struct gsh_parsed *parsed = malloc(sizeof(*parsed));
+	struct gsh_parse_bufs *parsed = malloc(sizeof(*parsed));
 
-	parsed->token_it = parsed->tokens =
-		calloc(GSH_MAX_ARGS, sizeof(char *));
+	parsed->tokens = calloc(GSH_MAX_ARGS, sizeof(char *));
 
 	// MAX_ARGS plus sentinel.
 	parsed->fmt_bufs = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
@@ -106,14 +113,14 @@ struct gsh_parsed *gsh_init_parsed()
 
 /*	Allocate and return a new format buffer.
  */
-static char *gsh_alloc_fmtbuf(struct gsh_parsed *parsed, size_t new_len)
+static char *gsh_alloc_fmtbuf(struct gsh_parse_state *state, size_t new_len)
 {
-	if (parsed->fmt_bufs[1]) {
-		parsed->fmt_bufs[1] = realloc(parsed->fmt_bufs[1], new_len + 1);
+	if (state->fmt_bufs[1]) {
+		state->fmt_bufs[1] = realloc(state->fmt_bufs[1], new_len + 1);
 	} else {
-		parsed->fmt_bufs[1] = malloc(new_len + 1);
+		state->fmt_bufs[1] = malloc(new_len + 1);
 
-		strcpy(parsed->fmt_bufs[1], *parsed->token_it);
+		strcpy(state->fmt_bufs[1], *state->token_it);
 	}
 	// There is currently no way to know whether to allocate
 	// or reallocate the buffer unless we increment fmt_bufs OUTSIDE of
@@ -121,22 +128,22 @@ static char *gsh_alloc_fmtbuf(struct gsh_parsed *parsed, size_t new_len)
 	// I think a confusion came from the fact that only ONE buffer
 	// will ever exist for a token/"word". There will never be multiple.
 
-	return parsed->fmt_bufs[1];
+	return state->fmt_bufs[1];
 }
 
 /*	Copy the token to a buffer for expansion.
  */
-static char *gsh_expand_alloc(struct gsh_parsed *parsed,
+static char *gsh_expand_alloc(struct gsh_parse_state *state,
 			      struct gsh_fmt_span *span, size_t print_len)
 {
 	span->begin[0] = '\0';
 
-	const size_t before_len = strlen(*parsed->token_it);
+	const size_t before_len = strlen(*state->token_it);
 
-	char *fmtbuf = gsh_alloc_fmtbuf(parsed, before_len + print_len +
+	char *fmtbuf = gsh_alloc_fmtbuf(state, before_len + print_len +
 							strlen(span->after));
 
-	*parsed->token_it = fmtbuf;
+	*state->token_it = fmtbuf;
 	fmtbuf += before_len;
 
 	return fmtbuf;
@@ -144,7 +151,7 @@ static char *gsh_expand_alloc(struct gsh_parsed *parsed,
 
 /*	Format a span with the given args, allocating a buffer if necessary.
  */
-static void gsh_expand_span(struct gsh_parsed *parsed,
+static void gsh_expand_span(struct gsh_parse_state *state,
 			    struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
@@ -164,7 +171,7 @@ static void gsh_expand_span(struct gsh_parsed *parsed,
 
 	if (span->len < (size_t)print_len) {
 		// Need to allocate.
-		span->begin = gsh_expand_alloc(parsed, span, (size_t)print_len);
+		span->begin = gsh_expand_alloc(state, span, (size_t)print_len);
 		vsprintf(span->begin, span->fmt_str, fmt_args);
 	}
 
@@ -181,26 +188,27 @@ static void gsh_expand_span(struct gsh_parsed *parsed,
  *	assigned to point to the value of the variable.
  *
  *	If the variable does not exist, the token will be assigned the empty
- *string.
+ *	string.
  */
-static void gsh_fmt_var(struct gsh_params *params, struct gsh_parsed *parsed,
+static void gsh_fmt_var(struct gsh_params *params,
+			struct gsh_parse_state *state,
 			struct gsh_fmt_span *span)
 {
-	if (strcmp(*parsed->token_it, span->begin) == 0) {
-		*parsed->token_it = (char *)gsh_getenv(params, span->begin + 1);
+	if (strcmp(*state->token_it, span->begin) == 0) {
+		*state->token_it = (char *)gsh_getenv(params, span->begin + 1);
 		return;
 	}
 
 	char *var_name = strndup(span->begin + 1, span->len - 1);
 
-	gsh_expand_span(parsed, span, gsh_getenv(params, var_name));
+	gsh_expand_span(state, span, gsh_getenv(params, var_name));
 	free(var_name);
 }
 
 /*      Substitute a parameter reference with its value.
  */
-static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
-			  char *const fmt_begin)
+static void gsh_fmt_param(struct gsh_params *params,
+			  struct gsh_parse_state *state, char *const fmt_begin)
 {
 	struct gsh_fmt_span span = {
 		.begin = fmt_begin,
@@ -211,12 +219,12 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 	case GSH_STATUS_PARAM:
 		span.fmt_str = "%d";
 
-		gsh_expand_span(parsed, &span, params->last_status);
+		gsh_expand_span(state, &span, params->last_status);
 		break;
 	default:
 		span.fmt_str = "%s";
 
-		gsh_fmt_var(params, parsed, &span);
+		gsh_fmt_var(params, state, &span);
 		break;
 	}
 }
@@ -226,13 +234,13 @@ static void gsh_fmt_param(struct gsh_params *params, struct gsh_parsed *parsed,
 	If the token consists only of the home character, it will be
 *	assigned to point to the value of $HOME.
 */
-static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
-			 char *const fmt_begin)
+static void gsh_fmt_home(struct gsh_params *params,
+			 struct gsh_parse_state *state, char *const fmt_begin)
 {
 	const char *homevar = gsh_getenv(params, "HOME");
 
-	if (strcmp(*parsed->token_it, (char[]){ GSH_HOME_CH, '\0' }) == 0) {
-		*parsed->token_it = (char *)homevar;
+	if (strcmp(*state->token_it, (char[]){ GSH_HOME_CH, '\0' }) == 0) {
+		*state->token_it = (char *)homevar;
 		return;
 	}
 
@@ -242,25 +250,26 @@ static void gsh_fmt_home(struct gsh_params *params, struct gsh_parsed *parsed,
 		.fmt_str = "%s",
 	};
 
-	gsh_expand_span(parsed, &span, homevar);
+	gsh_expand_span(state, &span, homevar);
 }
 
 /*      Expand the last token.
  *	Returns true while there are still expansions to be performed.
  */
-static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
+static bool gsh_expand_tok(struct gsh_params *params,
+			   struct gsh_parse_state *state)
 {
-	char *fmt_begin = strpbrk(*parsed->token_it, gsh_special_chars);
+	char *fmt_begin = strpbrk(*state->token_it, gsh_special_chars);
 
 	if (!fmt_begin)
 		return false;
 
 	switch ((enum gsh_special_char)fmt_begin[0]) {
 	case GSH_PARAM_CH:
-		gsh_fmt_param(params, parsed, fmt_begin);
+		gsh_fmt_param(params, state, fmt_begin);
 		return true;
 	case GSH_HOME_CH:
-		gsh_fmt_home(params, parsed, fmt_begin);
+		gsh_fmt_home(params, state, fmt_begin);
 		return true;
 	}
 
@@ -273,37 +282,35 @@ static bool gsh_expand_tok(struct gsh_params *params, struct gsh_parsed *parsed)
  *	similar to strtok.
  */
 static bool gsh_next_tok(struct gsh_params *params, struct gsh_parsed *parsed,
-			 char *line, char **tok_state)
+			  struct gsh_parse_state *state, char *line)
 {
-	char *next_tok = strtok_r(line, " ", tok_state);
+	char *next_tok = strtok_r(line, " ", &state->lineptr);
 	if (!next_tok)
 		return false;
 
-	*parsed->token_it = next_tok;
+	*state->token_it = next_tok;
 
-	while (gsh_expand_tok(params, parsed))
+	while (gsh_expand_tok(params, state))
 		;
 
-	if (parsed->fmt_bufs[1])
-		++parsed->fmt_bufs;
+	if (state->fmt_bufs[1])
+		++state->fmt_bufs;
 
-	++parsed->token_it;
-	return true;
+	++state->token_it;
+	++state->token_n;
 }
 
 /*      Parse the first token in the input line, and place
  *      the filename in the argument array.
  */
 static bool gsh_parse_filename(struct gsh_params *params,
-			       struct gsh_parsed *parsed, char *line,
-			       char **tok_state)
+			       struct gsh_parse_state *state)
 {
-	if (gsh_next_tok(params, parsed, line, tok_state))
-		return true;
-
-	char *last_slash = strrchr(line, '/');
+	// NOTE: next_tok() will NEVER return NULL here. (unless it does...)
+	char *last_slash =
+		strrchr(gsh_next_tok(params, state, state->lineptr), '/');
 	if (last_slash)
-		parsed->token_it[-1] = last_slash + 1;
+		state->token_it[-1] = last_slash + 1;
 
 	return false;
 }
@@ -312,24 +319,27 @@ static bool gsh_parse_filename(struct gsh_params *params,
  *      then terminated with a NULL pointer.
  */
 static void gsh_parse_cmd_args(struct gsh_params *params,
-			       struct gsh_parsed *parsed, char **tok_state)
+			       struct gsh_parse_state *state)
 {
-	while ((parsed->token_it - parsed->tokens) <= GSH_MAX_ARGS)
-		if (!gsh_next_tok(params, parsed, NULL, tok_state))
-			break;
+	while (state->token_n <= GSH_MAX_ARGS)
+		if (!gsh_next_tok(params, state, NULL))
+			return;
 }
 
-void gsh_free_parsed(struct gsh_parsed *parsed)
+static void gsh_free_parsed(struct gsh_parse_state *state)
 {
+	if (!state)
+		return;
+
 	// Delete substitution buffers.
-	while (*parsed->fmt_bufs) {
-		free(*parsed->fmt_bufs);
-		*parsed->fmt_bufs-- = NULL;
+	while (*state->fmt_bufs) {
+		free(*state->fmt_bufs);
+		*state->fmt_bufs-- = NULL;
 	}
 
 	// Reset token list.
-	while (parsed->token_it > parsed->tokens)
-		*(--parsed->token_it) = NULL;
+	while (state->token_n-- > 0)
+		*(--state->token_it) = NULL;
 }
 
 static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
@@ -400,13 +410,18 @@ void gsh_parse_and_run(struct gsh_state *sh)
 	if (sh->input->line[0] == '\0')
 		return;
 
-	char *tok_state;
+	gsh_free_parsed(sh->parse_state);
 
-	gsh_parse_filename(&sh->params, sh->parsed, sh->line, &tok_state);
-	gsh_parse_cmd_args(&sh->params, sh->parsed, &tok_state);
+	sh->parse_state = &(struct gsh_parse_state){
+		.token_it = sh->parse_bufs->tokens,
+		.fmt_bufs = sh->parse_bufs->fmt_bufs,
+		.lineptr = sh->input->line,
+	};
 
 	if (!sh->parsed->tokens[0])
 		return;
+
+	gsh_parse_cmd_args(&sh->params, sh->parse_state);
 
 	// Skip any whitespace preceding pathname.
 	sh->input->line += strspn(sh->input->line, " ");
@@ -414,5 +429,5 @@ void gsh_parse_and_run(struct gsh_state *sh)
 	sh->params.last_status =
 		gsh_switch(sh, sh->input->line, sh->parse_bufs->tokens);
 
-	gsh_free_parsed(sh->parsed);
+	sh->parse_state = NULL;
 }
