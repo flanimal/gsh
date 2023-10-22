@@ -280,11 +280,6 @@ void gsh_run_cmd(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);
 
-	// TODO: Move this outside of run_cmd()
-	// so that we can also use run_cmd() for recalls?
-	while (gsh_read_line(sh->input))
-		;
-
 	if (strcspn(sh->input->line, " ") == 0)
 		return;
 

@@ -13,6 +13,10 @@ int main(__attribute_maybe_unused__ int argc,
 	// and continue to next loop iteration if more input is needed?
 	for (;;) {
 		gsh_put_prompt(&sh_state);
+		
+		while (gsh_read_line(sh_state.input))
+			;
+
 		gsh_run_cmd(&sh_state);
 	}
 }
