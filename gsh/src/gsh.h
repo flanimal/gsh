@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include "params.h"
+
 /*	Allocates and creates a hashtable, filling it with
  *	elements from `elems`.
  */
@@ -20,16 +22,6 @@
 					   .data = &elems[_i] m_data },        \
 				  ENTER, &_result, tbl);                       \
 	} while (0)
-
-/* Parameters. */
-struct gsh_params {
-	size_t env_len;
-
-	/* Null-terminated value of HOME. */
-	size_t home_len;
-
-	int last_status;
-};
 
 /* Shell option bitflags. */
 enum gsh_shopt_flags {
@@ -59,15 +51,21 @@ struct gsh_state {
 	struct hsearch_data *builtin_tbl;
 };
 
-const char *gsh_getenv(const struct gsh_params *params, const char *name);
+struct gsh_parse_bufs;
 
-struct gsh_parse_bufs; // FIXME
+struct gsh_parse_bufs *gsh_new_parsebufs();
 
-/* Set initial values and resources for the shell. */
+/*	Set initial values and resources for the shell. 
+ */
 void gsh_init(struct gsh_state *sh, struct gsh_parse_bufs *parsebufs);
 
-/* Execute a null-terminated line of input.
- * The line will be modified by calls to `strtok`. */
+/*	Get a zero-terminated line of input from the terminal,
+ *	excluding the newline.
+ */
+bool gsh_read_line(struct gsh_input_buf *inputbuf);
+
+/*	Execute a null-terminated line of input.
+ */
 void gsh_run_cmd(struct gsh_state *sh);
 
 void gsh_put_prompt(const struct gsh_state *sh);
@@ -75,10 +73,3 @@ void gsh_put_prompt(const struct gsh_state *sh);
 void gsh_bad_cmd(const char *msg, int err);
 
 void gsh_getcwd(struct gsh_state *sh);
-
-/*	Get a zero-terminated line of input from the terminal,
- *	excluding the newline.
- */
-bool gsh_read_line(struct gsh_input_buf *inputbuf);
-
-struct gsh_parse_bufs *gsh_new_parsebufs();

@@ -49,5 +49,8 @@
     <ClInclude Include="src\input.h">
       <Filter>Public</Filter>
     </ClInclude>
+    <ClInclude Include="src\params.h">
+      <Filter>Public</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

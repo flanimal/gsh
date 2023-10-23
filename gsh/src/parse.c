@@ -7,6 +7,7 @@
 #include <ctype.h>
 
 #include "parse.h"
+#include "params.h"
 
 #include "special.def"
 
@@ -15,20 +16,6 @@
 #elif defined(_MSC_VER)
 	#define unreachable() __assume(0)
 #endif
-
-// FIXME: Put somewhere else!!!
-/* Parameters. */
-struct gsh_params {
-	size_t env_len;
-
-	/* Null-terminated value of HOME. */
-	size_t home_len;
-
-	int last_status;
-};
-
-// FIXME: And this!!!
-const char *gsh_getenv(const struct gsh_params *params, const char *name);
 
 /*
  *	The maximum number of arguments that can be passed on the command line,
