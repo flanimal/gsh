@@ -20,82 +20,81 @@ struct gsh_hist_ent {
 
 struct gsh_cmd_hist {
 	/* Tail and head of command history queue. */
-	struct gsh_hist_ent *cmd_history, *oldest_cmd;
+	struct gsh_hist_ent *newest, *oldest;
 
 	/* Number of commands in history (maximum 10). */
-	int hist_n;
+	int count;
 };
 
 struct gsh_cmd_hist *gsh_new_hist()
 {
 	struct gsh_cmd_hist *hist = malloc(sizeof(*hist));
 
-	hist->cmd_history = hist->oldest_cmd = NULL;
-	hist->hist_n = 0;
+	hist->newest = hist->oldest = NULL;
+	hist->count = 0;
 
 	return hist;
 }
 
-static void new_hist_ent(struct gsh_cmd_hist *sh_hist, size_t len,
+static void new_hist_ent(struct gsh_cmd_hist *hist, size_t len,
 			 const char *line)
 {
-	struct gsh_hist_ent *last_cmd = malloc(sizeof(*last_cmd));
+	struct gsh_hist_ent *ent = malloc(sizeof(*ent));
 
-	insque(last_cmd, sh_hist->cmd_history);
-	sh_hist->cmd_history = last_cmd;
+	insque(ent, hist->newest);
+	hist->newest = ent;
 
-	last_cmd->line = strcpy(malloc(len + 1), line);
-	last_cmd->len = len;
+	ent->line = strcpy(malloc(len + 1), line);
+	ent->len = len;
 
-	if (sh_hist->hist_n == 0)
-		sh_hist->oldest_cmd = last_cmd;
+	if (hist->count == 0)
+		hist->oldest = ent;
 
-	++sh_hist->hist_n;
+	++hist->count;
 }
 
-static void drop_hist_ent(struct gsh_cmd_hist *sh_hist,
-			  struct gsh_hist_ent *dropped_ent)
+static void drop_hist_ent(struct gsh_cmd_hist *hist,
+			  struct gsh_hist_ent *ent)
 {
-	if (!(sh_hist->oldest_cmd = dropped_ent->back))
-		sh_hist->cmd_history = NULL;
+	if (!(hist->oldest = ent->back))
+		hist->newest = NULL;
 
-	remque(dropped_ent);
+	remque(ent);
 
-	free(dropped_ent->line);
-	free(dropped_ent);
+	free(ent->line);
+	free(ent);
 
-	--sh_hist->hist_n;
+	--hist->count;
 }
 
-void gsh_add_hist(struct gsh_cmd_hist *sh_hist, size_t len, const char *line)
+void gsh_add_hist(struct gsh_cmd_hist *hist, size_t len, const char *line)
 {
 	// The recall command `r` itself should NOT be added to history.
 	if (line[0] == 'r' && (!line[1] || isspace(line[1])))
 		return;
 
-	new_hist_ent(sh_hist, len, line);
+	new_hist_ent(hist, len, line);
 
-	if (sh_hist->hist_n > GSH_MAX_HIST)
-		drop_hist_ent(sh_hist, sh_hist->oldest_cmd);
+	if (hist->count > GSH_MAX_HIST)
+		drop_hist_ent(hist, hist->oldest);
 }
 
 int gsh_list_hist(struct gsh_state *sh, char *const *args)
 {
 	if (args[1] && strcmp(args[1], "-c") == 0) {
+		while (sh->hist->count > 0)
+			drop_hist_ent(sh->hist, sh->hist->oldest);
 
-		while (sh->hist->hist_n > 0)
-			drop_hist_ent(sh->hist, sh->hist->oldest_cmd);
-		
 		return 0;
 	}
-		
-	// It is not possible for `cmd_history` to be NULL here,
-	// as it will contain at least the `hist` invocation.
-	int cmd_n = 1;
 
-	for (struct gsh_hist_ent *cmd_it = sh->hist->cmd_history; cmd_it;
-	     cmd_it = cmd_it->forw)
-		printf("%d: %s\n", cmd_n++, cmd_it->line);
+	// It is not possible for `newest` to be NULL here,
+	// as it will contain at least the `hist` invocation.
+	int n = 1;
+
+	for (struct gsh_hist_ent *hist_it = sh->hist->newest; hist_it;
+	     hist_it = hist_it->forw)
+		printf("%d: %s\n", n++, hist_it->line);
 
 	return 0;
 }
@@ -103,24 +102,24 @@ int gsh_list_hist(struct gsh_state *sh, char *const *args)
 /* Re-run the n-th previous line of input. */
 int gsh_recall(struct gsh_state *sh, char *const *args)
 {
-	int n_arg = (args[1]) ? atoi(args[1]) : 1;
+	int n = (args[1]) ? atoi(args[1]) : 1;
 
-	if (0 >= n_arg || sh->hist->hist_n < n_arg) {
+	if (0 >= n || sh->hist->count < n) {
 		gsh_bad_cmd("no matching history entry", 0);
 		return -1;
 	}
 
-	struct gsh_hist_ent *cmd_it = sh->hist->cmd_history;
+	struct gsh_hist_ent *hist_it = sh->hist->newest;
 
-	while (cmd_it->forw && n_arg-- > 1)
-		cmd_it = cmd_it->forw;
+	while (hist_it->forw && n-- > 1)
+		hist_it = hist_it->forw;
 
-	printf("%s\n", cmd_it->line);
+	printf("%s\n", hist_it->line);
 
 	// Make a copy so we don't lose it if the history entry
 	// gets deleted.
-	strcpy(sh->inputbuf->line, cmd_it->line);
-	sh->inputbuf->len = cmd_it->len;
+	strcpy(sh->inputbuf->line, hist_it->line);
+	sh->inputbuf->len = hist_it->len;
 
 	gsh_run_cmd(sh);
 	return sh->params.last_status;
