@@ -11,4 +11,4 @@ struct gsh_input_buf {
 	long max_input;
 };
 
-size_t gsh_max_input(const struct gsh_state *sh);
+size_t gsh_max_input(const struct gsh_input_buf *inputbuf);

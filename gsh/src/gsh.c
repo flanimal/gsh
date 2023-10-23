@@ -49,21 +49,23 @@ static bool gsh_replace_linebrk(char *line)
 bool gsh_read_line(struct gsh_input_buf *inputbuf)
 {
 	assert(g_gsh_initialized);
-	// FIXME: Reimplement gsh_max_input().
+
+	char *const line_it = inputbuf->line + inputbuf->len;
+
 	// TODO: fgets() or getline()?
-	if (!fgets(inputbuf->line + inputbuf->len,
-		   (int)inputbuf->max_input - (int)inputbuf->len + 1, stdin)) {
+	// Add 1 for the newline.
+	if (!fgets(line_it, (int)gsh_max_input(inputbuf) + 1, stdin)) {
 		if (ferror(stdin))
 			perror("gsh exited");
 
 		exit(feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE);
 	}
 
-	char *newline = strchr(inputbuf->line + inputbuf->len, '\n');
+	char *newline = strchr(line_it, '\n');
 	*newline = '\0';
 
-	bool need_more = gsh_replace_linebrk(inputbuf->line + inputbuf->len);
-	inputbuf->len = (size_t)(newline - (inputbuf->line + inputbuf->len));
+	bool need_more = gsh_replace_linebrk(line_it);
+	inputbuf->len = (size_t)(newline - line_it);
 
 	if (need_more) {
 		fputs(GSH_SECOND_PROMPT, stdout);
@@ -126,9 +128,9 @@ void gsh_getcwd(struct gsh_state *sh)
  *	that will currently be accepted, not including the newline
  *	or null byte.
  */
-size_t gsh_max_input(const struct gsh_state *sh)
+size_t gsh_max_input(const struct gsh_input_buf *inputbuf)
 {
-	return (size_t)sh->inputbuf->max_input;
+	return (size_t)inputbuf->max_input - inputbuf->len;
 }
 
 static void gsh_set_params(struct gsh_params *params)
