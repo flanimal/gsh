@@ -24,18 +24,18 @@
 #define GSH_MAX_ARGS 64
 
 struct gsh_parse_bufs {
-	/* List of tokens to be returned from parsing. */
-	char **tokens;
+	/* List of words to be returned from parsing. */
+	char **words;
 
-	/* Stack of buffers for tokens that contain substitutions. */
+	/* Stack of buffers for words that contain substitutions. */
 	char **fmtbufs;
 };
 
 struct gsh_parse_state {
-	/* Iterator pointing to the token currently being parsed. */
-	const char **token_it;
+	/* Iterator pointing to the word currently being parsed. */
+	const char **word_it;
 
-	size_t token_n;
+	size_t word_n;
 
 	char **fmtbufs;
 
@@ -43,14 +43,14 @@ struct gsh_parse_state {
 };
 
 struct gsh_fmt_span {
-	/* Beginning of format span within the current token. */
+	/* Beginning of format span within the current word. */
 	char *begin;
 
 	/* Length of the unformatted span, up to either the zero byte or the
 	 * next special char. */
 	size_t len;
 
-	/* A copy of the token text following the span, if any. */
+	/* A copy of the word text following the span, if any. */
 	char *after;
 
 	const char *fmt_str;
@@ -60,7 +60,7 @@ struct gsh_parse_bufs *gsh_new_parsebufs()
 {
 	struct gsh_parse_bufs *parsebufs = malloc(sizeof(*parsebufs));
 
-	parsebufs->tokens = calloc(GSH_MAX_ARGS, sizeof(char *));
+	parsebufs->words = calloc(GSH_MAX_ARGS, sizeof(char *));
 
 	// MAX_ARGS plus sentinel.
 	parsebufs->fmtbufs = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
@@ -74,8 +74,8 @@ void gsh_set_parse_state(struct gsh_parse_bufs *parsebufs,
 	*state = malloc(sizeof(**state));
 
 	(*state)->fmtbufs = parsebufs->fmtbufs;
-	(*state)->token_it = (const char**)parsebufs->tokens;
-	(*state)->token_n = 0;
+	(*state)->word_it = (const char**)parsebufs->words;
+	(*state)->word_n = 0;
 }
 
 /*	Allocate and return a new format buffer.
@@ -86,7 +86,7 @@ static char *gsh_alloc_fmtbuf(struct gsh_parse_state *state, size_t new_len)
 		state->fmtbufs[1] = realloc(state->fmtbufs[1], new_len + 1);
 	} else {
 		state->fmtbufs[1] = malloc(new_len + 1);
-		strcpy(state->fmtbufs[1], *state->token_it);
+		strcpy(state->fmtbufs[1], *state->word_it);
 	}
 	// There is currently no way to know whether to allocate
 	// or reallocate the buffer unless we increment fmt_bufs OUTSIDE of
@@ -97,19 +97,19 @@ static char *gsh_alloc_fmtbuf(struct gsh_parse_state *state, size_t new_len)
 	return state->fmtbufs[1];
 }
 
-/*	Copy the token to a buffer for expansion.
+/*	Copy the word to a buffer for expansion.
  */
 static char *gsh_expand_alloc(struct gsh_parse_state *state,
 			      struct gsh_fmt_span *span, size_t print_len)
 {
 	span->begin[0] = '\0';
 
-	const size_t before_len = strlen(*state->token_it);
+	const size_t before_len = strlen(*state->word_it);
 
 	char *fmtbuf = gsh_alloc_fmtbuf(state, before_len + print_len +
 						       strlen(span->after));
 
-	*state->token_it = fmtbuf;
+	*state->word_it = fmtbuf;
 	fmtbuf += before_len;
 
 	return fmtbuf;
@@ -150,18 +150,18 @@ static void gsh_expand_span(struct gsh_parse_state *state,
 
 /*	Substitute a variable reference with its value.
  *
- *	If the token consists only of the variable reference, it will be
+ *	If the word consists only of the variable reference, it will be
  *	assigned to point to the value of the variable.
  *
- *	If the variable does not exist, the token will be assigned the empty
+ *	If the variable does not exist, the word will be assigned the empty
  *	string.
  */
 static void gsh_fmt_var(struct gsh_params *params,
 			struct gsh_parse_state *state,
 			struct gsh_fmt_span *span)
 {
-	if (strcmp(*state->token_it, span->begin) == 0) {
-		*state->token_it = gsh_getenv(params, span->begin + 1);
+	if (strcmp(*state->word_it, span->begin) == 0) {
+		*state->word_it = gsh_getenv(params, span->begin + 1);
 		return;
 	}
 
@@ -197,7 +197,7 @@ static void gsh_fmt_param(struct gsh_params *params,
 
 /*	Substitute the home character with the value of $HOME.
 *
-	If the token consists only of the home character, it will be
+	If the word consists only of the home character, it will be
 *	assigned to point to the value of $HOME.
 */
 static void gsh_fmt_home(struct gsh_params *params,
@@ -205,8 +205,10 @@ static void gsh_fmt_home(struct gsh_params *params,
 {
 	const char *homevar = gsh_getenv(params, "HOME");
 
-	if (strcmp(*state->token_it, (char[]){ GSH_HOME_CH, '\0' }) == 0) {
-		*state->token_it = homevar;
+	// TODO: Move the whole-word check out of the fmt_* functions so that
+	// it makes more sense with strpbrk() converting const char * to char *?
+	if (strcmp(*state->word_it, (char[]){ GSH_HOME_CH, '\0' }) == 0) {
+		*state->word_it = homevar;
 		return;
 	}
 
@@ -219,13 +221,13 @@ static void gsh_fmt_home(struct gsh_params *params,
 	gsh_expand_span(state, &span, homevar);
 }
 
-/*      Expand the last token.
+/*      Expand the last word.
  *	Returns true while there are still expansions to be performed.
  */
-static bool gsh_expand_tok(struct gsh_params *params,
+static bool gsh_expand_word(struct gsh_params *params,
 			   struct gsh_parse_state *state)
 {
-	char *fmt_begin = strpbrk(*state->token_it, gsh_special_chars);
+	char *fmt_begin = strpbrk(*state->word_it, gsh_special_chars);
 
 	if (!fmt_begin)
 		return false;
@@ -242,55 +244,55 @@ static bool gsh_expand_tok(struct gsh_params *params,
 	unreachable();
 }
 
-/*      Collect and insert a fully-expanded token into the list.
+/*      Collect and insert a fully-expanded word into the list.
  *
- *	Returns next token or NULL if no next token, similar to strtok().
+ *	Returns next word or NULL if no next word, similar to strtok().
  */
-static char *gsh_next_tok(struct gsh_params *params,
+static char *gsh_next_word(struct gsh_params *params,
 			  struct gsh_parse_state *state, char *line)
 {
-	char *next_tok = strtok_r(line, WHITESPACE, &state->lineptr);
-	if (!next_tok)
+	char *word = strtok_r(line, WHITESPACE, &state->lineptr);
+	if (!word)
 		return NULL;
 
-	*state->token_it = next_tok;
+	*state->word_it = word;
 
-	while (gsh_expand_tok(params, state))
+	while (gsh_expand_word(params, state))
 		;
 
 	if (state->fmtbufs[1])
 		++state->fmtbufs;
 
-	++state->token_it;
-	++state->token_n;
-	return next_tok;
+	++state->word_it;
+	++state->word_n;
+	return word;
 }
 
-/*      Parse the first token in the input line, and place
+/*      Parse the first word in the input line, and place
  *      the filename in the argument array.
  */
 static bool gsh_parse_filename(struct gsh_params *params,
 			       struct gsh_parse_state *state)
 {
-	char *fn = gsh_next_tok(params, state, state->lineptr);
+	char *fn = gsh_next_word(params, state, state->lineptr);
 	if (!fn)
 		return false;
 
 	char *last_slash = strrchr(fn, '/');
 	if (last_slash)
-		state->token_it[-1] = last_slash + 1;
+		state->word_it[-1] = last_slash + 1;
 
-	return !!state->token_it[-1];
+	return !!state->word_it[-1];
 }
 
-/*	Parse tokens and place them into the argument array, which is
+/*	Parse words and place them into the argument array, which is
  *      then terminated with a NULL pointer.
  */
 static void gsh_parse_cmd_args(struct gsh_params *params,
 			       struct gsh_parse_state *state)
 {
-	while (state->token_n <= GSH_MAX_ARGS)
-		if (!gsh_next_tok(params, state, NULL))
+	while (state->word_n <= GSH_MAX_ARGS)
+		if (!gsh_next_word(params, state, NULL))
 			return;
 }
 
@@ -302,9 +304,9 @@ static void gsh_free_parsed(struct gsh_parse_state *state)
 		*state->fmtbufs-- = NULL;
 	}
 
-	// Reset token list.
-	for (; state->token_n > 0; --state->token_n)
-		*(--state->token_it) = NULL;
+	// Reset word list.
+	for (; state->word_n > 0; --state->word_n)
+		*(--state->word_it) = NULL;
 }
 
 // TODO: "while" builtin.
@@ -317,7 +319,7 @@ char **gsh_parse_cmd(struct gsh_params *params,
 	gsh_free_parsed(parse_state);
 	parse_state->lineptr = *line;
 
-	char **const tokens = (char **)parse_state->token_it;
+	char **const args = (char **)parse_state->word_it;
 
 	if (!gsh_parse_filename(params, parse_state))
 		return NULL;
@@ -327,5 +329,5 @@ char **gsh_parse_cmd(struct gsh_params *params,
 	// Skip any whitespace preceding pathname.
 	*line += strspn(*line, WHITESPACE);
 
-	return tokens;
+	return args;
 }
