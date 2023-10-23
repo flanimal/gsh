@@ -12,9 +12,9 @@
 #include "special.def"
 
 #if defined(__GNUC__)
-	#define unreachable() __builtin_unreachable()
+#define unreachable() __builtin_unreachable()
 #elif defined(_MSC_VER)
-	#define unreachable() __assume(0)
+#define unreachable() __assume(0)
 #endif
 
 /*
@@ -33,6 +33,7 @@ struct gsh_parse_bufs {
 
 struct gsh_parse_state {
 	/* Iterator pointing to the token currently being parsed. */
+	// TODO: Const qualifier(s)?
 	char **token_it;
 
 	size_t token_n;
@@ -68,7 +69,8 @@ struct gsh_parse_bufs *gsh_new_parsebufs()
 	return parsebufs;
 }
 
-void gsh_set_parse_state(struct gsh_parse_bufs *parsebufs, struct gsh_parse_state **state)
+void gsh_set_parse_state(struct gsh_parse_bufs *parsebufs,
+			 struct gsh_parse_state **state)
 {
 	*state = malloc(sizeof(**state));
 
@@ -85,7 +87,6 @@ static char *gsh_alloc_fmtbuf(struct gsh_parse_state *state, size_t new_len)
 		state->fmtbufs[1] = realloc(state->fmtbufs[1], new_len + 1);
 	} else {
 		state->fmtbufs[1] = malloc(new_len + 1);
-
 		strcpy(state->fmtbufs[1], *state->token_it);
 	}
 	// There is currently no way to know whether to allocate
@@ -249,7 +250,7 @@ static bool gsh_expand_tok(struct gsh_params *params,
 static char *gsh_next_tok(struct gsh_params *params,
 			  struct gsh_parse_state *state, char *line)
 {
-	char *next_tok = strtok_r(line, " ", &state->lineptr);
+	char *next_tok = strtok_r(line, WHITESPACE, &state->lineptr);
 	if (!next_tok)
 		return NULL;
 
@@ -308,7 +309,8 @@ static void gsh_free_parsed(struct gsh_parse_state *state)
 }
 
 // TODO: "while" builtin.
-char **gsh_parse_cmd(struct gsh_params *params, struct gsh_parse_state *parse_state, char **line)
+char **gsh_parse_cmd(struct gsh_params *params,
+		     struct gsh_parse_state *parse_state, char **line)
 {
 	if ((*line)[0] == '\0')
 		return NULL;
@@ -324,7 +326,7 @@ char **gsh_parse_cmd(struct gsh_params *params, struct gsh_parse_state *parse_st
 	gsh_parse_cmd_args(params, parse_state);
 
 	// Skip any whitespace preceding pathname.
-	*line += strspn(*line, " ");
+	*line += strspn(*line, WHITESPACE);
 
 	return tokens;
 }

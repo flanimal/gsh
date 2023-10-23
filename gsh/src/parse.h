@@ -1,5 +1,7 @@
 #pragma once
 
+#define WHITESPACE " \f\n\r\t\v"
+
 struct gsh_parse_bufs;
 struct gsh_parse_state;
 struct gsh_params;
