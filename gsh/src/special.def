@@ -16,7 +16,7 @@
 enum gsh_special_char { SPECIAL_CHARS(CHAR_ENUM) };
 enum gsh_special_param { SPECIAL_PARAMS(CHAR_ENUM) };
 
-const char gsh_special_chars[] = { SPECIAL_CHARS(CHAR_ARRAY) '\0' };
+static const char gsh_special_chars[] = { SPECIAL_CHARS(CHAR_ARRAY) '\0' };
 
 #undef CHAR_ENUM
 #undef CHAR_ARRAY
