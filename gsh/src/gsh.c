@@ -13,6 +13,7 @@
 #include <ctype.h>
 
 #include "gsh.h"
+#include "input.h"
 #include "parse.h"
 #include "history.h"
 #include "builtin.h"

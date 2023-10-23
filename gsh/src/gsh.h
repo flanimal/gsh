@@ -39,16 +39,6 @@ enum gsh_shopt_flags {
 	GSH_OPT_DEFAULTS = GSH_OPT_PROMPT_WORKDIR | GSH_OPT_ECHO,
 };
 
-// FIXME: input.h?
-struct gsh_input_buf {
-	// Buffer and size for getting terminal input.
-	char *line;
-	size_t len;
-
-	// Constants relating to terminal input.
-	long max_input;
-};
-
 struct gsh_state {
 	/* Command history. */
 	struct gsh_cmd_hist *hist;

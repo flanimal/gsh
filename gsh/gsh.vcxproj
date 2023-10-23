@@ -99,6 +99,7 @@
     <ClInclude Include="src\builtin.h" />
     <ClInclude Include="src\gsh.h" />
     <ClInclude Include="src\history.h" />
+    <ClInclude Include="src\input.h" />
     <ClInclude Include="src\parse.h" />
     <ClInclude Include="src\process.h" />
   </ItemGroup>

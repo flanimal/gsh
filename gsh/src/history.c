@@ -4,6 +4,7 @@
 #include <ctype.h>
 
 #include "gsh.h"
+#include "input.h"
 #include "history.h"
 #include "parse.h"
 

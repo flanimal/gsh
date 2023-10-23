@@ -46,5 +46,8 @@
     <ClInclude Include="src\parse.h">
       <Filter>Public</Filter>
     </ClInclude>
+    <ClInclude Include="src\input.h">
+      <Filter>Public</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
