@@ -33,8 +33,7 @@ struct gsh_parse_bufs {
 
 struct gsh_parse_state {
 	/* Iterator pointing to the token currently being parsed. */
-	// TODO: Const qualifier(s)?
-	char **token_it;
+	const char **token_it;
 
 	size_t token_n;
 
@@ -75,7 +74,7 @@ void gsh_set_parse_state(struct gsh_parse_bufs *parsebufs,
 	*state = malloc(sizeof(**state));
 
 	(*state)->fmtbufs = parsebufs->fmtbufs;
-	(*state)->token_it = parsebufs->tokens;
+	(*state)->token_it = (const char**)parsebufs->tokens;
 	(*state)->token_n = 0;
 }
 
@@ -162,7 +161,7 @@ static void gsh_fmt_var(struct gsh_params *params,
 			struct gsh_fmt_span *span)
 {
 	if (strcmp(*state->token_it, span->begin) == 0) {
-		*state->token_it = (char *)gsh_getenv(params, span->begin + 1);
+		*state->token_it = gsh_getenv(params, span->begin + 1);
 		return;
 	}
 
@@ -207,7 +206,7 @@ static void gsh_fmt_home(struct gsh_params *params,
 	const char *homevar = gsh_getenv(params, "HOME");
 
 	if (strcmp(*state->token_it, (char[]){ GSH_HOME_CH, '\0' }) == 0) {
-		*state->token_it = (char *)homevar;
+		*state->token_it = homevar;
 		return;
 	}
 
@@ -318,7 +317,7 @@ char **gsh_parse_cmd(struct gsh_params *params,
 	gsh_free_parsed(parse_state);
 	parse_state->lineptr = *line;
 
-	char **const tokens = parse_state->token_it;
+	char **const tokens = (char **)parse_state->token_it;
 
 	if (!gsh_parse_filename(params, parse_state))
 		return NULL;
