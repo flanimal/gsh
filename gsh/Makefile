@@ -1,16 +1,26 @@
-objects = $(addprefix obj/, main.o gsh.o builtin.o history.o parse.o)
+objects = main.o gsh.o builtin.o history.o parse.o
 
 DEFINES = _GNU_SOURCE
-CFLAGS = -O0 -Werror -Wall -Wextra -pedantic-errors -fno-omit-frame-pointer -std=gnu11 -D $(DEFINES)
+CFLAGS = -Werror -Wall -Wextra -pedantic-errors -std=gnu11 $(addprefix -D, $(DEFINES))
+
+objpath = obj/
+
+.PHONY : debug clean reset
+
+all : gsh
+
+debug : objpath = obj/debug/
+debug : CFLAGS += -O0 -fno-omit-frame-pointer -g
+debug : gsh
 
 gsh : $(objects)
-	gcc -o gsh $(objects)
+	gcc -o gsh $(addprefix $(objpath), $(objects))
 
-$(objects): obj/%.o: src/%.c
-	$(CC) $(CFLAGS) -c $< -o $@ 
+$(objects): %.o: src/%.c
+	mkdir -p $(objpath)
+	$(CC) $(CFLAGS) -c $< -o $(addprefix $(objpath), $@) 
 
-.PHONY : clean reset 
 clean : 
 	find -not \( -name gsh -or -name README.md \) -delete
 reset :
-	rm -f obj/* gsh
+	rm -rf obj/* gsh
