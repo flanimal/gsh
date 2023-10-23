@@ -50,6 +50,7 @@ bool gsh_read_line(struct gsh_input_buf *inputbuf)
 {
 	assert(g_gsh_initialized);
 	// FIXME: Reimplement gsh_max_input().
+	// TODO: fgets() or getline()?
 	if (!fgets(inputbuf->line + inputbuf->len,
 		   (int)inputbuf->max_input - (int)inputbuf->len + 1, stdin)) {
 		if (ferror(stdin))
@@ -282,8 +283,10 @@ void gsh_run_cmd(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);
 
-	if (strcspn(sh->inputbuf->line, " ") == 0)
+	if (strcspn(sh->inputbuf->line, " ") == 0) {
+		sh->inputbuf->len = 0;
 		return;
+	}
 
 	gsh_add_hist(sh->hist, sh->inputbuf->len, sh->inputbuf->line);
 
