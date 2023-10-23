@@ -25,7 +25,7 @@ struct gsh_cmd_hist {
 	int hist_n;
 };
 
-struct gsh_cmd_hist *gsh_init_hist()
+struct gsh_cmd_hist *gsh_new_hist()
 {
 	struct gsh_cmd_hist *hist = malloc(sizeof(*hist));
 
@@ -118,8 +118,8 @@ int gsh_recall(struct gsh_state *sh, char *const *args)
 
 	// Make a copy so we don't lose it if the history entry
 	// gets deleted.
-	strcpy(sh->input->line, cmd_it->line);
-	sh->input->input_len = cmd_it->len;
+	strcpy(sh->inputbuf->line, cmd_it->line);
+	sh->inputbuf->len = cmd_it->len;
 
 	gsh_run_cmd(sh);
 	return sh->params.last_status;

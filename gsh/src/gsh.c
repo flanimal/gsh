@@ -45,27 +45,27 @@ static bool gsh_replace_linebrk(char *line)
 	return false;
 }
 
-bool gsh_read_line(struct gsh_input_buf *input)
+bool gsh_read_line(struct gsh_input_buf *inputbuf)
 {
 	assert(g_gsh_initialized);
 	// FIXME: Reimplement gsh_max_input().
-	if (!fgets(input->line + input->input_len,
-		   (int)input->max_input - (int)input->input_len + 1, stdin)) {
+	if (!fgets(inputbuf->line + inputbuf->len,
+		   (int)inputbuf->max_input - (int)inputbuf->len + 1, stdin)) {
 		if (ferror(stdin))
 			perror("gsh exited");
 
 		exit(feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE);
 	}
 
-	char *newline = strchr(input->line + input->input_len, '\n');
+	char *newline = strchr(inputbuf->line + inputbuf->len, '\n');
 	*newline = '\0';
 
-	bool need_more = gsh_replace_linebrk(input->line + input->input_len);
-	input->input_len = (size_t)(newline - (input->line + input->input_len));
+	bool need_more = gsh_replace_linebrk(inputbuf->line + inputbuf->len);
+	inputbuf->len = (size_t)(newline - (inputbuf->line + inputbuf->len));
 
 	if (need_more) {
 		fputs(GSH_SECOND_PROMPT, stdout);
-		--input->input_len; // Exclude backslash.
+		--inputbuf->len; // Exclude backslash.
 	}
 
 	return need_more;
@@ -108,7 +108,7 @@ const char *gsh_getenv(const struct gsh_params *params, const char *name)
 
 void gsh_getcwd(struct gsh_state *sh)
 {
-	if (getcwd(sh->cwd, (size_t)sh->input->max_path))
+	if (getcwd(sh->cwd, (size_t)sh->max_path))
 		return;
 
 	/* Current working path longer than max_path chars. */
@@ -117,7 +117,7 @@ void gsh_getcwd(struct gsh_state *sh)
 	// We will use the buffer allocated by `getcwd`
 	// to store the working directory from now on.
 	sh->cwd = getcwd(NULL, 0);
-	sh->input->max_path = pathconf(sh->cwd, _PC_PATH_MAX);
+	sh->max_path = pathconf(sh->cwd, _PC_PATH_MAX);
 }
 
 /*	The maximum length of an input line on the terminal
@@ -126,7 +126,7 @@ void gsh_getcwd(struct gsh_state *sh)
  */
 size_t gsh_max_input(const struct gsh_state *sh)
 {
-	return (size_t)sh->input->max_input;
+	return (size_t)sh->inputbuf->max_input;
 }
 
 static void gsh_set_params(struct gsh_params *params)
@@ -156,7 +156,7 @@ static void gsh_set_shopts(struct hsearch_data **shopt_tbl)
 	create_hashtable(shopts, .cmd, .flag, *shopt_tbl);
 }
 
-static struct gsh_input_buf *gsh_init_inputbuf()
+static struct gsh_input_buf *gsh_new_inputbuf()
 {
 	struct gsh_input_buf *input = malloc(sizeof(*input));
 	// Get maximum length of terminal input line.
@@ -168,18 +168,18 @@ static struct gsh_input_buf *gsh_init_inputbuf()
 	return input;
 }
 
-void gsh_init(struct gsh_state *sh)
+void gsh_init(struct gsh_state *sh, struct gsh_parse_bufs *parsebufs)
 {
 	gsh_set_builtins(&sh->builtin_tbl);
 	gsh_set_shopts(&sh->shopt_tbl);
 	gsh_set_params(&sh->params);
 
 	// Get working dir and its max path length.
-	sh->cwd = malloc((size_t)(sh->input->max_path = _POSIX_PATH_MAX));
+	sh->cwd = malloc((size_t)(sh->max_path = _POSIX_PATH_MAX));
 	gsh_getcwd(sh);
 
-	sh->input = gsh_init_inputbuf();
-	sh->hist = gsh_init_hist();
+	sh->inputbuf = gsh_new_inputbuf();
+	sh->hist = gsh_new_hist();
 
 	sh->shopts = GSH_OPT_DEFAULTS;
 
@@ -254,17 +254,17 @@ static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 		return;
 	}
 
-	char *shopt_value = strchr(shopt_ch + 1, ' ');
-	char *after = shopt_value;
+	char *valstr = strchr(shopt_ch + 1, ' ');
+	char *after = valstr;
 
-	if (shopt_value && isalpha(shopt_value[1])) {
-		*shopt_value++ = '\0';
+	if (valstr && isalpha(valstr[1])) {
+		*valstr++ = '\0';
 
-		const int val = (strncmp(shopt_value, "on", 2) == 0)  ? true :
-				(strncmp(shopt_value, "off", 3) == 0) ? false :
+		const int val = (strncmp(valstr, "on", 2) == 0)  ? true :
+				(strncmp(valstr, "off", 3) == 0) ? false :
 									-1;
 		if (val != -1) {
-			after = strchr(shopt_value, ' ');
+			after = strchr(valstr, ' ');
 			gsh_set_opt(sh, shopt_ch + 1, val);
 		}
 	}
@@ -282,22 +282,22 @@ void gsh_run_cmd(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);
 
-	if (strcspn(sh->input->line, " ") == 0)
+	if (strcspn(sh->inputbuf->line, " ") == 0)
 		return;
 
-	gsh_add_hist(sh->hist, sh->input->input_len, sh->input->line);
+	gsh_add_hist(sh->hist, sh->inputbuf->len, sh->inputbuf->line);
 
 	// Change shell options first.
 	//
-	// TODO: Because this occurs before any other parsing or tokenizing,
+	// NOTE: Because this occurs before any other parsing or tokenizing,
 	// it means that "@" characters will be interpreted as shell options
 	// even inside quotes.
-	for (char *shopt = sh->input->line; (shopt = strchr(shopt, '@'));)
+	for (char *shopt = sh->inputbuf->line; (shopt = strchr(shopt, '@'));)
 		gsh_process_opt(sh, shopt);
 
-	char **args = gsh_parse_cmd(&sh->params, sh->parse_state, &sh->input->line);
+	char **args = gsh_parse_cmd(&sh->params, sh->parse_state, &sh->inputbuf->line);
 	if (args)
-		gsh_switch(sh, sh->input->line, args);
+		gsh_switch(sh, sh->inputbuf->line, args);
 	
-	sh->input->input_len = 0;
+	sh->inputbuf->len = 0;
 }

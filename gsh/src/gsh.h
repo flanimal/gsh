@@ -39,77 +39,27 @@ enum gsh_shopt_flags {
 	GSH_OPT_DEFAULTS = GSH_OPT_PROMPT_WORKDIR | GSH_OPT_ECHO,
 };
 
+// FIXME: input.h?
 struct gsh_input_buf {
 	// Buffer and size for getting terminal input.
 	char *line;
-	size_t input_len;
+	size_t len;
 
 	// Constants relating to terminal input.
 	long max_input;
-	long max_path; // (?)
 };
 
 struct gsh_state {
 	/* Command history. */
 	struct gsh_cmd_hist *hist;
 
-	// Currently, we have:
-	// struct gsh_parsed {
-	//	char **tokens;
+	struct gsh_input_buf *inputbuf;
 
-	//	char **token_it;
-
-	//	char **fmt_bufs;
-	// };
-	// 
-	// This is potentially suboptimal since it ties together
-	// references to the buffers for the purpose of keeping track
-	// of their allocation, AND the state surrounding those buffers.
-	// So if a function needs only one, it still gets both. Which potentially
-	// lessens encapsulation?
-	// 
-	// We might instead have *two* structs,
-	// 
-	// struct gsh_parse_bufs {
-	//	char **tokens
-	//	char **fmt_bufs
-	// };
-	// 
-	// and
-	// 
-	// struct gsh_parse_state {
-	//	char **token_it
-	//	size_t token_n;
-	// 
-	//	char **fmt_bufs
-	// 
-	//	char *lineptr?
-	// };
-	// 
-	// This would allow us to store input_len in parse_bufs,
-	// which we could pass to read_line(), 
-	// 
-	// But this might not make sense, since the "line" buffer is filled
-	// before parsing even *begins*. It has nothing to do with the parse state!
-	// 
-	// What if we had:
-	// 
-
-	// 
-	// We could then pass *this* to read_line().
-	// TODO: Do we (need to) resize line if max_input changes?
-	// 
-	// 
-	// /////////////////////////////////////
-	// TODO: !!! Put reference to gsh_params in parse_state?
-	/* The buffers used for parsing. */
-	struct gsh_parse_bufs *parse_bufs;
 	struct gsh_parse_state *parse_state;
-
-	struct gsh_input_buf *input;
 
 	/* Current working directory of the shell process. */
 	char *cwd;
+	long max_path;
 
 	struct gsh_params params;
 

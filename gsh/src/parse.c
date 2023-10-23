@@ -41,7 +41,7 @@ struct gsh_parse_bufs {
 	char **tokens;
 
 	/* Stack of buffers for tokens that contain substitutions. */
-	char **fmt_bufs;
+	char **fmtbufs;
 };
 
 struct gsh_parse_state {
@@ -50,7 +50,7 @@ struct gsh_parse_state {
 
 	size_t token_n;
 
-	char **fmt_bufs;
+	char **fmtbufs;
 
 	char *lineptr;
 };
@@ -69,24 +69,24 @@ struct gsh_fmt_span {
 	const char *fmt_str;
 };
 
-struct gsh_parse_bufs *gsh_init_parsebufs()
+struct gsh_parse_bufs *gsh_new_parsebufs()
 {
-	struct gsh_parse_bufs *parsed = malloc(sizeof(*parsed));
+	struct gsh_parse_bufs *parsebufs = malloc(sizeof(*parsebufs));
 
-	parsed->tokens = calloc(GSH_MAX_ARGS, sizeof(char *));
+	parsebufs->tokens = calloc(GSH_MAX_ARGS, sizeof(char *));
 
 	// MAX_ARGS plus sentinel.
-	parsed->fmt_bufs = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
+	parsebufs->fmtbufs = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
 
-	return parsed;
+	return parsebufs;
 }
 
-void gsh_set_parse_state(struct gsh_parse_bufs *parse_bufs, struct gsh_parse_state **state)
+void gsh_set_parse_state(struct gsh_parse_bufs *parsebufs, struct gsh_parse_state **state)
 {
 	*state = malloc(sizeof(**state));
 
-	(*state)->fmt_bufs = parse_bufs->fmt_bufs;
-	(*state)->token_it = parse_bufs->tokens;
+	(*state)->fmtbufs = parsebufs->fmtbufs;
+	(*state)->token_it = parsebufs->tokens;
 	(*state)->token_n = 0;
 }
 
@@ -94,12 +94,12 @@ void gsh_set_parse_state(struct gsh_parse_bufs *parse_bufs, struct gsh_parse_sta
  */
 static char *gsh_alloc_fmtbuf(struct gsh_parse_state *state, size_t new_len)
 {
-	if (state->fmt_bufs[1]) {
-		state->fmt_bufs[1] = realloc(state->fmt_bufs[1], new_len + 1);
+	if (state->fmtbufs[1]) {
+		state->fmtbufs[1] = realloc(state->fmtbufs[1], new_len + 1);
 	} else {
-		state->fmt_bufs[1] = malloc(new_len + 1);
+		state->fmtbufs[1] = malloc(new_len + 1);
 
-		strcpy(state->fmt_bufs[1], *state->token_it);
+		strcpy(state->fmtbufs[1], *state->token_it);
 	}
 	// There is currently no way to know whether to allocate
 	// or reallocate the buffer unless we increment fmt_bufs OUTSIDE of
@@ -107,7 +107,7 @@ static char *gsh_alloc_fmtbuf(struct gsh_parse_state *state, size_t new_len)
 	// I think a confusion came from the fact that only ONE buffer
 	// will ever exist for a token/"word". There will never be multiple.
 
-	return state->fmt_bufs[1];
+	return state->fmtbufs[1];
 }
 
 /*	Copy the token to a buffer for expansion.
@@ -271,8 +271,8 @@ static char *gsh_next_tok(struct gsh_params *params,
 	while (gsh_expand_tok(params, state))
 		;
 
-	if (state->fmt_bufs[1])
-		++state->fmt_bufs;
+	if (state->fmtbufs[1])
+		++state->fmtbufs;
 
 	++state->token_it;
 	++state->token_n;
@@ -310,9 +310,9 @@ static void gsh_parse_cmd_args(struct gsh_params *params,
 static void gsh_free_parsed(struct gsh_parse_state *state)
 {
 	// Delete substitution buffers.
-	while (*state->fmt_bufs) {
-		free(*state->fmt_bufs);
-		*state->fmt_bufs-- = NULL;
+	while (*state->fmtbufs) {
+		free(*state->fmtbufs);
+		*state->fmtbufs-- = NULL;
 	}
 
 	// Reset token list.
