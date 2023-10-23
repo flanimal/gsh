@@ -181,10 +181,9 @@ void gsh_init(struct gsh_state *sh, struct gsh_parse_bufs *parsebufs)
 	sh->inputbuf = gsh_new_inputbuf();
 	sh->hist = gsh_new_hist();
 
-	sh->shopts = GSH_OPT_DEFAULTS;
+	gsh_set_parse_state(parsebufs, &sh->parse_state);
 
-	sh->parse_bufs = gsh_init_parsebufs();
-	gsh_set_parse_state(sh->parse_bufs, &sh->parse_state);
+	sh->shopts = GSH_OPT_DEFAULTS;
 
 #ifndef NDEBUG
 	g_gsh_initialized = true;

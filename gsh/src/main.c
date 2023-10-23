@@ -6,11 +6,10 @@ int main(__attribute_maybe_unused__ int argc,
 	 __attribute_maybe_unused__ char *argv[])
 {
 	struct gsh_state sh;
-	gsh_init(&sh_state);
+	struct gsh_parse_bufs *parsebufs = gsh_new_parsebufs();
 
-	// TODO: !!! Create the parse bufs here?
-	// TODO: Use put_prompt() to print secondary prompt too,
-	// and continue to next loop iteration if more input is needed?
+	gsh_init(&sh, parsebufs);
+
 	for (;;) {
 		gsh_put_prompt(&sh);
 		

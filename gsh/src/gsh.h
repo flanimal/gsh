@@ -52,7 +52,7 @@ struct gsh_input_buf {
 struct gsh_state {
 	/* Command history. */
 	struct gsh_cmd_hist *hist;
-
+	
 	struct gsh_input_buf *inputbuf;
 
 	struct gsh_parse_state *parse_state;
@@ -71,8 +71,10 @@ struct gsh_state {
 
 const char *gsh_getenv(const struct gsh_params *params, const char *name);
 
+struct gsh_parse_bufs; // FIXME
+
 /* Set initial values and resources for the shell. */
-void gsh_init(struct gsh_state *sh);
+void gsh_init(struct gsh_state *sh, struct gsh_parse_bufs *parsebufs);
 
 /* Execute a null-terminated line of input.
  * The line will be modified by calls to `strtok`. */
@@ -87,4 +89,6 @@ void gsh_getcwd(struct gsh_state *sh);
 /*	Get a zero-terminated line of input from the terminal,
  *	excluding the newline.
  */
-bool gsh_read_line(struct gsh_input_buf *input);
+bool gsh_read_line(struct gsh_input_buf *inputbuf);
+
+struct gsh_parse_bufs *gsh_new_parsebufs();

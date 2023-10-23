@@ -5,8 +5,7 @@ struct gsh_parse_state;
 struct gsh_state;
 struct gsh_params;
 
-struct gsh_parse_bufs *gsh_init_parsebufs();
-void gsh_set_parse_state(struct gsh_parse_bufs *parse_bufs,
+void gsh_set_parse_state(struct gsh_parse_bufs *parsebufs,
 			 struct gsh_parse_state **state);
 
 size_t gsh_max_input(const struct gsh_state *sh);
