@@ -1,29 +1,31 @@
 SRC	:= $(wildcard src/*.c)
-OBJECTS := $(notdir $(SRC:.c=.o))
 
 ERRORS	:= -Werror -Wall -Wextra -pedantic-errors
 DEFINES := _GNU_SOURCE
 
 CFLAGS	:= $(ERRORS) -std=gnu11 $(addprefix -D, $(DEFINES))
 
+OBJECTS := $(notdir $(SRC:.c=.o))
+OUT	:= gsh
+
 .PHONY : all debug clean reset
 
-all : bin/gsh
+all : bin/$(OUT)
 
 debug : CFLAGS += -O0 -fno-omit-frame-pointer -g
-debug : bin/debug/gsh
+debug : bin/debug/$(OUT)
 
 clean : 
-	find -not \( -wholename bin/gsh -or -name README.md \) -delete
+	find -not \( -wholename bin/$(OUT) -or -name README.md \) -delete
 reset :
-	rm -rf obj/* bin/*
+	rm -rf obj/* bin/* src/*.d
 
 .SECONDEXPANSION:
 
 BINPATH = $$(@D)/
 OBJPATH = $$(subst bin, obj, $$(@D)/)
 
-bin/gsh bin/debug/gsh : $(addprefix $(OBJPATH), $(OBJECTS)) | $(BINPATH)
+bin/$(OUT) bin/debug/$(OUT) : $(addprefix $(OBJPATH), $(OBJECTS)) | $(BINPATH)
 	$(CC) -o $@ $^
 
 obj/%.o obj/debug/%.o : src/%.d | $(OBJPATH)
