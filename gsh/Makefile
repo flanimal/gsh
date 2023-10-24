@@ -13,16 +13,15 @@ all : bin/gsh
 debug : CFLAGS += -O0 -fno-omit-frame-pointer -g
 debug : bin/debug/gsh
 
-bin/debug/gsh : $(addprefix obj/debug/, $(OBJECTS))
-	mkdir -p $(@D)
+.SECONDEXPANSION:
+bin/gsh bin/debug/gsh : %gsh : $(addprefix $$(subst bin, obj, $$(@D)/), $(OBJECTS)) | %
 	$(CC) -o $@ $^
 
-bin/gsh : $(addprefix obj/, $(OBJECTS))
-	mkdir -p $(@D)
-	$(CC) -o $@ $^
-
-obj/%.o obj/debug/%.o : src/%.d
+obj/%.o obj/debug/%.o : src/%.d | $$(subst bin, obj, $$(@D)/)
 	$(CC) $(CFLAGS) -c src/$*.c -o $@
+
+%/ %/debug/ :
+	mkdir -p $@
 
 # STEP 1: Generate the list of included header files in the source file.
 #
