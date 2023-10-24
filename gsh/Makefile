@@ -1,19 +1,14 @@
-SRC = $(wildcard src/*.c)
-OBJECTS = $(notdir $(SRC:.c=.o))
+SRC := $(wildcard src/*.c)
+OBJECTS := $(notdir $(SRC:.c=.o))
 
-ERRORS	= -Werror -Wall -Wextra -pedantic-errors
-DEFINES = _GNU_SOURCE
+ERRORS	:= -Werror -Wall -Wextra -pedantic-errors
+DEFINES := _GNU_SOURCE
 
-CFLAGS = $(ERRORS) -std=gnu11 $(addprefix -D, $(DEFINES))
+CFLAGS := $(ERRORS) -std=gnu11 $(addprefix -D, $(DEFINES))
 
 .PHONY : all debug clean reset
 
 all : bin/gsh
-
-clean : 
-	find -not \( -wholename bin/gsh -or -name README.md \) -delete
-reset :
-	rm -rf obj/* bin/*
 
 debug : CFLAGS += -O0 -fno-omit-frame-pointer -g
 debug : bin/debug/gsh
@@ -40,3 +35,8 @@ src/%.d : src/%.c
 # These update the .d (and .o) files when the _contents of the header files_
 # have changed.
 include $(SRC:.c=.d)
+
+clean : 
+	find -not \( -wholename bin/gsh -or -name README.md \) -delete
+reset :
+	rm -rf obj/* bin/*
