@@ -29,7 +29,9 @@ static GSH_DEF_BUILTIN(gsh_echo, _, args)
 
 static GSH_DEF_BUILTIN(gsh_chdir, sh, args)
 {
-	if (chdir(args[1]) == -1) {
+	if (!args[1]) {
+		chdir(gsh_getenv(&sh->params, "HOME"));
+	} else if (chdir(args[1]) == -1) {
 		printf("%s: %s\n", args[1], strerror(errno));
 		return -1;
 	}
