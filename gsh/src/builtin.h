@@ -6,6 +6,8 @@ typedef int (*gsh_builtin_func)(struct gsh_state *, char *const *);
 
 struct gsh_builtin {
 	char *cmd;
+	char *helpstr;
+
 	gsh_builtin_func func;
 };
 

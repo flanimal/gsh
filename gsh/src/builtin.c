@@ -16,11 +16,29 @@
 GSH_DEF_BUILTIN(gsh_recall, sh, args);
 GSH_DEF_BUILTIN(gsh_list_hist, sh, args);
 
+// TODO: [ ] type builtin.
+// TODO: [ ] pwd builtin?
+// 
+// For example:
+//
+
+// 
+// When we do "help echo", for example, it should look something like this:
+// 
+//	<builtin name> : <builtin syntax>
+//	<description string>
+// 
+//	[argument description] ...
+// 
 static GSH_DEF_BUILTIN(gsh_echo, _, args)
 {
-	for (++args; *args; putchar(' '), ++args)
+	for (++args; *args; ++args) {
 		if (fputs(*args, stdout) == EOF)
 			return -1;
+
+		if (args[1])
+			putchar(' ');
+	}
 
 	putchar('\n');
 
@@ -41,42 +59,40 @@ static GSH_DEF_BUILTIN(gsh_chdir, sh, args)
 	return 0;
 }
 
+static GSH_DEF_BUILTIN(gsh_puthelp, _, __);
+
+static struct gsh_builtin builtins[] = {
+	{ "echo", "Write arguments to standard output.", gsh_echo },
+	{ "r", "Execute the Nth last line.", gsh_recall },
+	{ "cd", "Change the shell working directory.", gsh_chdir },
+	{ "hist", "Display or clear line history.", gsh_list_hist },
+	{ "help", "Display this help page.", gsh_puthelp },
+	{ "exit", "Exit the shell.", NULL },
+};
+
 static GSH_DEF_BUILTIN(gsh_puthelp, _, __)
 {
-	puts("\ngsh - GNU island shell");
-	puts("\ngsh displays the current working directory in the shell prompt :");
-	puts("\t~@ /");
-	puts("\tusr/ @");
-	puts("\t/mnt/.../repos @");
+	char dots[15];
+	memset(dots, '.', sizeof(dots));
 
-	puts("\nCommands");
-	puts("\n\t<command> [<arg>...]\tRun command or program with optional arguments.");
+	for (size_t i = 0; i < sizeof(builtins) / sizeof(*builtins); ++i) {
+		const size_t cmd_len = (size_t)printf("%s ", builtins[i].cmd);
 
-	puts("\n\tr[<n>]\tExecute the nth last line.");
-	puts("\t\tThe line will be placed in history--not the `r` invocation.");
-	puts("\t\tThe line in question will be echoed to the screen before being executed.");
+		if (cmd_len > sizeof(dots)) {
+			puts(builtins[i].helpstr);
+			continue;
+		}
 
-	puts("\nShell builtins");
-	puts("\n\texit\tExit the shell.");
-	puts("\thist\tDisplay up to 10 last lines entered, numbered.");
+		dots[sizeof(dots) - cmd_len] = '\0';
 
-	puts("\t----");
-
-	puts("\techo\tWrite to standard output.");
-	puts("\thelp\tDisplay this help page.");
-
-	putchar('\n');
+		printf("%s %s\n", dots, builtins[i].helpstr);
+		dots[sizeof(dots) - cmd_len] = '.';
+	}
 
 	return 0;
 }
 
 void gsh_set_builtins(struct hsearch_data **builtin_tbl)
 {
-	static struct gsh_builtin builtins[] = {
-		{ "echo", gsh_echo },	 { "r", gsh_recall },
-		{ "cd", gsh_chdir },	 { "hist", gsh_list_hist },
-		{ "help", gsh_puthelp },
-	};
-
 	create_hashtable(builtins, .cmd, , *builtin_tbl);
 }
