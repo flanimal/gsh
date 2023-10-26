@@ -185,7 +185,7 @@ void gsh_init(struct gsh_state *sh, const struct gsh_parse_bufs *parsebufs)
 	sh->inputbuf = gsh_new_inputbuf();
 	sh->hist = gsh_new_hist();
 
-	gsh_set_parse_state(parsebufs, &sh->parse_state);
+	gsh_set_parse_state(&sh->parse_state, parsebufs);
 
 	sh->shopts = GSH_OPT_DEFAULTS;
 
@@ -312,9 +312,10 @@ void gsh_run_cmd(struct gsh_state *sh)
 	for (char *shopt = sh->inputbuf->line; (shopt = strchr(shopt, '@'));)
 		gsh_process_opt(sh, shopt);
 
-	char **args = gsh_parse_cmd(&sh->params, sh->parse_state, &sh->inputbuf->line);
-	if (args)
-		gsh_switch(sh, sh->inputbuf->line, args);
+	char *const *argv = gsh_parse_cmd(sh->parse_state, &sh->params,
+					  &sh->inputbuf->line);
+	if (argv)
+		gsh_switch(sh, sh->inputbuf->line, argv);
 	
 	sh->inputbuf->len = 0;
 }
