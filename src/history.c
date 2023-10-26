@@ -79,6 +79,8 @@ void gsh_add_hist(struct gsh_cmd_hist *hist, size_t len, const char *line)
 		drop_hist_ent(hist, hist->oldest);
 }
 
+/* Builtins. */
+
 int gsh_list_hist(struct gsh_state *sh, char *const *args)
 {
 	if (args[1] && strcmp(args[1], "-c") == 0) {

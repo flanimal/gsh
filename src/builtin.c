@@ -9,9 +9,8 @@
 #include "history.h"
 #include "builtin.h"
 
-#define GSH_DEF_BUILTIN(name, sh_param, args_param)                     \
-	int name(__attribute_maybe_unused__ struct gsh_state *sh_param, \
-		 __attribute_maybe_unused__ char *const *args_param)
+#define GSH_DEF_BUILTIN(name, sh_param, args_param) \
+	int name(struct gsh_state *sh_param, char *const *args_param)
 
 GSH_DEF_BUILTIN(gsh_recall, sh, args);
 GSH_DEF_BUILTIN(gsh_list_hist, sh, args);
