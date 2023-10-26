@@ -37,7 +37,7 @@ struct gsh_parse_state {
 
 	size_t word_n;
 
-	char **fmtbufs;
+	char **wordbufs;
 
 	char *lineptr;
 };
@@ -71,14 +71,14 @@ void gsh_set_parse_state(struct gsh_parse_state **state, const struct gsh_parse_
 {
 	*state = malloc(sizeof(**state));
 
-	(*state)->fmtbufs = parsebufs->fmtbufs;
-	(*state)->word_it = (const char**)parsebufs->words;
+	(*state)->wordbufs = parsebufs->fmtbufs;
+	(*state)->word_it = (const char **)parsebufs->words;
 	(*state)->word_n = 0;
 }
 
-/*	Allocate and return a new format buffer.
+/*	Allocate and return a word buffer.
  */
-static char *gsh_alloc_fmtbuf(const struct gsh_parse_state *state, size_t new_len)
+static char *gsh_alloc_wordbuf(const struct gsh_parse_state *state, size_t inc)
 {
 	if (state->fmtbufs[1]) {
 		state->fmtbufs[1] = realloc(state->fmtbufs[1], new_len + 1);
@@ -113,8 +113,10 @@ static char *gsh_expand_alloc(const struct gsh_parse_state *state,
 	return fmtbuf;
 }
 
-// TODO: Pass pointer to const span.
-/*	Format a span with the given args, allocating a buffer if necessary.
+// TODO: Keep track of length of each word?
+
+/*	Format a span within a word with the given args, allocating a buffer if
+ * necessary.
  */
 static void gsh_expand_span(const struct gsh_parse_state *state,
 			    struct gsh_fmt_span span, ...)
@@ -251,21 +253,17 @@ static bool gsh_expand_word(const struct gsh_parse_state *state,
 static const char *gsh_next_word(struct gsh_parse_state *state,
 				 const struct gsh_params *params, char *line)
 {
-	char *word = strtok_r(line, WHITESPACE, &state->lineptr);
-	if (!word)
+	if (!(*state->word_it = strtok_r(line, WHITESPACE, &state->lineptr)))
 		return NULL;
 
 	while (gsh_expand_word(state, params))
-
-	while (gsh_expand_word(params, state))
 		;
 
-	if (state->fmtbufs[1])
-		++state->fmtbufs;
+	if (state->wordbufs[1])
+		++state->wordbufs;
 
-	++state->word_it;
 	++state->word_n;
-	return word;
+	return *state->word_it++;
 }
 
 /*      Parse the first word in the input line, and place
@@ -299,9 +297,9 @@ static void gsh_parse_cmd_args(struct gsh_parse_state *state,
 static void gsh_free_parsed(struct gsh_parse_state *state)
 {
 	// Delete substitution buffers.
-	while (*state->fmtbufs) {
-		free(*state->fmtbufs);
-		*state->fmtbufs-- = NULL;
+	while (*state->wordbufs) {
+		free(*state->wordbufs);
+		*state->wordbufs-- = NULL;
 	}
 
 	// Reset word list.
