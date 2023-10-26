@@ -50,7 +50,6 @@ struct gsh_fmt_span {
 	 * next special char. */
 	size_t len;
 
-	/* A copy of the word text following the span, if any. */
 	char *after;
 
 	const char *fmt_str;
@@ -115,10 +114,11 @@ static char *gsh_expand_alloc(const struct gsh_parse_state *state,
 	return fmtbuf;
 }
 
+// TODO: Pass pointer to const span.
 /*	Format a span with the given args, allocating a buffer if necessary.
  */
 static void gsh_expand_span(const struct gsh_parse_state *state,
-			    struct gsh_fmt_span *span, ...)
+			    struct gsh_fmt_span span, ...)
 {
 	va_list fmt_args;
 	va_start(fmt_args, span);
@@ -127,25 +127,25 @@ static void gsh_expand_span(const struct gsh_parse_state *state,
 	va_copy(args_cpy, fmt_args);
 
 	const int print_len =
-		vsnprintf(span->begin, span->len, span->fmt_str, args_cpy);
+		vsnprintf(span.begin, span.len, span.fmt_str, args_cpy);
 	va_end(args_cpy);
 
 	assert(print_len >= 0);
 
-	span->after = span->begin[span->len] ? strdup(span->begin + span->len) :
+	span.after = span.begin[span.len] ? strdup(span.begin + span.len) :
 					       "";
 
-	if (span->len < (size_t)print_len) {
+	if (span.len < (size_t)print_len) {
 		// Need to allocate.
-		span->begin = gsh_expand_alloc(state, span, (size_t)print_len);
-		vsprintf(span->begin, span->fmt_str, fmt_args);
+		span.begin = gsh_expand_alloc(state, &span, (size_t)print_len);
+		vsprintf(span.begin, span.fmt_str, fmt_args);
 	}
 
 	va_end(fmt_args);
-	strcpy(span->begin + print_len, span->after);
+	strcpy(span.begin + print_len, span.after);
 
-	if (strcmp(span->after, "") != 0)
-		free(span->after);
+	if (strcmp(span.after, "") != 0)
+		free(span.after);
 }
 
 /*	Substitute a variable reference with its value.
@@ -167,7 +167,7 @@ static void gsh_fmt_var(const struct gsh_params *params,
 
 	char *var_name = strndup(span->begin + 1, span->len - 1);
 
-	gsh_expand_span(state, span, gsh_getenv(params, var_name));
+	gsh_expand_span(state, *span, gsh_getenv(params, var_name));
 	free(var_name);
 }
 
@@ -185,7 +185,7 @@ static void gsh_fmt_param(const struct gsh_params *params,
 	case GSH_STATUS_PARAM:
 		span.fmt_str = "%d";
 
-		gsh_expand_span(state, &span, params->last_status);
+		gsh_expand_span(state, span, params->last_status);
 		break;
 	default:
 		span.fmt_str = "%s";
@@ -218,7 +218,7 @@ static void gsh_fmt_home(const struct gsh_params *params,
 		.fmt_str = "%s",
 	};
 
-	gsh_expand_span(state, &span, homevar);
+	gsh_expand_span(state, span, homevar);
 }
 
 /*      Expand the last word.
