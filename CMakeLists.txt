@@ -1,4 +1,4 @@
-﻿# CMakeList.txt : CMake project for CMakeProject1, include source and define
+﻿# CMakeList.txt : CMake project for gsh, include source and define
 # project specific logic here.
 #
 cmake_minimum_required (VERSION 3.8)
@@ -11,25 +11,28 @@ endif()
 
 project ("gsh")
 
+# :^)
+
 # Add source to this project's executable.
 add_executable (gsh
-	"src/builtin.c" 
 	"include/builtin.h"
-	"src/gsh.c" 
 	"include/gsh.h"
-	"src/history.c" 
 	"include/history.h"
-	"src/parse.c" 
 	"include/parse.h"
 	"include/process.h"
-	"src/special.def"
-	"src/main.c"
 	"include/params.h" 
 	"include/input.h"
+	"src/builtin.c" 
+	"src/gsh.c" 
+	"src/history.c" 
+	"src/parse.c" 
+	"src/special.def"
+	"src/main.c"
 )
 
-add_compile_definitions(_GNU_SOURCE)
+target_compile_definitions(gsh PRIVATE _GNU_SOURCE)
 target_include_directories(gsh PRIVATE "include/")
+target_compile_options(gsh PRIVATE -Werror -Wall -Wextra -Wno-unused-parameter -pedantic-errors)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET gsh PROPERTY CXX_STANDARD 20)
