@@ -33,11 +33,11 @@ enum gsh_shopt_flags {
 
 struct gsh_state {
 	/* Command history. */
-	struct gsh_cmd_hist *hist;
+	const struct gsh_cmd_hist *hist;
 	
-	struct gsh_input_buf *inputbuf;
+	const struct gsh_input_buf *inputbuf;
 
-	struct gsh_parse_state *parse_state;
+	const struct gsh_parse_state *parse_state;
 
 	/* Current working directory of the shell process. */
 	char *cwd;
