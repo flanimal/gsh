@@ -29,6 +29,7 @@ add_executable (gsh
 )
 
 add_compile_definitions(_GNU_SOURCE)
+target_include_directories(gsh PRIVATE "include/")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET gsh PROPERTY CXX_STANDARD 20)
