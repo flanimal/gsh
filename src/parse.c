@@ -50,8 +50,6 @@ struct gsh_fmt_span {
 	 * next special char. */
 	size_t len;
 
-	char *after;
-
 	const char *fmt_str;
 };
 
@@ -80,37 +78,14 @@ void gsh_set_parse_state(struct gsh_parse_state **state, const struct gsh_parse_
  */
 static char *gsh_alloc_wordbuf(const struct gsh_parse_state *state, size_t inc)
 {
-	if (state->fmtbufs[1]) {
-		state->fmtbufs[1] = realloc(state->fmtbufs[1], new_len + 1);
-	} else {
-		state->fmtbufs[1] = malloc(new_len + 1);
-		strcpy(state->fmtbufs[1], *state->word_it);
-	}
-	// There is currently no way to know whether to allocate
-	// or reallocate the buffer unless we increment fmt_bufs OUTSIDE of
-	// expand_tok().
-	// I think a confusion came from the fact that only ONE buffer
-	// will ever exist for a token/"word". There will never be multiple.
+	const size_t new_len = strlen(*state->word_it) + inc;
 
-	return state->fmtbufs[1];
-}
+	char *newbuf = realloc(state->wordbufs[1], new_len + 1);
+	if (!state->wordbufs[1])
+		strcpy(newbuf, *state->word_it);
 
-/*	Copy the word to a buffer for expansion.
- */
-static char *gsh_expand_alloc(const struct gsh_parse_state *state,
-			      const struct gsh_fmt_span *span, size_t print_len)
-{
-	span->begin[0] = '\0';
-
-	const size_t before_len = strlen(*state->word_it);
-
-	char *fmtbuf = gsh_alloc_fmtbuf(state, before_len + print_len +
-						       strlen(span->after));
-
-	*state->word_it = fmtbuf;
-	fmtbuf += before_len;
-
-	return fmtbuf;
+	*state->word_it = newbuf;
+	return (state->wordbufs[1] = newbuf);
 }
 
 // TODO: Keep track of length of each word?
@@ -119,7 +94,7 @@ static char *gsh_expand_alloc(const struct gsh_parse_state *state,
  * necessary.
  */
 static void gsh_expand_span(const struct gsh_parse_state *state,
-			    struct gsh_fmt_span span, ...)
+			    struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
 	va_start(fmt_args, span);
@@ -127,26 +102,30 @@ static void gsh_expand_span(const struct gsh_parse_state *state,
 	va_list args_cpy;
 	va_copy(args_cpy, fmt_args);
 
-	const int print_len =
-		vsnprintf(span.begin, span.len, span.fmt_str, args_cpy);
+	const int print_len = vsnprintf(NULL, 0, span->fmt_str, args_cpy);
 	va_end(args_cpy);
 
 	assert(print_len >= 0);
 
-	span.after = span.begin[span.len] ? strdup(span.begin + span.len) :
-					       "";
-
-	if (span.len < (size_t)print_len) {
+	if (span->len < (size_t)print_len) {
 		// Need to allocate.
-		span.begin = gsh_expand_alloc(state, &span, (size_t)print_len);
-		vsprintf(span.begin, span.fmt_str, fmt_args);
+		char *after = strdup(span->begin + span->len);
+
+		const size_t before_len =
+			(size_t)(span->begin - *state->word_it);
+
+		span->begin = gsh_alloc_wordbuf(state, print_len - span->len) +
+			      before_len;
+
+		vsprintf(span->begin, span->fmt_str, fmt_args);
+		strcpy(span->begin + print_len, after);
+
+		free(after);
+	} else {
+		vsprintf(span->begin, span->fmt_str, fmt_args);
 	}
 
 	va_end(fmt_args);
-	strcpy(span.begin + print_len, span.after);
-
-	if (strcmp(span.after, "") != 0)
-		free(span.after);
 }
 
 /*	Substitute a variable reference with its value.
@@ -168,7 +147,7 @@ static void gsh_fmt_var(const struct gsh_parse_state *state,
 
 	char *var_name = strndup(span->begin + 1, span->len - 1);
 
-	gsh_expand_span(state, *span, gsh_getenv(params, var_name));
+	gsh_expand_span(state, span, gsh_getenv(params, var_name));
 	free(var_name);
 }
 
@@ -187,7 +166,7 @@ static void gsh_fmt_param(const struct gsh_parse_state *state,
 	case GSH_STATUS_PARAM:
 		span.fmt_str = "%d";
 
-		gsh_expand_span(state, span, params->last_status);
+		gsh_expand_span(state, &span, params->last_status);
 		break;
 	default:
 		span.fmt_str = "%s";
@@ -220,7 +199,7 @@ static void gsh_fmt_home(const struct gsh_parse_state *state,
 		.fmt_str = "%s",
 	};
 
-	gsh_expand_span(state, span, homevar);
+	gsh_expand_span(state, &span, homevar);
 }
 
 /*      Expand the last word.
