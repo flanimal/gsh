@@ -14,9 +14,9 @@
 	do {                                                                   \
 		hcreate_r(sizeof(elems) / sizeof(*elems),                      \
 			  (tbl = calloc(1, sizeof(*tbl))));                    \
-                                                                               \
+									       \
 		ENTRY *_result;                                                \
-                                                                               \
+									       \
 		for (size_t _i = 0; _i < sizeof(elems) / sizeof(*elems); ++_i) \
 			hsearch_r((ENTRY){ .key = elems[_i] m_key,             \
 					   .data = &elems[_i] m_data },        \
@@ -33,11 +33,11 @@ enum gsh_shopt_flags {
 
 struct gsh_state {
 	/* Command history. */
-	const struct gsh_cmd_hist *hist;
+	struct gsh_cmd_hist *hist;
 	
-	const struct gsh_input_buf *inputbuf;
+	struct gsh_input_buf *inputbuf;
 
-	const struct gsh_parse_state *parse_state;
+	struct gsh_parse_state *parse_state;
 
 	/* Current working directory of the shell process. */
 	char *cwd;
@@ -57,7 +57,7 @@ struct gsh_parse_bufs *gsh_new_parsebufs();
 
 /*	Set initial values and resources for the shell. 
  */
-void gsh_init(struct gsh_state *sh, struct gsh_parse_bufs *parsebufs);
+void gsh_init(struct gsh_state *sh, const struct gsh_parse_bufs *parsebufs);
 
 /*	Get a zero-terminated line of input from the terminal,
  *	excluding the newline.
