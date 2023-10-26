@@ -13,14 +13,19 @@ project ("gsh")
 
 # Add source to this project's executable.
 add_executable (gsh
-	"src/builtin.c" "src/builtin.h"
-	"src/gsh.c" "src/gsh.h"
-	"src/history.c" "src/history.h"
-	"src/parse.c" "src/parse.h"
-	"src/process.h"
+	"src/builtin.c" 
+	"include/builtin.h"
+	"src/gsh.c" 
+	"include/gsh.h"
+	"src/history.c" 
+	"include/history.h"
+	"src/parse.c" 
+	"include/parse.h"
+	"include/process.h"
 	"src/special.def"
 	"src/main.c"
-	"src/params.h" "src/input.h"
+	"include/params.h" 
+	"include/input.h"
 )
 
 add_compile_definitions(_GNU_SOURCE)
