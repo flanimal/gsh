@@ -17,4 +17,6 @@ int main(int argc, char *argv[])
 
 		gsh_run_cmd(&sh);
 	}
+
+	return 0;
 }
