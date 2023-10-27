@@ -284,24 +284,26 @@ static void gsh_free_parsed(struct gsh_parse_state *state)
 }
 
 // TODO: "while" builtin.
-char *const *gsh_parse_cmd(struct gsh_parse_state *parse_state,
-			   const struct gsh_params *params, char **line)
+struct gsh_parsed_cmd gsh_parse_cmd(struct gsh_parse_state *parse_state,
+			   const struct gsh_params *params, char *line)
 {
-	if ((*line)[0] == '\0')
-		return NULL;
+	struct gsh_parsed_cmd cmd = { 0 };
+
+	if (line[0] == '\0')
+		return cmd;
 
 	gsh_free_parsed(parse_state);
-	parse_state->lineptr = *line;
+	parse_state->lineptr = line;
 
-	char *const *ret_argv = (char *const *)parse_state->word_it;
+	cmd.argv = (char *const *)parse_state->word_it;
 
 	if (!gsh_parse_filename(parse_state, params))
-		return NULL;
+		return cmd;
 
 	gsh_parse_cmd_args(parse_state, params);
 
 	// Skip any whitespace preceding pathname.
-	*line += strspn(*line, WHITESPACE);
+	cmd.pathname = line + strspn(line, WHITESPACE);
 
-	return ret_argv;
+	return cmd;
 }

@@ -87,8 +87,7 @@ void gsh_put_prompt(const struct gsh_state *sh)
 		return;
 	}
 
-	const bool in_home = strncmp(sh->cwd,
-				     gsh_getenv(&sh->params, "HOME"),
+	const bool in_home = strncmp(sh->cwd, gsh_getenv(&sh->params, "HOME"),
 				     sh->params.home_len) == 0;
 
 	printf((in_home) ? GSH_WORKDIR_PROMPT("~%s") : GSH_WORKDIR_PROMPT("%s"),
@@ -124,6 +123,7 @@ void gsh_getcwd(struct gsh_state *sh)
 	sh->max_path = pathconf(sh->cwd, _PC_PATH_MAX);
 }
 
+// FIXME: Clean up the encapsulation here.
 /*	The maximum length of an input line on the terminal
  *	that will currently be accepted, not including the newline
  *	or null byte.
@@ -264,9 +264,9 @@ static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 	if (valstr && isalpha(valstr[1])) {
 		*valstr++ = '\0';
 
-		const int val = (strncmp(valstr, "on", 2) == 0)  ? true :
+		const int val = (strncmp(valstr, "on", 2) == 0)	 ? true :
 				(strncmp(valstr, "off", 3) == 0) ? false :
-									-1;
+								   -1;
 		if (val != -1) {
 			after = strpbrk(valstr, WHITESPACE);
 			gsh_set_opt(sh, shopt_ch + 1, val);
@@ -298,25 +298,29 @@ void gsh_run_cmd(struct gsh_state *sh)
 	// NOTE: Because this occurs before any other parsing or tokenizing,
 	// it means that "@" characters will be interpreted as shell options
 	// even inside quotes.
-	// 
+	//
 	// The solution might be to only count words _beginning with_ the '@'
 	// character as option assignments.
-	// So, 
+	// So,
 	//	If '@' occurs at beginning of line, OR
-	//	If '@' occurs immediately after whitespace (beginning of new word)
-	// Except that won't necessarily work -- what if the '@' follows whitespace,
-	// but within quotes? It will still be processed.
+	//	If '@' occurs immediately after whitespace (beginning of new
+	//word)
+	// Except that won't necessarily work -- what if the '@' follows
+	// whitespace, but within quotes? It will still be processed.
 	//
-	// The _real_ solution might be that we have to split the line into words
-	// separately from parsing them. Split first, then process options, then parse.
+	// The _real_ solution might be that we have to split the line into
+	// words separately from parsing them. Split first, then process
+	// options, then parse.
 	//
 	for (char *shopt = sh->inputbuf->line; (shopt = strchr(shopt, '@'));)
 		gsh_process_opt(sh, shopt);
 
-	char *const *argv = gsh_parse_cmd(sh->parse_state, &sh->params,
-					  &sh->inputbuf->line);
-	if (argv)
-		gsh_switch(sh, sh->inputbuf->line, argv);
-	
+	struct gsh_parsed_cmd cmd =
+		gsh_parse_cmd(sh->parse_state, &sh->params, sh->inputbuf->line);
+
+	if (cmd.argv)
+		// Skip any whitespace preceding pathname.
+		gsh_switch(sh, cmd.pathname, cmd.argv);
+
 	sh->inputbuf->len = 0;
 }
