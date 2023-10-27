@@ -5,16 +5,10 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <assert.h>
 
 #include "input.h"
 
 #define GSH_SECOND_PROMPT "> "
-
-// TODO: Should this be declared (as extern) in gsh.h?
-#ifndef NDEBUG
-extern bool g_gsh_initialized;
-#endif
 
 struct gsh_input_buf *gsh_new_inputbuf()
 {
@@ -58,8 +52,6 @@ static bool gsh_replace_linebrk(char *line)
 
 bool gsh_read_line(struct gsh_input_buf *inputbuf)
 {
-	assert(g_gsh_initialized);
-
 	char *const line_it = inputbuf->line + inputbuf->len;
 
 	// TODO: fgets() or getline()?
