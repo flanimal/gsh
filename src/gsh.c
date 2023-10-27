@@ -144,21 +144,21 @@ static int gsh_exec(char *pathname, char *const *args)
 	exit(GSH_EXIT_NOTFOUND);
 }
 
-static void gsh_switch(struct gsh_state *sh, struct gsh_parsed_cmd cmd)
+static void gsh_switch(struct gsh_state *sh, struct gsh_parsed_cmd *cmd)
 {
-	if (cmd.argc == 0)
+	if (cmd->argc == 0)
 		return;
 
-	if (strcmp(cmd.argv[0], "exit") == 0)
+	if (strcmp(cmd->argv[0], "exit") == 0)
 		exit(EXIT_SUCCESS);
 
 	ENTRY *builtin;
-	if (hsearch_r((ENTRY){ .key = cmd.argv[0] }, FIND, &builtin,
+	if (hsearch_r((ENTRY){ .key = cmd->argv[0] }, FIND, &builtin,
 		      sh->builtin_tbl))
 		sh->params.last_status =
-			GSH_BUILTIN_FUNC(builtin)(sh, cmd.argc, cmd.argv);
+			GSH_BUILTIN_FUNC(builtin)(sh, cmd->argc, cmd->argv);
 	else
-		sh->params.last_status = gsh_exec(cmd.pathname, cmd.argv);
+		sh->params.last_status = gsh_exec(cmd->pathname, cmd->argv);
 }
 
 static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)

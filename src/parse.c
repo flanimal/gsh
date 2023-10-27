@@ -17,29 +17,16 @@
 #define unreachable() __assume(0)
 #endif
 
-/*
- *	The maximum number of arguments that can be passed on the command line,
- * 	including the filename.
- */
-#define GSH_MAX_ARGS 64
-
-struct gsh_parse_bufs {
-	/* List of words to be returned from parsing. */
-	char *words[GSH_MAX_ARGS];
-
-	/* Stack of buffers for words that contain substitutions,
-	 * with an additional pointer for the NULL sentinel.
-	 */
-	char *fmtbufs[GSH_MAX_ARGS + 1];
-};
-
 struct gsh_parse_state {
 	/* Iterator pointing to the word currently being parsed. */
 	const char **word_it;
 
 	size_t word_n;
 
-	char **wordbufs;
+	/* Stack of buffers for words that contain substitutions,
+	 * with an additional pointer for the NULL sentinel.
+	 */
+	char *wordbufs[GSH_MAX_ARGS + 1];
 
 	char *lineptr;
 };
@@ -55,13 +42,13 @@ struct gsh_fmt_span {
 	const char *fmt_str;
 };
 
-struct gsh_parse_bufs *gsh_new_parsebufs()
+struct gsh_parsed_cmd *gsh_new_parsebufs()
 {
-	return calloc(1, sizeof(struct gsh_parse_bufs));
+	return calloc(1, sizeof(struct gsh_parsed_cmd));
 }
 
 void gsh_set_parse_state(struct gsh_parse_state **state,
-			 struct gsh_parse_bufs *parsebufs)
+			 struct gsh_parsed_cmd *parsebufs)
 {
 	*state = malloc(sizeof(**state));
 
@@ -283,8 +270,9 @@ static void gsh_free_parsed(struct gsh_parse_state *state)
 		*(--state->word_it) = NULL;
 }
 
+// FIXME: X(Idea) Pass line as the initial first element of parsed_cmd::argv?
 // TODO: "while" builtin.
-struct gsh_parsed_cmd gsh_parse_cmd(struct gsh_parse_state *parse_state,
+struct gsh_parsed_cmd *gsh_parse_cmd(struct gsh_parse_state *parse_state,
 			   const struct gsh_params *params, char *line)
 {
 	struct gsh_parsed_cmd cmd = { 0 };
