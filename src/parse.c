@@ -302,6 +302,8 @@ struct gsh_parsed_cmd gsh_parse_cmd(struct gsh_parse_state *parse_state,
 
 	gsh_parse_cmd_args(parse_state, params);
 
+	cmd.argc = parse_state->word_n;
+
 	// Skip any whitespace preceding pathname.
 	cmd.pathname = line + strspn(line, WHITESPACE);
 

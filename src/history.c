@@ -81,9 +81,9 @@ void gsh_add_hist(struct gsh_cmd_hist *hist, size_t len, const char *line)
 
 /* Builtins. */
 
-int gsh_list_hist(struct gsh_state *sh, char *const *args)
+int gsh_list_hist(struct gsh_state *sh, int argc, char *const *argv)
 {
-	if (args[1] && strcmp(args[1], "-c") == 0) {
+	if (argc > 1 && strcmp(argv[1], "-c") == 0) {
 		while (sh->hist->count > 0)
 			drop_hist_ent(sh->hist, sh->hist->oldest);
 
@@ -102,9 +102,9 @@ int gsh_list_hist(struct gsh_state *sh, char *const *args)
 }
 
 /* Re-run the n-th previous line of input. */
-int gsh_recall(struct gsh_state *sh, char *const *args)
+int gsh_recall(struct gsh_state *sh, int argc, char *const *argv)
 {
-	int n = (args[1]) ? atoi(args[1]) : 1;
+	int n = (argv[1]) ? atoi(argv[1]) : 1;
 
 	if (0 >= n || sh->hist->count < n) {
 		gsh_bad_cmd("no matching history entry", 0);

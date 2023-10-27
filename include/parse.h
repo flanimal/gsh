@@ -8,6 +8,8 @@ struct gsh_params;
 
 struct gsh_parsed_cmd {
 	char *pathname;
+	
+	int argc;
 	char *const *argv;
 };
 

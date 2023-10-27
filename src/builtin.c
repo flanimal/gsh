@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
+#include <getopt.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -10,11 +11,8 @@
 #include "history.h"
 #include "builtin.h"
 
-#define GSH_DEF_BUILTIN(name, sh_param, args_param) \
-	int name(struct gsh_state *sh_param, char *const *args_param)
-
-GSH_DEF_BUILTIN(gsh_recall, sh, args);
-GSH_DEF_BUILTIN(gsh_list_hist, sh, args);
+int gsh_recall(struct gsh_state *sh, int argc, char *const *args);
+int gsh_list_hist(struct gsh_state *sh, int argc, char *const *args);
 
 // TODO: [ ] pwd builtin? Use for prompt as well?
 //
@@ -29,13 +27,13 @@ GSH_DEF_BUILTIN(gsh_list_hist, sh, args);
 //
 //	[argument description] ...
 //
-static GSH_DEF_BUILTIN(gsh_echo, _, args)
+static int gsh_echo(struct gsh_state *sh, int argc, char *const *argv)
 {
-	for (++args; *args; ++args) {
-		if (fputs(*args, stdout) == EOF)
+	for (++argv; *argv; ++argv) {
+		if (fputs(*argv, stdout) == EOF)
 			return -1;
 
-		if (args[1])
+		if (argv[1])
 			putchar(' ');
 	}
 
@@ -44,22 +42,23 @@ static GSH_DEF_BUILTIN(gsh_echo, _, args)
 	return 0;
 }
 
-static GSH_DEF_BUILTIN(gsh_type, sh, args)
+static int gsh_type(struct gsh_state *sh, int argc, char *const *argv)
 {
-	if (!args[2] || strcmp(args[2], "-f") != 0) {
+	// FIXME: Don't depend on order of arguments and switches.
+	if (argc < 3 || strcmp(argv[2], "-f") != 0) {
 		ENTRY *builtin;
-		if (hsearch_r((ENTRY){ .key = args[1] }, FIND, &builtin,
+		if (hsearch_r((ENTRY){ .key = argv[1] }, FIND, &builtin,
 			      sh->builtin_tbl)) {
-			printf("%s: builtin\n", args[1]);
+			printf("%s: builtin\n", argv[1]);
 			return 0;
 		}
 	}
 
 	struct stat st;
 
-	if (strchr(args[1], '/') && stat(args[1], &st) == 0 &&
+	if (strchr(argv[1], '/') && stat(argv[1], &st) == 0 &&
 	    (st.st_mode & 0111)) {
-		puts(args[1]);
+		puts(argv[1]);
 		return 0;
 	}
 
@@ -70,10 +69,10 @@ static GSH_DEF_BUILTIN(gsh_type, sh, args)
 		const size_t path_len = strcspn(path_it, ":");
 
 		snprintf(stpncpy(pathname, path_it, path_len),
-			 sh->max_path - path_len, "/%s", args[1]);
+			 sh->max_path - path_len, "/%s", argv[1]);
 
 		if (stat(pathname, &st) == 0 && (st.st_mode & 0111)) {
-			printf("%s: %s\n", args[1], pathname);
+			printf("%s: %s\n", argv[1], pathname);
 			return 0;
 		}
 
@@ -82,16 +81,16 @@ static GSH_DEF_BUILTIN(gsh_type, sh, args)
 			break;
 	}
 
-	printf("%s: not found\n", args[1]);
+	printf("%s: not found\n", argv[1]);
 	return -1;
 }
 
-static GSH_DEF_BUILTIN(gsh_chdir, sh, args)
+static int gsh_chdir(struct gsh_state *sh, int argc, char *const *argv)
 {
-	if (!args[1]) {
+	if (argc == 1) {
 		chdir(gsh_getenv(&sh->params, "HOME"));
-	} else if (chdir(args[1]) == -1) {
-		printf("%s: %s\n", args[1], strerror(errno));
+	} else if (chdir(argv[1]) == -1) {
+		printf("%s: %s\n", argv[1], strerror(errno));
 		return -1;
 	}
 
@@ -100,7 +99,7 @@ static GSH_DEF_BUILTIN(gsh_chdir, sh, args)
 	return 0;
 }
 
-static GSH_DEF_BUILTIN(gsh_puthelp, _, __);
+static int gsh_puthelp(struct gsh_state *sh, int argc, char *const *argv);
 
 static struct gsh_builtin builtins[] = {
 	{ "echo", "Write arguments to standard output.", gsh_echo },
@@ -112,7 +111,7 @@ static struct gsh_builtin builtins[] = {
 	{ "exit", "Exit the shell.", NULL },
 };
 
-static GSH_DEF_BUILTIN(gsh_puthelp, _, __)
+static int gsh_puthelp(struct gsh_state *sh, int argc, char *const *argv)
 {
 	char dots[15];
 	memset(dots, '.', sizeof(dots));

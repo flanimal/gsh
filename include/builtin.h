@@ -2,7 +2,7 @@
 
 #include "process.h"
 
-typedef int (*gsh_builtin_func)(struct gsh_state *, char *const *);
+typedef int (*gsh_builtin_func)(struct gsh_state *, int, char *const *);
 
 struct gsh_builtin {
 	char *cmd;

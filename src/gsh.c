@@ -144,18 +144,21 @@ static int gsh_exec(char *pathname, char *const *args)
 	exit(GSH_EXIT_NOTFOUND);
 }
 
-static void gsh_switch(struct gsh_state *sh, char *pathname, char *const *args)
+static void gsh_switch(struct gsh_state *sh, struct gsh_parsed_cmd cmd)
 {
-	// TODO: Should check for atl one argument be done in here?
-	if (strcmp(args[0], "exit") == 0)
+	if (cmd.argc == 0)
+		return;
+
+	if (strcmp(cmd.argv[0], "exit") == 0)
 		exit(EXIT_SUCCESS);
 
 	ENTRY *builtin;
-	if (hsearch_r((ENTRY){ .key = args[0] }, FIND, &builtin,
+	if (hsearch_r((ENTRY){ .key = cmd.argv[0] }, FIND, &builtin,
 		      sh->builtin_tbl))
-		sh->params.last_status = GSH_BUILTIN_FUNC(builtin)(sh, args);
+		sh->params.last_status =
+			GSH_BUILTIN_FUNC(builtin)(sh, cmd.argc, cmd.argv);
 	else
-		sh->params.last_status = gsh_exec(pathname, args);
+		sh->params.last_status = gsh_exec(cmd.pathname, cmd.argv);
 }
 
 static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
@@ -236,7 +239,7 @@ void gsh_run_cmd(struct gsh_state *sh)
 	// So,
 	//	If '@' occurs at beginning of line, OR
 	//	If '@' occurs immediately after whitespace (beginning of new
-	//word)
+	// word)
 	// Except that won't necessarily work -- what if the '@' follows
 	// whitespace, but within quotes? It will still be processed.
 	//
@@ -247,12 +250,8 @@ void gsh_run_cmd(struct gsh_state *sh)
 	for (char *shopt = sh->inputbuf->line; (shopt = strchr(shopt, '@'));)
 		gsh_process_opt(sh, shopt);
 
-	struct gsh_parsed_cmd cmd =
-		gsh_parse_cmd(sh->parse_state, &sh->params, sh->inputbuf->line);
-
-	if (cmd.argv)
-		// Skip any whitespace preceding pathname.
-		gsh_switch(sh, cmd.pathname, cmd.argv);
+	gsh_switch(sh, gsh_parse_cmd(sh->parse_state, &sh->params,
+				     sh->inputbuf->line));
 
 	sh->inputbuf->len = 0;
 }
