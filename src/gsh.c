@@ -83,7 +83,7 @@ void gsh_put_prompt(const struct gsh_state *sh)
 					255);
 
 	if (!(sh->shopts & GSH_OPT_PROMPT_WORKDIR)) {
-		printf(GSH_PROMPT);
+		fputs(GSH_PROMPT, stdout);
 		return;
 	}
 
@@ -162,12 +162,13 @@ static void gsh_set_shopts(struct hsearch_data **shopt_tbl)
 
 static struct gsh_input_buf *gsh_new_inputbuf()
 {
-	struct gsh_input_buf *input = malloc(sizeof(*input));
 	// Get maximum length of terminal input line.
-	input->max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
+	const long max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
 
+	// FIXME: Does _PC_MAX_INPUT include the newline??
 	// Max input line length + newline + null byte.
-	input->line = malloc((size_t)input->max_input + 2);
+	struct gsh_input_buf *input = malloc(sizeof(*input) + max_input + 2);
+	input->max_input = max_input;
 
 	return input;
 }
