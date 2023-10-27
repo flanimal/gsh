@@ -16,19 +16,19 @@
 GSH_DEF_BUILTIN(gsh_recall, sh, args);
 GSH_DEF_BUILTIN(gsh_list_hist, sh, args);
 
-// TODO: [ ] pwd builtin?
-// 
+// TODO: [ ] pwd builtin? Use for prompt as well?
+//
 // For example:
 //
 
-// 
+//
 // When we do "help echo", for example, it should look something like this:
-// 
+//
 //	<builtin name> : <builtin syntax>
 //	<description string>
-// 
+//
 //	[argument description] ...
-// 
+//
 static GSH_DEF_BUILTIN(gsh_echo, _, args)
 {
 	for (++args; *args; ++args) {
@@ -46,30 +46,33 @@ static GSH_DEF_BUILTIN(gsh_echo, _, args)
 
 static GSH_DEF_BUILTIN(gsh_type, sh, args)
 {
-	ENTRY *builtin;
-	if (hsearch_r((ENTRY){ .key = args[1] }, FIND, &builtin,
-		      sh->builtin_tbl)) {
-		printf("%s: builtin\n", args[1]);
-		return 0;
+	if (!args[2] || strcmp(args[2], "-f") != 0) {
+		ENTRY *builtin;
+		if (hsearch_r((ENTRY){ .key = args[1] }, FIND, &builtin,
+			      sh->builtin_tbl)) {
+			printf("%s: builtin\n", args[1]);
+			return 0;
+		}
 	}
 
 	struct stat st;
 
-	if (strchr(args[1], '/') && stat(args[1], &st) == 0) {
+	if (strchr(args[1], '/') && stat(args[1], &st) == 0 &&
+	    (st.st_mode & 0111)) {
 		puts(args[1]);
 		return 0;
 	}
 
 	char *pathname = malloc(sh->max_path);
 
-	for (const char *path_it = gsh_getenv(&sh->params, "PATH");
-		path_it;  ++path_it) {
+	for (const char *path_it = gsh_getenv(&sh->params, "PATH"); path_it;
+	     ++path_it) {
 		const size_t path_len = strcspn(path_it, ":");
 
 		snprintf(stpncpy(pathname, path_it, path_len),
-				sh->max_path - path_len, "/%s", args[1]);
+			 sh->max_path - path_len, "/%s", args[1]);
 
-		if (stat(pathname, &st) == 0) {
+		if (stat(pathname, &st) == 0 && (st.st_mode & 0111)) {
 			printf("%s: %s\n", args[1], pathname);
 			return 0;
 		}
@@ -105,7 +108,7 @@ static struct gsh_builtin builtins[] = {
 	{ "cd", "Change the shell working directory.", gsh_chdir },
 	{ "hist", "Display or clear line history.", gsh_list_hist },
 	{ "help", "Display this help page.", gsh_puthelp },
-	{ "type", "Display what program or builtin would be executed by the specified command.", gsh_type },
+	{ "type", "Display command type and location.", gsh_type },
 	{ "exit", "Exit the shell.", NULL },
 };
 
