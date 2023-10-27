@@ -22,13 +22,14 @@ add_executable (gsh
 	"include/process.h"
 	"include/params.h" 
 	"include/input.h"
+	"src/input.c"
 	"src/builtin.c" 
 	"src/gsh.c" 
 	"src/history.c" 
 	"src/parse.c" 
 	"src/special.def"
 	"src/main.c"
-)
+ "src/input.c")
 
 target_compile_definitions(gsh PRIVATE _GNU_SOURCE)
 target_include_directories(gsh PRIVATE "include/")

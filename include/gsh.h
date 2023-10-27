@@ -60,12 +60,7 @@ struct gsh_parse_bufs *gsh_new_parsebufs();
  */
 void gsh_init(struct gsh_state *sh, struct gsh_parse_bufs *parsebufs);
 
-/*	Get a zero-terminated line of input from the terminal,
- *	excluding the newline.
- */
-bool gsh_read_line(struct gsh_input_buf *inputbuf);
-
-/*	Execute a null-terminated line of input.
+/*	Execute a zero-terminated line of input.
  */
 void gsh_run_cmd(struct gsh_state *sh);
 
