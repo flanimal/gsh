@@ -172,7 +172,7 @@ static struct gsh_input_buf *gsh_new_inputbuf()
 	return input;
 }
 
-void gsh_init(struct gsh_state *sh, const struct gsh_parse_bufs *parsebufs)
+void gsh_init(struct gsh_state *sh, struct gsh_parse_bufs *parsebufs)
 {
 	gsh_set_builtins(&sh->builtin_tbl);
 	gsh_set_shopts(&sh->shopt_tbl);

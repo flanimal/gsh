@@ -51,13 +51,14 @@ struct gsh_state {
 	struct hsearch_data *builtin_tbl;
 };
 
+// FIXME: Move somewhere else.
 struct gsh_parse_bufs;
 
 struct gsh_parse_bufs *gsh_new_parsebufs();
 
 /*	Set initial values and resources for the shell. 
  */
-void gsh_init(struct gsh_state *sh, const struct gsh_parse_bufs *parsebufs);
+void gsh_init(struct gsh_state *sh, struct gsh_parse_bufs *parsebufs);
 
 /*	Get a zero-terminated line of input from the terminal,
  *	excluding the newline.

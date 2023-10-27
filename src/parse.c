@@ -25,10 +25,12 @@
 
 struct gsh_parse_bufs {
 	/* List of words to be returned from parsing. */
-	char **words;
+	char *words[GSH_MAX_ARGS];
 
-	/* Stack of buffers for words that contain substitutions. */
-	char **fmtbufs;
+	/* Stack of buffers for words that contain substitutions,
+	 * with an additional pointer for the NULL sentinel.
+	 */
+	char *fmtbufs[GSH_MAX_ARGS + 1];
 };
 
 struct gsh_parse_state {
@@ -55,17 +57,11 @@ struct gsh_fmt_span {
 
 struct gsh_parse_bufs *gsh_new_parsebufs()
 {
-	struct gsh_parse_bufs *parsebufs = malloc(sizeof(*parsebufs));
-
-	parsebufs->words = calloc(GSH_MAX_ARGS, sizeof(char *));
-
-	// MAX_ARGS plus sentinel.
-	parsebufs->fmtbufs = calloc(GSH_MAX_ARGS + 1, sizeof(char *));
-
-	return parsebufs;
+	return calloc(1, sizeof(struct gsh_parse_bufs));
 }
 
-void gsh_set_parse_state(struct gsh_parse_state **state, const struct gsh_parse_bufs *parsebufs)
+void gsh_set_parse_state(struct gsh_parse_state **state,
+			 struct gsh_parse_bufs *parsebufs)
 {
 	*state = malloc(sizeof(**state));
 
@@ -232,7 +228,8 @@ static bool gsh_expand_word(const struct gsh_parse_state *state,
 static const char *gsh_next_word(struct gsh_parse_state *state,
 				 const struct gsh_params *params, char *line)
 {
-	if (!(*state->word_it = strtok_r(line, WHITESPACE, &state->lineptr)))
+	*state->word_it = strtok_r(line, WHITESPACE, &state->lineptr);
+	if (!(*state->word_it))
 		return NULL;
 
 	while (gsh_expand_word(state, params))
