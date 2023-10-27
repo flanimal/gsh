@@ -51,7 +51,6 @@ struct gsh_state {
 	struct hsearch_data *builtin_tbl;
 };
 
-// FIXME: Move somewhere else?
 struct gsh_parse_bufs;
 
 struct gsh_parse_bufs *gsh_new_parsebufs();

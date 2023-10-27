@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -15,7 +16,6 @@
 GSH_DEF_BUILTIN(gsh_recall, sh, args);
 GSH_DEF_BUILTIN(gsh_list_hist, sh, args);
 
-// TODO: [ ] type builtin.
 // TODO: [ ] pwd builtin?
 // 
 // For example:
@@ -44,6 +44,45 @@ static GSH_DEF_BUILTIN(gsh_echo, _, args)
 	return 0;
 }
 
+static GSH_DEF_BUILTIN(gsh_type, sh, args)
+{
+	ENTRY *builtin;
+	if (hsearch_r((ENTRY){ .key = args[1] }, FIND, &builtin,
+		      sh->builtin_tbl)) {
+		printf("%s: builtin\n", args[1]);
+		return 0;
+	}
+
+	struct stat st;
+
+	if (strchr(args[1], '/') && stat(args[1], &st) == 0) {
+		puts(args[1]);
+		return 0;
+	}
+
+	char *pathname = malloc(sh->max_path);
+
+	for (const char *path_it = gsh_getenv(&sh->params, "PATH");
+		path_it;  ++path_it) {
+		const size_t path_len = strcspn(path_it, ":");
+
+		snprintf(stpncpy(pathname, path_it, path_len),
+				sh->max_path - path_len, "/%s", args[1]);
+
+		if (stat(pathname, &st) == 0) {
+			printf("%s: %s\n", args[1], pathname);
+			return 0;
+		}
+
+		path_it = strchr(path_it + 1, ':');
+		if (!path_it)
+			break;
+	}
+
+	printf("%s: not found\n", args[1]);
+	return -1;
+}
+
 static GSH_DEF_BUILTIN(gsh_chdir, sh, args)
 {
 	if (!args[1]) {
@@ -66,6 +105,7 @@ static struct gsh_builtin builtins[] = {
 	{ "cd", "Change the shell working directory.", gsh_chdir },
 	{ "hist", "Display or clear line history.", gsh_list_hist },
 	{ "help", "Display this help page.", gsh_puthelp },
+	{ "type", "Display what program or builtin would be executed by the specified command.", gsh_type },
 	{ "exit", "Exit the shell.", NULL },
 };
 

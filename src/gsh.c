@@ -212,6 +212,8 @@ static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 		*shopt_ch++ = ' ';
 }
 
+// TODO: (Idea) The entire reason gsh_input_buf exists
+// is for gsh_run_cmd(). Should we move run_cmd() to input.c?
 void gsh_run_cmd(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);

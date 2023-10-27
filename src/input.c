@@ -23,7 +23,6 @@ struct gsh_input_buf *gsh_new_inputbuf()
 	return input;
 }
 
-// FIXME: Clean up the encapsulation here.
 /*	The maximum length of an input line on the terminal
  *	that will currently be accepted, not including the newline
  *	or null byte.
