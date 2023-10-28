@@ -249,8 +249,11 @@ void gsh_run_cmd(struct gsh_state *sh)
 	//
 	for (char *shopt = sh->inputbuf->line; (shopt = strchr(shopt, '@'));)
 		gsh_process_opt(sh, shopt);
+
+	// FIXME:
+	sh->parse_state->lineptr = sh->inputbuf->line;
 	
-	gsh_parse_cmd(sh->cmd, sh->parse_state, &sh->params, sh->inputbuf->line);
+	gsh_parse_cmd(sh->cmd, sh->parse_state, &sh->params);
 	gsh_switch(sh, sh->cmd);
 
 	sh->inputbuf->len = 0;

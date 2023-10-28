@@ -10,6 +10,7 @@
 #include "gsh.h"
 #include "history.h"
 #include "builtin.h"
+#include "parse.h"
 
 int gsh_recall(struct gsh_state *sh, int argc, char *const *args);
 int gsh_list_hist(struct gsh_state *sh, int argc, char *const *args);
@@ -66,13 +67,18 @@ static int gsh_type(struct gsh_state *sh, int argc, char *const *argv)
 
 	for (const char *path_it = gsh_getenv(&sh->params, "PATH"); path_it;
 	     ++path_it) {
-		const size_t path_len = strcspn(path_it, ":");
-
-		snprintf(stpncpy(pathname, path_it, path_len),
-			 sh->max_path - path_len, "/%s", argv[1]);
+		// TODO: Isn't it odd how there's seemingly no way
+		// to copy upto a certain character without iterating
+		// the string twice?
+		
+		// FIXME: We need to subtract from the size passed to snprintf!
+		snprintf(memccpy(pathname, path_it, ':', sh->max_path),
+			 sh->max_path, "/%s", argv[1]);
 
 		if (stat(pathname, &st) == 0 && (st.st_mode & 0111)) {
 			printf("%s: %s\n", argv[1], pathname);
+	
+			free(pathname);
 			return 0;
 		}
 
@@ -82,6 +88,8 @@ static int gsh_type(struct gsh_state *sh, int argc, char *const *argv)
 	}
 
 	printf("%s: not found\n", argv[1]);
+	
+	free(pathname);
 	return -1;
 }
 
@@ -99,6 +107,18 @@ static int gsh_chdir(struct gsh_state *sh, int argc, char *const *argv)
 	return 0;
 }
 
+// while COMMANDS; do COMMANDS; done
+// 
+// TODO: After encountering a `while` followed by a semicolon, modify
+// the parse state to expect a "do", followed by commands and a semicolon,
+// and then a "done".
+
+// This is an example of a "syntactic" builtin.
+static int gsh_while(struct gsh_state* sh, int argc, char* const* argv)
+{
+	gsh_parse_cmd(sh->cmd, sh->parse_state, &sh->params);
+}
+
 static int gsh_puthelp(struct gsh_state *sh, int argc, char *const *argv);
 
 static struct gsh_builtin builtins[] = {
@@ -108,6 +128,7 @@ static struct gsh_builtin builtins[] = {
 	{ "hist", "Display or clear line history.", gsh_list_hist },
 	{ "help", "Display this help page.", gsh_puthelp },
 	{ "type", "Display command type and location.", gsh_type },
+	{ "while", "Run command while a condition is true.", gsh_while },
 	{ "exit", "Exit the shell.", NULL },
 };
 

@@ -24,4 +24,4 @@ void gsh_parse_init(struct gsh_parse_state **state,
 		    struct gsh_parsed_cmd **parsebufs);
 
 void gsh_parse_cmd(struct gsh_parsed_cmd *cmd, struct gsh_parse_state *state,
-		   struct gsh_params *params, char *line);
+		   struct gsh_params *params);

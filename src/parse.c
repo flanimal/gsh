@@ -17,6 +17,8 @@
 #define unreachable() __assume(0)
 #endif
 
+// TODO: gsh_expand_state?
+// Expansion -> Parsing?
 struct gsh_parse_state {
 	/* Iterator pointing to the word currently being parsed. */
 	const char **word_it;
@@ -78,16 +80,15 @@ static void gsh_expand_span(struct gsh_parse_state *state,
 			    struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
+
 	va_start(fmt_args, span);
-
-	va_list args_cpy;
-	va_copy(args_cpy, fmt_args);
-
-	const int print_len = vsnprintf(NULL, 0, span->fmt_str, args_cpy);
-	va_end(args_cpy);
+	// TODO: MAX_EXPAND_LEN?
+	const int print_len = vsnprintf(NULL, 0, span->fmt_str, fmt_args);
+	va_end(fmt_args);
 
 	assert(print_len >= 0);
 
+	va_start(fmt_args, span);
 	// FIXME: We don't remove extra space after expansion!
 	if (span->len >= (size_t)print_len) {
 		state->expand_skip +=
@@ -257,9 +258,23 @@ static bool gsh_parse_filename(struct gsh_parse_state *state,
 static void gsh_parse_cmd_args(struct gsh_parse_state *state,
 			       const struct gsh_params *params)
 {
-	while (state->word_n <= GSH_MAX_ARGS)
-		if (!gsh_next_word(state, params, NULL))
+	char *next_word;
+
+	while (state->word_n <= GSH_MAX_ARGS) {
+		if (!(next_word = gsh_next_word(state, params, NULL)))
 			return;
+
+		// TODO: Don't use strlen() for this.
+		if (next_word[strlen(next_word) - 1] == ';')
+			// End current command, and begin another with remaining
+			// words.
+			//
+			// This could be done by checking that we have reached
+			// the end of the input buffer; if not, it must mean
+			// there was more than one command.
+			return;
+		
+	}
 }
 
 static void gsh_free_parsed(struct gsh_parse_state *state)
@@ -277,23 +292,29 @@ static void gsh_free_parsed(struct gsh_parse_state *state)
 		*(--state->word_it) = NULL;
 }
 
-// TODO: "while" builtin.
+// TODO: Semicolon ';' command break.
+// TODO: Command stack.
+// 
+// FIXME: Don't pass line to this?
 void gsh_parse_cmd(struct gsh_parsed_cmd *cmd, struct gsh_parse_state *state,
-		   struct gsh_params *params, char *line)
+		   struct gsh_params *params)
 {
-	if (line[0] == '\0')
+	if (state->lineptr[0] == '\0')
 		return;
 
+	// FIXME: WARNING: THIS MIGHT BE WRONG!
+	// Skip any whitespace preceding pathname.
+	cmd->pathname = state->lineptr + strspn(state->lineptr, WHITESPACE);
+
 	gsh_free_parsed(state);
-	state->lineptr = line;
 
 	if (!gsh_parse_filename(state, params))
 		return;
 
 	gsh_parse_cmd_args(state, params);
 
-	cmd->argc = state->word_n;
+	// Still more words in line, so start new command.
+	if (*state->word_it)
 
-	// Skip any whitespace preceding pathname.
-	cmd->pathname = line + strspn(line, WHITESPACE);
+	cmd->argc = state->word_n;
 }
