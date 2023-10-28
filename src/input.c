@@ -62,11 +62,11 @@ bool gsh_read_line(struct gsh_input_buf *inputbuf)
 		exit(feof(stdin) ? EXIT_SUCCESS : EXIT_FAILURE);
 	}
 
-	char *newline = strchr(line_it, '\n');
-	*newline = '\0';
+	inputbuf->len = strlen(line_it);
+	if (line_it[inputbuf->len - 1] == '\n')
+		line_it[inputbuf->len - 1] = '\0';
 
 	bool need_more = gsh_replace_linebrk(line_it);
-	inputbuf->len = (size_t)(newline - line_it);
 
 	if (need_more) {
 		fputs(GSH_SECOND_PROMPT, stdout);
