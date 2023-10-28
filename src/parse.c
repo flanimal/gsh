@@ -42,24 +42,18 @@ struct gsh_fmt_span {
 	const char *fmt_str;
 };
 
-struct gsh_parsed_cmd *gsh_new_parsebufs()
+void gsh_parse_init(struct gsh_parse_state **state,
+		    struct gsh_parsed_cmd **parsebufs)
 {
-	return calloc(1, sizeof(struct gsh_parsed_cmd));
-}
+	*parsebufs = calloc(1, sizeof(**parsebufs));
 
-void gsh_set_parse_state(struct gsh_parse_state **state,
-			 struct gsh_parsed_cmd *parsebufs)
-{
-	*state = malloc(sizeof(**state));
-
-	(*state)->wordbufs = parsebufs->fmtbufs;
-	(*state)->word_it = (const char **)parsebufs->words;
-	(*state)->word_n = 0;
+	*state = calloc(1, sizeof(**state));
+	(*state)->word_it = (const char **)(*parsebufs)->argv;
 }
 
 /*	Allocate and return a word buffer.
  */
-static char *gsh_alloc_wordbuf(const struct gsh_parse_state *state, size_t inc)
+static char *gsh_alloc_wordbuf(struct gsh_parse_state *state, size_t inc)
 {
 	const size_t new_len = strlen(*state->word_it) + inc;
 
@@ -76,7 +70,7 @@ static char *gsh_alloc_wordbuf(const struct gsh_parse_state *state, size_t inc)
 /*	Format a span within a word with the given args, allocating a buffer if
  * necessary.
  */
-static void gsh_expand_span(const struct gsh_parse_state *state,
+static void gsh_expand_span(struct gsh_parse_state *state,
 			    struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
@@ -119,7 +113,7 @@ static void gsh_expand_span(const struct gsh_parse_state *state,
  *	If the variable does not exist, the word will be assigned the empty
  *	string.
  */
-static void gsh_fmt_var(const struct gsh_parse_state *state,
+static void gsh_fmt_var(struct gsh_parse_state *state,
 			const struct gsh_params *params,
 			struct gsh_fmt_span *span)
 {
@@ -136,7 +130,7 @@ static void gsh_fmt_var(const struct gsh_parse_state *state,
 
 /*      Substitute a parameter reference with its value.
  */
-static void gsh_fmt_param(const struct gsh_parse_state *state,
+static void gsh_fmt_param(struct gsh_parse_state *state,
 			  const struct gsh_params *params,
 			  char *const fmt_begin)
 {
@@ -164,7 +158,7 @@ static void gsh_fmt_param(const struct gsh_parse_state *state,
 	If the word consists only of the home character, it will be
 *	assigned to point to the value of $HOME.
 */
-static void gsh_fmt_home(const struct gsh_parse_state *state,
+static void gsh_fmt_home(struct gsh_parse_state *state,
 			 const struct gsh_params *params, char *const fmt_begin)
 {
 	const char *homevar = gsh_getenv(params, "HOME");
@@ -270,30 +264,23 @@ static void gsh_free_parsed(struct gsh_parse_state *state)
 		*(--state->word_it) = NULL;
 }
 
-// FIXME: X(Idea) Pass line as the initial first element of parsed_cmd::argv?
 // TODO: "while" builtin.
-struct gsh_parsed_cmd *gsh_parse_cmd(struct gsh_parse_state *parse_state,
-			   const struct gsh_params *params, char *line)
+void gsh_parse_cmd(struct gsh_parsed_cmd *cmd, struct gsh_parse_state *state,
+		   struct gsh_params *params, char *line)
 {
-	struct gsh_parsed_cmd cmd = { 0 };
-
 	if (line[0] == '\0')
-		return cmd;
+		return;
 
-	gsh_free_parsed(parse_state);
-	parse_state->lineptr = line;
+	gsh_free_parsed(state);
+	state->lineptr = line;
 
-	cmd.argv = (char *const *)parse_state->word_it;
+	if (!gsh_parse_filename(state, params))
+		return;
 
-	if (!gsh_parse_filename(parse_state, params))
-		return cmd;
+	gsh_parse_cmd_args(state, params);
 
-	gsh_parse_cmd_args(parse_state, params);
-
-	cmd.argc = parse_state->word_n;
+	cmd->argc = state->word_n;
 
 	// Skip any whitespace preceding pathname.
-	cmd.pathname = line + strspn(line, WHITESPACE);
-
-	return cmd;
+	cmd->pathname = line + strspn(line, WHITESPACE);
 }

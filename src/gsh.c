@@ -103,7 +103,7 @@ static void gsh_set_shopts(struct hsearch_data **shopt_tbl)
 	create_hashtable(shopts, .cmd, .flag, *shopt_tbl);
 }
 
-void gsh_init(struct gsh_state *sh, struct gsh_parse_bufs *parsebufs)
+void gsh_init(struct gsh_state *sh)
 {
 	gsh_set_builtins(&sh->builtin_tbl);
 	gsh_set_shopts(&sh->shopt_tbl);
@@ -116,7 +116,7 @@ void gsh_init(struct gsh_state *sh, struct gsh_parse_bufs *parsebufs)
 	sh->inputbuf = gsh_new_inputbuf();
 	sh->hist = gsh_new_hist();
 
-	gsh_set_parse_state(&sh->parse_state, parsebufs);
+	gsh_parse_init(&sh->parse_state, &sh->cmd);
 
 	sh->shopts = GSH_OPT_DEFAULTS;
 
@@ -215,7 +215,7 @@ static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 		*shopt_ch++ = ' ';
 }
 
-// TODO: (Idea) The entire reason gsh_input_buf exists
+// NOTE: (Idea) The entire reason gsh_input_buf exists
 // is for gsh_run_cmd(). Should we move run_cmd() to input.c?
 void gsh_run_cmd(struct gsh_state *sh)
 {
@@ -249,9 +249,9 @@ void gsh_run_cmd(struct gsh_state *sh)
 	//
 	for (char *shopt = sh->inputbuf->line; (shopt = strchr(shopt, '@'));)
 		gsh_process_opt(sh, shopt);
-
-	gsh_switch(sh, gsh_parse_cmd(sh->parse_state, &sh->params,
-				     sh->inputbuf->line));
+	
+	gsh_parse_cmd(sh->cmd, sh->parse_state, &sh->params, sh->inputbuf->line);
+	gsh_switch(sh, sh->cmd);
 
 	sh->inputbuf->len = 0;
 }

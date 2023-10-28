@@ -37,6 +37,7 @@ struct gsh_state {
 	
 	struct gsh_input_buf *inputbuf;
 
+	struct gsh_parsed_cmd *cmd;
 	struct gsh_parse_state *parse_state;
 
 	/* Current working directory of the shell process. */
@@ -51,13 +52,9 @@ struct gsh_state {
 	struct hsearch_data *builtin_tbl;
 };
 
-struct gsh_parse_bufs;
-
-struct gsh_parse_bufs *gsh_new_parsebufs();
-
 /*	Set initial values and resources for the shell. 
  */
-void gsh_init(struct gsh_state *sh, struct gsh_parse_bufs *parsebufs);
+void gsh_init(struct gsh_state *sh);
 
 /*	Execute a zero-terminated line of input.
  */
