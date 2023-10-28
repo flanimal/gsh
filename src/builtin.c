@@ -64,27 +64,19 @@ static int gsh_type(struct gsh_state *sh, int argc, char *const *argv)
 	}
 
 	char *pathname = malloc(sh->max_path);
-
+	char *pn_pos;
+	
 	for (const char *path_it = gsh_getenv(&sh->params, "PATH"); path_it;
-	     ++path_it) {
-		// TODO: Isn't it odd how there's seemingly no way
-		// to copy upto a certain character without iterating
-		// the string twice?
-		
-		// FIXME: We need to subtract from the size passed to snprintf!
-		snprintf(memccpy(pathname, path_it, ':', sh->max_path),
-			 sh->max_path, "/%s", argv[1]);
+	     path_it += (pn_pos - pathname)) {
+		pn_pos = memccpy(pathname, path_it, ':', sh->max_path);
+		snprintf(pn_pos - 1, sh->max_path - (pn_pos - pathname), "/%s", argv[1]);
 
 		if (stat(pathname, &st) == 0 && (st.st_mode & 0111)) {
-			printf("%s: %s\n", argv[1], pathname);
+			printf("%s: file (%s)\n", argv[1], pathname);
 	
 			free(pathname);
 			return 0;
 		}
-
-		path_it = strchr(path_it + 1, ':');
-		if (!path_it)
-			break;
 	}
 
 	printf("%s: not found\n", argv[1]);
@@ -113,10 +105,11 @@ static int gsh_chdir(struct gsh_state *sh, int argc, char *const *argv)
 // the parse state to expect a "do", followed by commands and a semicolon,
 // and then a "done".
 
-// This is an example of a "syntactic" builtin.
+// This is an example of a "syntactic" builtin, or _keyword_.
 static int gsh_while(struct gsh_state* sh, int argc, char* const* argv)
 {
-	gsh_parse_cmd(sh->cmd, sh->parse_state, &sh->params);
+	gsh_parse_cmd(sh->parse_state, &sh->params, sh->cmd);
+	return 0;
 }
 
 static int gsh_puthelp(struct gsh_state *sh, int argc, char *const *argv);
