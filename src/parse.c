@@ -302,13 +302,16 @@ void gsh_parse_reset(struct gsh_parse_state *state, char *line)
 // TODO: Semicolon ';' command break.
 // TODO: Command stack.
 // 
-void gsh_parse_cmd(struct gsh_parse_state *state, struct gsh_params *params,
+void gsh_parse_cmd(struct gsh_parse_state *state, const struct gsh_params *params,
 		   struct gsh_parsed_cmd *cmd)
 {
 	if (state->lineptr[0] == '\0')
 		return;
 
 	// FIXME: WARNING: THIS MIGHT BE WRONG!
+	// If the command is a keyword, there won't be a pathname.
+	// (At first.)
+	
 	// Skip any whitespace preceding pathname.
 	cmd->pathname = state->lineptr + strspn(state->lineptr, WHITESPACE);
 

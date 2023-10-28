@@ -25,5 +25,5 @@ void gsh_parse_init(struct gsh_parse_state **state,
 
 void gsh_parse_reset(struct gsh_parse_state *state, char *line);
 
-void gsh_parse_cmd(struct gsh_parse_state *state, struct gsh_params *params,
+void gsh_parse_cmd(struct gsh_parse_state *state, const struct gsh_params *params,
 		   struct gsh_parsed_cmd *cmd);
