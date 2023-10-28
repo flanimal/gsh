@@ -117,9 +117,6 @@ int gsh_recall(struct gsh_state *sh, int argc, char *const *argv)
 
 	printf("%s\n", hist_it->line);
 
-	// FIXME: NEED TO SET parse_state->lineptr HERE!
-	// maybe a gsh_rerun_cmd()?
-
 	// Make a copy so we don't lose it if the history entry
 	// gets deleted.
 	strcpy(sh->inputbuf->line, hist_it->line);

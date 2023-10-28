@@ -1,12 +1,9 @@
-#include <sys/cdefs.h>
-
 #include "gsh.h"
 #include "input.h"
 
 int main(int argc, char *argv[])
 {
 	struct gsh_state sh;
-
 	gsh_init(&sh);
 
 	for (;;) {

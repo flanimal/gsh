@@ -3,10 +3,12 @@
 #include <stddef.h>
 
 struct gsh_input_buf {
-	// Constants relating to terminal input.
+	/*	The maximum length of an input line to get from the terminal, 
+	 *	including the newline, but NOT the NUL byte.
+	 */
 	long max_input;
 
-	// Buffer for terminal input.
+	/* Buffer for terminal input. */
 	size_t len;
 	char line[];
 };

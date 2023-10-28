@@ -15,17 +15,15 @@ struct gsh_input_buf *gsh_new_inputbuf()
 	// Get maximum length of terminal input line.
 	const long max_input = fpathconf(STDIN_FILENO, _PC_MAX_INPUT);
 
-	// FIXME: Does _PC_MAX_INPUT include the newline??
-	// Max input line length + newline + null byte.
-	struct gsh_input_buf *input = malloc(sizeof(*input) + max_input + 2);
+	// Max input line length + NUL byte.
+	struct gsh_input_buf *input = malloc(sizeof(*input) + max_input + 1);
 	input->max_input = max_input;
 
 	return input;
 }
 
 /*	The maximum length of an input line on the terminal
- *	that will currently be accepted, not including the newline
- *	or null byte.
+ *	that will currently be accepted, not including the NUL byte.
  */
 size_t gsh_max_input(const struct gsh_input_buf *inputbuf)
 {

@@ -42,13 +42,14 @@ struct gsh_state {
 
 	/* Current working directory of the shell process. */
 	char *cwd;
+
+	/* The maximum length of a pathname, including the NUL byte. */
 	long max_path;
 
 	struct gsh_params params;
-
 	enum gsh_shopt_flags shopts;
+	
 	struct hsearch_data *shopt_tbl;
-
 	struct hsearch_data *builtin_tbl;
 };
 

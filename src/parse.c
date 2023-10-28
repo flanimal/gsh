@@ -31,6 +31,7 @@ struct gsh_parse_state {
 	size_t buf_n;
 	char *wordbufs[GSH_MAX_ARGS];
 
+	/* Pointer to the next word in the line, gotten by strtok_r(). */
 	char *lineptr;
 };
 
@@ -258,7 +259,7 @@ static bool gsh_parse_filename(struct gsh_parse_state *state,
 static void gsh_parse_cmd_args(struct gsh_parse_state *state,
 			       const struct gsh_params *params)
 {
-	char *next_word;
+	const char *next_word;
 
 	while (state->word_n <= GSH_MAX_ARGS) {
 		if (!(next_word = gsh_next_word(state, params, NULL)))
@@ -292,12 +293,17 @@ static void gsh_free_parsed(struct gsh_parse_state *state)
 		*(--state->word_it) = NULL;
 }
 
+void gsh_parse_reset(struct gsh_parse_state *state, char *line)
+{
+	gsh_free_parsed(state);
+	state->lineptr = line;
+}
+
 // TODO: Semicolon ';' command break.
 // TODO: Command stack.
 // 
-// FIXME: Don't pass line to this?
-void gsh_parse_cmd(struct gsh_parsed_cmd *cmd, struct gsh_parse_state *state,
-		   struct gsh_params *params)
+void gsh_parse_cmd(struct gsh_parse_state *state, struct gsh_params *params,
+		   struct gsh_parsed_cmd *cmd)
 {
 	if (state->lineptr[0] == '\0')
 		return;
@@ -306,15 +312,13 @@ void gsh_parse_cmd(struct gsh_parsed_cmd *cmd, struct gsh_parse_state *state,
 	// Skip any whitespace preceding pathname.
 	cmd->pathname = state->lineptr + strspn(state->lineptr, WHITESPACE);
 
-	gsh_free_parsed(state);
-
 	if (!gsh_parse_filename(state, params))
 		return;
 
 	gsh_parse_cmd_args(state, params);
 
 	// Still more words in line, so start new command.
-	if (*state->word_it)
+	//if (*state->word_it)
 
 	cmd->argc = state->word_n;
 }
