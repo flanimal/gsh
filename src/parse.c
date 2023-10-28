@@ -20,13 +20,10 @@
 struct gsh_parse_state {
 	/* Iterator pointing to the word currently being parsed. */
 	const char **word_it;
-
 	size_t word_n;
 
-	/* Stack of buffers for words that contain substitutions,
-	 * with an additional pointer for the NULL sentinel.
-	 */
-	char *wordbufs[GSH_MAX_ARGS + 1];
+	/* Position within word to begin expansion. */
+	size_t expand_skip;
 
 	char *lineptr;
 };
@@ -96,6 +93,9 @@ static void gsh_expand_span(struct gsh_parse_state *state,
 
 		vsprintf(span->begin, span->fmt_str, fmt_args);
 		strcpy(span->begin + print_len, after);
+	}
+
+	state->expand_skip += (span->begin) ? (size_t)print_len : span->len;
 
 		free(after);
 	} else {
@@ -182,10 +182,12 @@ static void gsh_fmt_home(struct gsh_parse_state *state,
 /*      Expand the last word.
  *	Returns true while there are still expansions to be performed.
  */
-static bool gsh_expand_word(const struct gsh_parse_state *state,
+static bool gsh_expand_word(struct gsh_parse_state *state,
 			    const struct gsh_params *params)
 {
 	char *fmt_begin = strpbrk(*state->word_it, gsh_special_chars);
+	char *fmt_begin = strpbrk(*state->word_it + state->expand_skip,
+				  gsh_special_chars);
 
 	if (!fmt_begin)
 		return false;
@@ -216,7 +218,7 @@ static const char *gsh_next_word(struct gsh_parse_state *state,
 	while (gsh_expand_word(state, params))
 		;
 
-	if (state->wordbufs[1])
+	state->expand_skip = 0;
 		++state->wordbufs;
 
 	++state->word_n;
@@ -253,6 +255,8 @@ static void gsh_parse_cmd_args(struct gsh_parse_state *state,
 
 static void gsh_free_parsed(struct gsh_parse_state *state)
 {
+	state->expand_skip = 0;
+
 	// Delete substitution buffers.
 	while (*state->wordbufs) {
 		free(*state->wordbufs);
