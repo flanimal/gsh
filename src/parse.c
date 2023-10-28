@@ -25,6 +25,10 @@ struct gsh_parse_state {
 	/* Position within word to begin expansion. */
 	size_t expand_skip;
 
+	/* Stack of buffers for words that contain substitutions. */
+	size_t buf_n;
+	char *wordbufs[GSH_MAX_ARGS];
+
 	char *lineptr;
 };
 
@@ -53,13 +57,16 @@ void gsh_parse_init(struct gsh_parse_state **state,
 static char *gsh_alloc_wordbuf(struct gsh_parse_state *state, size_t inc)
 {
 	const size_t new_len = strlen(*state->word_it) + inc;
+	const size_t buf_n = state->buf_n;
 
-	char *newbuf = realloc(state->wordbufs[1], new_len + 1);
-	if (!state->wordbufs[1])
+	char *newbuf = realloc(state->wordbufs[buf_n], new_len + 1);
+	if (!state->wordbufs[buf_n])
 		strcpy(newbuf, *state->word_it);
 
+	state->wordbufs[buf_n] = newbuf;
 	*state->word_it = newbuf;
-	return (state->wordbufs[1] = newbuf);
+
+	return newbuf;
 }
 
 // TODO: Keep track of length of each word?
@@ -81,27 +88,29 @@ static void gsh_expand_span(struct gsh_parse_state *state,
 
 	assert(print_len >= 0);
 
-	if (span->len < (size_t)print_len) {
-		// Need to allocate.
-		char *after = strdup(span->begin + span->len);
+	// FIXME: We don't remove extra space after expansion!
+	if (span->len >= (size_t)print_len) {
+		state->expand_skip +=
+			vsprintf(span->begin, span->fmt_str, fmt_args);
 
-		const size_t before_len =
-			(size_t)(span->begin - *state->word_it);
-
-		span->begin = gsh_alloc_wordbuf(state, print_len - span->len) +
-			      before_len;
-
-		vsprintf(span->begin, span->fmt_str, fmt_args);
-		strcpy(span->begin + print_len, after);
+		va_end(fmt_args);
+		return;
 	}
+
+	// TODO: (Idea) Allocate and fill with empty space instead of duping
+	// after? Need to allocate.
+	char *after = strdup(span->begin + span->len);
+
+	const ptrdiff_t before_len = span->begin - *state->word_it;
+
+	span->begin = gsh_alloc_wordbuf(state, print_len - span->len) + before_len;
+
+	vsprintf(span->begin, span->fmt_str, fmt_args);
+	strcpy(span->begin + print_len, after);
 
 	state->expand_skip += (span->begin) ? (size_t)print_len : span->len;
 
-		free(after);
-	} else {
-		vsprintf(span->begin, span->fmt_str, fmt_args);
-	}
-
+	free(after);
 	va_end(fmt_args);
 }
 
@@ -185,7 +194,6 @@ static void gsh_fmt_home(struct gsh_parse_state *state,
 static bool gsh_expand_word(struct gsh_parse_state *state,
 			    const struct gsh_params *params)
 {
-	char *fmt_begin = strpbrk(*state->word_it, gsh_special_chars);
 	char *fmt_begin = strpbrk(*state->word_it + state->expand_skip,
 				  gsh_special_chars);
 
@@ -219,7 +227,8 @@ static const char *gsh_next_word(struct gsh_parse_state *state,
 		;
 
 	state->expand_skip = 0;
-		++state->wordbufs;
+	if (state->wordbufs[state->buf_n])
+		++state->buf_n;
 
 	++state->word_n;
 	return *state->word_it++;
@@ -258,9 +267,9 @@ static void gsh_free_parsed(struct gsh_parse_state *state)
 	state->expand_skip = 0;
 
 	// Delete substitution buffers.
-	while (*state->wordbufs) {
-		free(*state->wordbufs);
-		*state->wordbufs-- = NULL;
+	for (; state->buf_n > 0; --state->buf_n) {
+		free(state->wordbufs[state->buf_n - 1]);
+		state->wordbufs[state->buf_n - 1] = NULL;
 	}
 
 	// Reset word list.
