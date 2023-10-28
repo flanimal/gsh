@@ -59,7 +59,7 @@ static int gsh_type(struct gsh_state *sh, int argc, char *const *argv)
 
 	if (strchr(argv[1], '/') && stat(argv[1], &st) == 0 &&
 	    (st.st_mode & 0111)) {
-		puts(argv[1]);
+		printf("%s: file", argv[1]);
 		return 0;
 	}
 
