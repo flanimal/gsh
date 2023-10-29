@@ -34,7 +34,7 @@ struct gsh_parsed_cmd
 
 void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params);
 
-void gsh_split_words(struct gsh_parser *p, char *line);
+void gsh_split_words(struct gsh_parser *p, char *line, size_t max_size);
 
 void gsh_parse_cmd(struct gsh_parser *parser,
 		   struct gsh_cmd_queue *cmd_queue);

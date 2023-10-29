@@ -363,12 +363,10 @@ static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 		*shopt_ch++ = ' ';
 }
 
-void gsh_split_words(struct gsh_parser *p, char *line)
+void gsh_split_words(struct gsh_parser *p, char *line, size_t max_size)
 {
 	gsh_free_parsed(p);
 	p->lineptr = line;
-
-	const size_t max_size = _POSIX_ARG_MAX - p->expand_st->params->env_len;
 
 	while (p->words_size <= max_size)
 		if (!gsh_next_word(p, NULL))
