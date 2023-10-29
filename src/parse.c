@@ -287,15 +287,14 @@ static const char *gsh_next_word(struct gsh_parser *p, char *line)
  */
  static bool gsh_parse_filename(struct gsh_parser *p)
 {
-	const char *fn = gsh_next_word(p, p->lineptr);
-	if (!fn)
+	if (!p->words[0])
 		return false;
 
-	char *last_slash = strrchr(fn, '/');
+	char *last_slash = strrchr(p->words[0], '/');
 	if (last_slash)
-		p->word_it[-1] = last_slash + 1;
+		p->words[0] = last_slash + 1;
 
-	return !!p->word_it[-1];
+	return !!p->words[0];
  }
 
  // FIXME:
