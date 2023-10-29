@@ -161,7 +161,7 @@ static void gsh_switch(struct gsh_state *sh, struct gsh_parsed_cmd *cmd)
 		sh->params.last_status = gsh_exec(cmd->pathname, cmd->argv);
 }
 
-static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
+void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
 {
 	ENTRY *result;
 	if (!hsearch_r((ENTRY){ .key = name }, FIND, &result, sh->shopt_tbl))
@@ -173,46 +173,6 @@ static void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
 		sh->shopts |= flag;
 	else
 		sh->shopts &= ~flag;
-}
-
-/*
-	You don't want to have to specify explicitly what to do if
-	a token or part of token isn't found. It's verbose and clumsy.
-
-	*** For our purposes, a "word" is a contiguous sequence of characters
-		NOT containing whitespace.
-*/
-static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
-{
-	if (!isalnum(shopt_ch[1])) {
-		// There wasn't a name following the '@' character,
-		// so remove the '@' and continue.
-		*shopt_ch = ' ';
-		return;
-	}
-
-	char *valstr = strpbrk(shopt_ch + 1, WHITESPACE);
-	char *after = valstr;
-
-	if (valstr && isalpha(valstr[1])) {
-		*valstr++ = '\0';
-
-		const int val = (strncmp(valstr, "on", 2) == 0)	 ? true :
-				(strncmp(valstr, "off", 3) == 0) ? false :
-								   -1;
-		if (val != -1) {
-			after = strpbrk(valstr, WHITESPACE);
-			gsh_set_opt(sh, shopt_ch + 1, val);
-		}
-	}
-
-	if (!after) {
-		*shopt_ch = '\0';
-		return;
-	}
-
-	while (shopt_ch != after + 1)
-		*shopt_ch++ = ' ';
 }
 
 // NOTE: (Idea) The entire reason gsh_input_buf exists
@@ -227,10 +187,6 @@ void gsh_run_cmd(struct gsh_state *sh)
 	}
 
 	gsh_add_hist(sh->hist, sh->inputbuf->len, sh->inputbuf->line);
-
-
-	//for (char *shopt = sh->inputbuf->line; (shopt = strchr(shopt, '@'));)
-	//	gsh_process_opt(sh, shopt);
 
 	gsh_split_words(sh->parse_state, sh->inputbuf->line);
 	gsh_parse_cmd(sh->parse_state, sh->cmd);

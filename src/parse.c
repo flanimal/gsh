@@ -19,6 +19,8 @@
 #define unreachable() __assume(0)
 #endif
 
+void gsh_set_opt(struct gsh_state *sh, char *name, bool value);
+
 struct gsh_parse_state {
 	/* Iterator pointing to the word currently being parsed. */
 	const char **word_it;
@@ -299,6 +301,44 @@ static void gsh_free_parsed(struct gsh_parse_state *state)
 		*(--state->word_it) = NULL;
 }
 
+// TODO: Make process_opt a builtin?
+/*
+	You don't want to have to specify explicitly what to do if
+	a token or part of token isn't found. It's verbose and clumsy.
+*/
+static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
+{
+	if (!isalnum(shopt_ch[1])) {
+		// There wasn't a name following the '@' character,
+		// so remove the '@' and continue.
+		*shopt_ch = ' ';
+		return;
+	}
+
+	char *valstr = strpbrk(shopt_ch + 1, WHITESPACE);
+	char *after = valstr;
+
+	if (valstr && isalpha(valstr[1])) {
+		*valstr++ = '\0';
+
+		const int val = (strncmp(valstr, "on", 2) == 0)	 ? true :
+				(strncmp(valstr, "off", 3) == 0) ? false :
+								   -1;
+		if (val != -1) {
+			after = strpbrk(valstr, WHITESPACE);
+			gsh_set_opt(sh, shopt_ch + 1, val);
+		}
+	}
+
+	if (!after) {
+		*shopt_ch = '\0';
+		return;
+	}
+
+	while (shopt_ch != after + 1)
+		*shopt_ch++ = ' ';
+}
+
 void gsh_split_words(struct gsh_parse_state *state, char *line)
 {
 	gsh_free_parsed(state);
@@ -309,15 +349,36 @@ void gsh_split_words(struct gsh_parse_state *state, char *line)
 			return;
 }
 
-// TODO: Semicolon ';' command break.
-// TODO: Command queue.
+/*
+	*** For our purposes, a "word" is a contiguous sequence of characters
+		NOT containing whitespace.
+*/
+// Splitting.
 // 
-// For each input line, zero or more semicolon (or newline) terminated commands
-// are pushed onto the FIFO command queue.
+// Step 1:	Split the ENTIRE line into words, and place the addresses
+//		of these words in an array.
 
-//	SPLIT into words -> PARSE ->
-//	->	1. PROCESS AND REMOVE OPTIONS
-//		2. Perform EXPANSIONS with '$' tokens followed by text tokens, etc.
+// Parsing.
+// 
+// Step 2:	Using these words, parse tokens such as ';', '$' and '@', 
+//		as well as text and/or numbers.
+
+// Expansion.
+// 
+// Step 3:	Replace '$' tokens followed by text tokens with the corresponding values.
+//		This is also where shell option tokens are processed and removed.
+
+// Creation of command objects.
+// 
+// Step 4:	Whenever a ';' token (or newline) is encountered, 
+//		create a new command object consisting of the tokens 
+//		preceding the semicolon, and which have not yet been placed in a command.
+//
+//		Push this command object onto the command queue.
+
+// Running.
+// 
+// Step 5:	Run and pop the command objects, starting from the first one.
 void gsh_parse_cmd(struct gsh_parse_state *state,
 		   struct gsh_parsed_cmd *cmd)
 {

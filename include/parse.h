@@ -10,12 +10,14 @@
 struct gsh_parse_state;
 struct gsh_params;
 
+struct gsh_words {
+
+};
+
 struct gsh_parsed_cmd {
 	char *pathname;
 
 	int argc;
-
-	/* List of words to be returned from parsing. */
 	char *argv[];
 };
 
