@@ -244,7 +244,7 @@ static bool gsh_expand_word(struct gsh_expand_state *exp,
 	unreachable();
 }
 
-/*      Collect and insert a fully-expanded word into the list.
+/*      Collect and insert a into the list.
  *
  *	Returns next word or NULL if no next word, similar to strtok().
  */
@@ -258,9 +258,6 @@ static const char *gsh_next_word(struct gsh_parser *p, char *line)
 
 	// FIXME: ... is using lineptr a good idea?
 	p->words_size += p->lineptr - *p->word_it;
-
-	while (gsh_expand_word(p->expand_st, *p->word_it))
-		;
 
 	p->words_size += p->expand_st->size_inc;
 	const size_t word_len = p->words_size - old_words_size;
@@ -352,11 +349,61 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	//	- Double-quote "
 	//	- Opening paren '('
 	//	- Closing paren ')'
-	for (const char **word_it = p->words;  word_it != p->word_it; ++word_it) {
+	// FIXME: We need an actual _grammar_.
+	// E.g. If we reached a '$' 
+
+	enum token_type
+	{
+		SINGLE_QUOTE = '\'',
+		DOUBLE_QUOTE = '\"',
+		OPEN_PAREN = '(',
+		CLOSE_PAREN = ')',
+		TEXT,
+		PARAM_REF,
+		CMD_SEP = ';',
+	};
+
+	struct token
+	{
+		const char *data;
+		size_t len;
+		enum token_type type;
+	};
+
+	struct token tokens[256];
+	struct token *tok_it = tokens;
+
+	for (const char **word_it = p->words; word_it != p->word_it; ++word_it) {
+		char *ch = *word_it;
 		// This handles tokens that are expanded.
 		while (gsh_expand_word(p->expand_st, word_it))
 			;
 
+		while (*ch) {
+			tok_it->data = ch;
+			tok_it->type = TEXT;
+
+			switch (*ch) {
+			case '\'':
+			case '\"':
+			case '(':
+			case ')':
+			case ';':
+				tok_it->len = 1;
+				tok_it->type = (enum token_type)(*ch);
+
+				++ch;
+				++tok_it;
+				
+				break;
+			default:
+				++tok_it->len;
+
+				break;
+			}
+
+
+		}
 	}
 
 	// Still more words in line, so start new command.
