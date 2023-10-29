@@ -40,11 +40,14 @@ struct gsh_parser {
 	char *words[];
 };
 
+// TODO: Should this be the state for a single expansion, or all so far?
 struct gsh_expand_state {
 	/* Position within word to begin expansion. */
 	size_t skip;
 
 	const struct gsh_params *params;
+
+	size_t size_inc;
 
 	/* Stack of buffers for words that contain substitutions. */
 	size_t buf_n;
@@ -103,7 +106,7 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *state, char **word_it,
 /*	Format a span within a word with the given args, allocating a buffer if
  *	necessary. Returns the increase in size if there is one.
  */
-static int gsh_expand_span(struct gsh_expand_state *state, const char **word_it,
+static void gsh_expand_span(struct gsh_expand_state *state, const char **word_it,
 			   struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
@@ -122,8 +125,10 @@ static int gsh_expand_span(struct gsh_expand_state *state, const char **word_it,
 		state->skip += vsprintf(span->begin, span->fmt_str, fmt_args);
 
 		va_end(fmt_args);
-		return size_inc;
+		return;
 	}
+
+	state->size_inc += size_inc;
 
 	const ptrdiff_t before_len = span->begin - *word_it;
 
@@ -139,8 +144,6 @@ static int gsh_expand_span(struct gsh_expand_state *state, const char **word_it,
 
 	free(after);
 	va_end(fmt_args);
-
-	return size_inc
 }
 
 /*	Substitute a variable reference with its value.
@@ -258,6 +261,7 @@ static const char *gsh_next_word(struct gsh_parser *p, char *line)
 	while (gsh_expand_word(p->expand_st, *p->word_it))
 		;
 
+	p->words_size += p->expand_st->size_inc;
 	const size_t word_len = p->words_size - old_words_size;
 
 	if (*p->word_it[word_len - 1] == ';')
