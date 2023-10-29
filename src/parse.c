@@ -25,23 +25,19 @@
 void gsh_set_opt(struct gsh_state *sh, char *name, bool value);
 
 struct gsh_parser {
-	struct gsh_parse_state *parse_st;
-	struct gsh_expand_state *expand_st;
-
-	/* Iterator pointing to current word. */
-	const char **word_it;
-
-	char *words[];
-};
-
-struct gsh_parse_state {
-	size_t word_n;
-
 	/* Must be below ARG_MAX/__POSIX_ARG_MAX. */
 	size_t words_size;
 
 	/* Pointer to the next word in the line, gotten by strtok_r(). */
 	char *lineptr;
+
+	struct gsh_expand_state *expand_st;
+
+	/* Iterator pointing to current word. */
+	const char **word_it;
+
+	size_t word_n;
+	char *words[];
 };
 
 struct gsh_expand_state {
@@ -79,8 +75,6 @@ void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
 	const size_t words_size = GSH_MIN_WORD_N * sizeof(char *);
 
 	*parser = calloc(1, sizeof(**parser) + words_size);
-
-	(*parser)->parse_st = calloc(1, sizeof(*(*parser)->parse_st));
 	(*parser)->word_it = (const char **)(*parser)->words;
 
 	(*parser)->expand_st =
@@ -107,11 +101,10 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *state, char **word_it,
 }
 
 /*	Format a span within a word with the given args, allocating a buffer if
- *	necessary.
+ *	necessary. Returns the increase in size if there is one.
  */
-static void gsh_expand_span(struct gsh_expand_state *state,
-			    const char **word_it, struct gsh_fmt_span *span,
-			    ...)
+static int gsh_expand_span(struct gsh_expand_state *state, const char **word_it,
+			   struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
 
@@ -129,10 +122,8 @@ static void gsh_expand_span(struct gsh_expand_state *state,
 		state->skip += vsprintf(span->begin, span->fmt_str, fmt_args);
 
 		va_end(fmt_args);
-		return;
+		return size_inc;
 	}
-
-	state->words_size += size_inc;
 
 	const ptrdiff_t before_len = span->begin - *word_it;
 
@@ -148,6 +139,8 @@ static void gsh_expand_span(struct gsh_expand_state *state,
 
 	free(after);
 	va_end(fmt_args);
+
+	return size_inc
 }
 
 /*	Substitute a variable reference with its value.
@@ -253,19 +246,19 @@ static bool gsh_expand_word(struct gsh_expand_state *state,
  */
 static const char *gsh_next_word(struct gsh_parser *p, char *line)
 {
-	*p->word_it = strtok_r(line, WHITESPACE, &p->parse_st->lineptr);
+	*p->word_it = strtok_r(line, WHITESPACE, &p->lineptr);
 	if (!(*p->word_it))
 		return NULL;
 
-	const size_t old_words_size = p->parse_st->words_size;
+	const size_t old_words_size = p->words_size;
 
 	// FIXME: ... is using lineptr a good idea?
-	p->parse_st->words_size += p->parse_st->lineptr - *p->word_it;
+	p->words_size += p->lineptr - *p->word_it;
 
-	while (gsh_expand_word(p->parse_st, *p->word_it))
+	while (gsh_expand_word(p->expand_st, *p->word_it))
 		;
 
-	const size_t word_len = p->parse_st->words_size - old_words_size;
+	const size_t word_len = p->words_size - old_words_size;
 
 	if (*p->word_it[word_len - 1] == ';')
 		// End current command, and begin another with remaining
@@ -280,7 +273,7 @@ static const char *gsh_next_word(struct gsh_parser *p, char *line)
 	if (p->expand_st->bufs[p->expand_st->buf_n])
 		++p->expand_st->buf_n;
 
-	++p->parse_st->word_n;
+	++p->word_n;
 	return *p->word_it++;
 }
 
@@ -323,7 +316,7 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	}
 
 	// Reset word list.
-	for (; p->parse_st->word_n > 0; --p->parse_st->word_n)
+	for (; p->word_n > 0; --p->word_n)
 		*(--p->word_it) = NULL;
 }
 
@@ -369,9 +362,9 @@ static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 void gsh_split_words(struct gsh_parser *p, char *line)
 {
 	gsh_free_parsed(p);
-	p->parse_st->lineptr = line;
+	p->lineptr = line;
 
-	while (p->parse_st->words_size <=
+	while (p->words_size <=
 	       (_POSIX_ARG_MAX - p->expand_st->params->env_len))
 		if (!gsh_next_word(p, NULL))
 			return;
@@ -379,7 +372,7 @@ void gsh_split_words(struct gsh_parser *p, char *line)
 
 void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 {
-	if (p->parse_st->lineptr[0] == '\0')
+	if (p->lineptr[0] == '\0')
 		return;
 
 	// FIXME: WARNING: THIS MIGHT BE WRONG!
@@ -389,8 +382,7 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	struct gsh_parsed_cmd *cmd = gsh_new_cmd(cmd_queue);
 
 	// Skip any whitespace preceding pathname.
-	cmd->pathname =
-		p->parse_st->lineptr + strspn(p->parse_st->lineptr, WHITESPACE);
+	cmd->pathname = p->lineptr + strspn(p->lineptr, WHITESPACE);
 
 	// if (!gsh_parse_filename(state, params))
 	//	return;
@@ -400,5 +392,5 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	// Still more words in line, so start new command.
 	// if (*state->word_it)
 
-	cmd->argc = p->parse_st->word_n;
+	cmd->argc = p->word_n;
 }
