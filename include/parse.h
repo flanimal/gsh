@@ -12,14 +12,12 @@
 // FIXME: Do we need a maximum number of commands per line?
 
 /*
-*	gsh_words		: Array of word locations in input line.
-*	gsh_parsed_cmd		: A stack of one or more parsed commands.
-* 
-*	gsh_parse_state		: State used for parsing/tokenizing(?)
-*	gsh_expand_state	: State used for expansions following parsing/tokenizing(?).
-*/
+ *	gsh_parser		: State, buffers used for parsing/tokenizing(?)
+ *	gsh_parsed_cmd		: A stack of one or more parsed commands.
+ * 
+ *	gsh_expand_state	: State used for expansions following parsing/tokenizing(?).
+ */
 
-struct gsh_parse_state;
 struct gsh_params;
 
 struct gsh_parsed_cmd

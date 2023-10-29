@@ -108,7 +108,7 @@ static int gsh_chdir(struct gsh_state *sh, int argc, char *const *argv)
 // This is an example of a "syntactic" builtin, or _keyword_.
 static int gsh_while(struct gsh_state* sh, int argc, char* const* argv)
 {
-	gsh_parse_cmd(sh->parse_state, &sh->params, sh->cmd);
+	//gsh_parse_cmd(sh->parse_state, &sh->params, sh->cmd);
 	return 0;
 }
 
