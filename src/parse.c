@@ -108,7 +108,7 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *state,
  *	necessary.
  */
 static void gsh_expand_span(struct gsh_expand_state *state,
-			    char **word_it, struct gsh_fmt_span *span, ...)
+			    const char **word_it, struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
 
@@ -157,7 +157,7 @@ static void gsh_expand_span(struct gsh_expand_state *state,
  *	string.
  */
 static void gsh_fmt_var(struct gsh_expand_state *state,
-			char **word_it, struct gsh_fmt_span *span)
+			const char **word_it, struct gsh_fmt_span *span)
 {
 	if (strcmp(*word_it, span->begin) == 0) {
 		*word_it = gsh_getenv(state->params, span->begin + 1);
@@ -173,7 +173,7 @@ static void gsh_fmt_var(struct gsh_expand_state *state,
 /*      Substitute a parameter reference with its value.
  */
 static void gsh_fmt_param(struct gsh_expand_state *state,
-			  char **word_it, char *const fmt_begin)
+			  const char **word_it, char *const fmt_begin)
 {
 	struct gsh_fmt_span span = {
 		.begin = fmt_begin,
@@ -200,7 +200,7 @@ static void gsh_fmt_param(struct gsh_expand_state *state,
 *	assigned to point to the value of $HOME.
 */
 static void gsh_fmt_home(struct gsh_expand_state *state,
-			 char **word_it, char *const fmt_begin)
+			 const char **word_it, char *const fmt_begin)
 {
 	const char *homevar = gsh_getenv(state->params, "HOME");
 
@@ -223,7 +223,7 @@ static void gsh_fmt_home(struct gsh_expand_state *state,
 /*      Expand the last word.
  *	Returns true while there are still expansions to be performed.
  */
-static bool gsh_expand_word(struct gsh_expand_state *state, char **word_it)
+static bool gsh_expand_word(struct gsh_expand_state *state, const char **word_it)
 {
 	char *fmt_begin = strpbrk(*word_it + state->expand_skip,
 				  gsh_special_chars);
