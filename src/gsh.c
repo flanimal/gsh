@@ -116,7 +116,8 @@ void gsh_init(struct gsh_state *sh)
 	sh->inputbuf = gsh_new_inputbuf();
 	sh->hist = gsh_new_hist();
 
-	gsh_parse_init(&sh->parse_state, &sh->cmd, &sh->params);
+	sh->cmd_queue.front = NULL;
+	gsh_parse_init(&sh->parser, &sh->params);
 
 	sh->shopts = GSH_OPT_DEFAULTS;
 

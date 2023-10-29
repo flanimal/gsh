@@ -1,4 +1,5 @@
 #include <limits.h>
+#include <search.h>
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -8,6 +9,8 @@
 #include <stdarg.h>
 #include <ctype.h>
 
+// FIXME:
+#include "gsh.h"
 #include "parse.h"
 #include "params.h"
 
@@ -21,6 +24,16 @@
 
 void gsh_set_opt(struct gsh_state *sh, char *name, bool value);
 
+struct gsh_parser {
+	struct gsh_parse_state *parse_state;
+	struct gsh_expand_state *expand_state;
+
+	const struct gsh_params *params;
+
+	size_t word_n;
+	char *words[];
+};
+
 struct gsh_parse_state {
 	/* Iterator pointing to the word currently being parsed. */
 	const char **word_it;
@@ -33,12 +46,9 @@ struct gsh_parse_state {
 	char *lineptr;
 };
 
-struct gsh_expand_state
-{
+struct gsh_expand_state {
 	/* Position within word to begin expansion. */
 	size_t expand_skip;
-
-	const struct gsh_params *params;
 
 	/* Stack of buffers for words that contain substitutions. */
 	size_t buf_n;
@@ -56,17 +66,24 @@ struct gsh_fmt_span {
 	const char *fmt_str;
 };
 
-void gsh_parse_init(struct gsh_parse_state **state,
-		    struct gsh_parsed_cmd **parsebufs,
-		    struct gsh_params *params)
+struct gsh_parsed_cmd *gsh_new_cmd(struct gsh_cmd_queue *queue)
 {
-	const size_t args_size = GSH_MIN_ARG_N * sizeof(char *);
+	struct gsh_parsed_cmd *cmd = calloc(1, sizeof(*cmd));
+	insque(cmd, queue->front);
 
-	*parsebufs = calloc(1, sizeof(**parsebufs) + args_size);
+	return cmd;
+}
 
-	*state = calloc(1, sizeof(**state) + args_size);
-	(*state)->word_it = (const char **)(*parsebufs)->argv;
-	(*state)->params = params;
+void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
+{
+	const size_t words_size = GSH_MIN_WORD_N * sizeof(char *);
+
+	*parser = calloc(1, sizeof(**parser) + words_size);
+
+	(*parser)->parse_state = calloc(1, sizeof(*(*parser)->parse_state));
+	(*parser)->parse_state->word_it = (const char **)(*parser)->words;
+
+	(*parser)->params = params;
 }
 
 /*	Allocate and return a word buffer.
@@ -113,7 +130,7 @@ static void gsh_expand_span(struct gsh_parse_state *state,
 	}
 
 	state->words_size += size_inc;
-	
+
 	const ptrdiff_t before_len = span->begin - *state->word_it;
 
 	// TODO: (Idea) Allocate and fill with empty space instead of duping
@@ -154,8 +171,7 @@ static void gsh_fmt_var(struct gsh_parse_state *state,
 
 /*      Substitute a parameter reference with its value.
  */
-static void gsh_fmt_param(struct gsh_parse_state *state,
-			  char *const fmt_begin)
+static void gsh_fmt_param(struct gsh_parse_state *state, char *const fmt_begin)
 {
 	struct gsh_fmt_span span = {
 		.begin = fmt_begin,
@@ -264,7 +280,7 @@ static const char *gsh_next_word(struct gsh_parse_state *state, char *line)
 /*      Parse the first word in the input line, and place
  *      the filename in the argument array.
  */
-//static bool gsh_parse_filename(struct gsh_parse_state *state,
+// static bool gsh_parse_filename(struct gsh_parse_state *state,
 //			       const struct gsh_params *params)
 //{
 //	const char *fn = gsh_next_word(state, params, state->lineptr);
@@ -276,12 +292,12 @@ static const char *gsh_next_word(struct gsh_parse_state *state, char *line)
 //		state->word_it[-1] = last_slash + 1;
 //
 //	return !!state->word_it[-1];
-//}
+// }
 //
 ///*	Parse words and place them into the argument array, which is
 // *      then terminated with a NULL pointer.
 // */
-//static void gsh_parse_cmd_args(struct gsh_parse_state *state,
+// static void gsh_parse_cmd_args(struct gsh_parse_state *state,
 //			       const struct gsh_params *params)
 //{
 //	while (state->words_size <= (_POSIX_ARG_MAX - params->env_len))
@@ -329,7 +345,8 @@ static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
 								   -1;
 		if (val != -1) {
 			after = strpbrk(valstr, WHITESPACE);
-			gsh_set_opt(sh, shopt_ch + 1, val);
+			// gsh_set_opt(sh, shopt_ch + 1, val);
+			//  FIXME: Push shopt command onto queue.
 		}
 	}
 
@@ -352,43 +369,8 @@ void gsh_split_words(struct gsh_parse_state *state, char *line)
 			return;
 }
 
-/*
-	*** For our purposes, a "word" is a contiguous sequence of characters
-		NOT containing whitespace.
-*/
-// Init.
-//
-// Step 0:	[ ] Clean up previous parse state.
-// 
-// Splitting.
-// 
-// Step 1:	[x] Split the ENTIRE line into words, and place the addresses
-//		of these words in an array.
-
-// Parsing.
-// 
-// Step 2:	[ ] Using these words, parse tokens such as ';', '$' and '@', 
-//		as well as text and/or numbers.
-
-// Expansion.
-// 
-// Step 3:	[ ] Replace '$' tokens followed by text tokens with the corresponding values.
-//		This is also where shell option tokens are processed and removed.
-
-// Creation of command objects.
-// 
-// Step 4:	[ ] Whenever a ';' token (or newline) is encountered, 
-//		create a new command object consisting of the tokens 
-//		preceding the semicolon, and which have not yet been placed in a command.
-//
-//		Push this command object onto the command queue.
-
-// Running.
-// 
-// Step 5:	[ ] Run and pop the command objects, starting from the first one.
-//
 void gsh_parse_cmd(struct gsh_parse_state *state,
-		   struct gsh_parsed_cmd *cmd)
+		   struct gsh_cmd_queue *cmd_queue)
 {
 	if (state->lineptr[0] == '\0')
 		return;
@@ -396,17 +378,17 @@ void gsh_parse_cmd(struct gsh_parse_state *state,
 	// FIXME: WARNING: THIS MIGHT BE WRONG!
 	// If the command is a keyword, there won't be a pathname.
 	// (At first.)
-	
+
 	// Skip any whitespace preceding pathname.
 	cmd->pathname = state->lineptr + strspn(state->lineptr, WHITESPACE);
 
-	//if (!gsh_parse_filename(state, params))
+	// if (!gsh_parse_filename(state, params))
 	//	return;
 
-	//gsh_parse_cmd_args(state, params);
+	// gsh_parse_cmd_args(state, params);
 
 	// Still more words in line, so start new command.
-	//if (*state->word_it)
+	// if (*state->word_it)
 
 	cmd->argc = state->word_n;
 }

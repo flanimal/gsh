@@ -31,14 +31,18 @@ enum gsh_shopt_flags {
 	GSH_OPT_DEFAULTS = GSH_OPT_PROMPT_WORKDIR | GSH_OPT_ECHO,
 };
 
+struct gsh_cmd_queue {
+	struct gsh_parsed_cmd *front;
+};
+
 struct gsh_state {
 	/* Command history. */
 	struct gsh_cmd_hist *hist;
 	
 	struct gsh_input_buf *inputbuf;
 
-	struct gsh_parsed_cmd *cmd;
-	struct gsh_parse_state *parse_state;
+	struct gsh_parser *parser;
+	struct gsh_cmd_queue cmd_queue;
 
 	/* Current working directory of the shell process. */
 	char *cwd;
@@ -49,8 +53,8 @@ struct gsh_state {
 	struct gsh_params params;
 	enum gsh_shopt_flags shopts;
 	
-	struct hsearch_data *shopt_tbl;
-	struct hsearch_data *builtin_tbl;
+	const struct hsearch_data *shopt_tbl;
+	const struct hsearch_data *builtin_tbl;
 };
 
 /*	Set initial values and resources for the shell. 

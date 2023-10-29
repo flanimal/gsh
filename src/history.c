@@ -27,12 +27,7 @@ struct gsh_cmd_hist {
 
 struct gsh_cmd_hist *gsh_new_hist()
 {
-	struct gsh_cmd_hist *hist = malloc(sizeof(*hist));
-
-	hist->newest = hist->oldest = NULL;
-	hist->count = 0;
-
-	return hist;
+	return calloc(1, sizeof(struct gsh_cmd_hist));
 }
 
 static void new_hist_ent(struct gsh_cmd_hist *hist, size_t len,
