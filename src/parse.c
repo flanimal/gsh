@@ -29,11 +29,14 @@ struct gsh_parse_state {
 	/* Must be below ARG_MAX/__POSIX_ARG_MAX. */
 	size_t words_size;
 
-	/* Position within word to begin expansion. */
-	size_t expand_skip;
-
 	/* Pointer to the next word in the line, gotten by strtok_r(). */
 	char *lineptr;
+};
+
+struct gsh_expand_state
+{
+	/* Position within word to begin expansion. */
+	size_t expand_skip;
 
 	const struct gsh_params *params;
 
@@ -353,6 +356,10 @@ void gsh_split_words(struct gsh_parse_state *state, char *line)
 	*** For our purposes, a "word" is a contiguous sequence of characters
 		NOT containing whitespace.
 */
+// Init.
+//
+// Step 0:	Clean up previous parse state.
+// 
 // Splitting.
 // 
 // Step 1:	Split the ENTIRE line into words, and place the addresses
