@@ -64,12 +64,12 @@ static int gsh_type(struct gsh_state *sh, int argc, char *const *argv)
 	}
 
 	char *pathname = malloc(sh->max_path);
-	char *pn_pos;
+	char *pdir;
 	
 	for (const char *path_it = gsh_getenv(&sh->params, "PATH"); path_it;
-	     path_it += (pn_pos - pathname)) {
-		pn_pos = memccpy(pathname, path_it, ':', sh->max_path);
-		snprintf(pn_pos - 1, sh->max_path - (pn_pos - pathname), "/%s", argv[1]);
+	     path_it += (pdir - pathname)) {
+		pdir = memccpy(pathname, path_it, ':', sh->max_path);
+		snprintf(pdir - 1, sh->max_path - (pdir - pathname), "/%s", argv[1]);
 
 		if (stat(pathname, &st) == 0 && (st.st_mode & 0111)) {
 			printf("%s: file (%s)\n", argv[1], pathname);
@@ -117,7 +117,7 @@ static int gsh_while(struct gsh_state* sh, int argc, char* const* argv)
 	You don't want to have to specify explicitly what to do if
 	a token or part of token isn't found. It's verbose and clumsy.
 */
-static int gsh_while(struct gsh_state *sh, int argc, char *const *argv)
+static int gsh_process_opt(struct gsh_state *sh, int argc, char *const *argv)
 {
 	if (!isalnum(shopt_ch[1])) {
 		// There wasn't a name following the '@' character,

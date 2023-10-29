@@ -80,6 +80,8 @@ void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
 	*parser = calloc(1, sizeof(**parser) + words_size);
 	(*parser)->word_it = (const char **)(*parser)->words;
 
+	// FIXME: It may be unwise to initialize expand_state::bufs with
+	// calloc().
 	(*parser)->expand_st =
 		calloc(1, sizeof(*(*parser)->expand_st) + words_size);
 	(*parser)->expand_st->params = params;
@@ -90,6 +92,7 @@ void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
 static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, char **word_it,
 			       int inc)
 {
+	// FIXME: May want to get rid of strlen().
 	const size_t new_len = strlen(*word_it) + inc;
 	const size_t buf_n = exp->buf_n;
 
@@ -106,44 +109,41 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, char **word_it,
 /*	Format a span within a word with the given args, allocating a buffer if
  *	necessary. Returns the increase in size if there is one.
  */
-static void gsh_expand_span(struct gsh_expand_state *exp,
-			    const char **word_it, struct gsh_fmt_span *span,
-			    ...)
+static void gsh_expand_span(struct gsh_expand_state *exp, const char **word_it,
+			    struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
 
 	va_start(fmt_args, span);
+
 	// TODO: MAX_EXPAND_LEN?
 	const int print_len = vsnprintf(NULL, 0, span->fmt_str, fmt_args);
 	va_end(fmt_args);
 
 	assert(print_len >= 0);
+
 	const int size_inc = print_len - span->len;
 
-	va_start(fmt_args, span);
-	// FIXME: We don't remove extra space after expansion!
-	if (size_inc <= 0) {
-		exp->skip += vsprintf(span->begin, span->fmt_str, fmt_args);
+	exp->size_inc += size_inc;
+	exp->skip += print_len;
 
-		va_end(fmt_args);
-		return;
+	va_start(fmt_args, span);
+
+	if (size_inc > 0) {
+		const ptrdiff_t before_len = span->begin - *word_it;
+		span->begin =
+			gsh_alloc_wordbuf(exp, word_it, size_inc) + before_len;
 	}
 
-	exp->size_inc += size_inc;
-
-	const ptrdiff_t before_len = span->begin - *word_it;
-
-	// TODO: (Idea) Allocate and fill with empty space instead of duping
-	// after? Need to allocate.
-	char *after = strdup(span->begin + span->len);
-	span->begin = gsh_alloc_wordbuf(exp, word_it, size_inc) + before_len;
+	// If the printed length is less than the length of the unformatted
+	// span, there will be empty space. So, shift the rest of the string
+	// down. And of course, do this if the rest of the string would've
+	// been overwritten.
+	if (size_inc != 0)
+		memmove(span->begin + print_len, span->begin + span->len,
+			span->len);
 
 	vsprintf(span->begin, span->fmt_str, fmt_args);
-	strcpy(span->begin + print_len, after);
-
-	exp->skip += (span->begin) ? (size_t)print_len : span->len;
-
-	free(after);
 	va_end(fmt_args);
 }
 
@@ -165,8 +165,7 @@ static void gsh_fmt_var(struct gsh_expand_state *exp, const char **word_it,
 
 	char *var_name = strndup(span->begin + 1, span->len - 1);
 
-	gsh_expand_span(exp, word_it, span,
-			gsh_getenv(exp->params, var_name));
+	gsh_expand_span(exp, word_it, span, gsh_getenv(exp->params, var_name));
 	free(var_name);
 }
 
@@ -184,8 +183,7 @@ static void gsh_fmt_param(struct gsh_expand_state *exp, const char **word_it,
 	case GSH_CHAR_PARAM_STATUS:
 		span.fmt_str = "%d";
 
-		gsh_expand_span(exp, word_it, &span,
-				exp->params->last_status);
+		gsh_expand_span(exp, word_it, &span, exp->params->last_status);
 		break;
 	default:
 		span.fmt_str = "%s";
@@ -224,8 +222,7 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word_it,
 /*      Expand the last word.
  *	Returns true while there are still expansions to be performed.
  */
-static bool gsh_expand_word(struct gsh_expand_state *exp,
-			    const char **word_it)
+static bool gsh_expand_word(struct gsh_expand_state *exp, const char **word_it)
 {
 	char *fmt_begin = strpbrk(*word_it + exp->skip, gsh_special_chars);
 
@@ -350,21 +347,19 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	//	- Opening paren '('
 	//	- Closing paren ')'
 	// FIXME: We need an actual _grammar_.
-	// E.g. If we reached a '$' 
+	// E.g. If we reached a '$'
 
-	enum token_type
-	{
+	enum token_type {
+		TEXT,
+		PARAM_REF,
 		SINGLE_QUOTE = '\'',
 		DOUBLE_QUOTE = '\"',
 		OPEN_PAREN = '(',
 		CLOSE_PAREN = ')',
-		TEXT,
-		PARAM_REF,
 		CMD_SEP = ';',
 	};
 
-	struct token
-	{
+	struct token {
 		const char *data;
 		size_t len;
 		enum token_type type;
@@ -373,7 +368,8 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	struct token tokens[256];
 	struct token *tok_it = tokens;
 
-	for (const char **word_it = p->words; word_it != p->word_it; ++word_it) {
+	for (const char **word_it = p->words; word_it != p->word_it;
+	     ++word_it) {
 		char *ch = *word_it;
 		// This handles tokens that are expanded.
 		while (gsh_expand_word(p->expand_st, word_it))
@@ -394,15 +390,13 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 
 				++ch;
 				++tok_it;
-				
+
 				break;
 			default:
 				++tok_it->len;
 
 				break;
 			}
-
-
 		}
 	}
 
