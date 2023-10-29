@@ -2,11 +2,10 @@
 
 #define WHITESPACE " \f\n\r\t\v"
 
-/*
- *	The maximum number of arguments that can be passed on the command line,
- * 	including the filename.
+/*	The maximum number of arguments to accept before reallocating the 
+ *	argument list.
  */
-#define GSH_MAX_ARGS 64
+#define GSH_MIN_ARG_N 64
 
 struct gsh_parse_state;
 struct gsh_params;
@@ -17,13 +16,13 @@ struct gsh_parsed_cmd {
 	int argc;
 
 	/* List of words to be returned from parsing. */
-	char *argv[GSH_MAX_ARGS];
+	char *argv[];
 };
 
 void gsh_parse_init(struct gsh_parse_state **state,
-		    struct gsh_parsed_cmd **parsebufs);
+		    struct gsh_parsed_cmd **parsebufs, struct gsh_params *params);
 
-void gsh_parse_reset(struct gsh_parse_state *state, char *line);
+void gsh_split_words(struct gsh_parse_state *state, char *line);
 
-void gsh_parse_cmd(struct gsh_parse_state *state, const struct gsh_params *params,
+void gsh_parse_cmd(struct gsh_parse_state *state,
 		   struct gsh_parsed_cmd *cmd);

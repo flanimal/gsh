@@ -116,7 +116,7 @@ void gsh_init(struct gsh_state *sh)
 	sh->inputbuf = gsh_new_inputbuf();
 	sh->hist = gsh_new_hist();
 
-	gsh_parse_init(&sh->parse_state, &sh->cmd);
+	gsh_parse_init(&sh->parse_state, &sh->cmd, &sh->params);
 
 	sh->shopts = GSH_OPT_DEFAULTS;
 
@@ -228,30 +228,12 @@ void gsh_run_cmd(struct gsh_state *sh)
 
 	gsh_add_hist(sh->hist, sh->inputbuf->len, sh->inputbuf->line);
 
-	// Change shell options first.
-	//
-	// NOTE: Because this occurs before any other parsing or tokenizing,
-	// it means that "@" characters will be interpreted as shell options
-	// even inside quotes.
-	//
-	// The solution might be to only count words _beginning with_ the '@'
-	// character as option assignments.
-	// So,
-	//	If '@' occurs at beginning of line, OR
-	//	If '@' occurs immediately after whitespace (beginning of new
-	// word)
-	// Except that won't necessarily work -- what if the '@' follows
-	// whitespace, but within quotes? It will still be processed.
-	//
-	// The _real_ solution might be that we have to split the line into
-	// words separately from parsing them. Split first, then process
-	// options, then parse.
-	//
-	for (char *shopt = sh->inputbuf->line; (shopt = strchr(shopt, '@'));)
-		gsh_process_opt(sh, shopt);
 
-	gsh_parse_reset(sh->parse_state, sh->inputbuf->line);
-	gsh_parse_cmd(sh->parse_state, &sh->params, sh->cmd);
+	//for (char *shopt = sh->inputbuf->line; (shopt = strchr(shopt, '@'));)
+	//	gsh_process_opt(sh, shopt);
+
+	gsh_split_words(sh->parse_state, sh->inputbuf->line);
+	gsh_parse_cmd(sh->parse_state, sh->cmd);
 	
 	gsh_switch(sh, sh->cmd);
 

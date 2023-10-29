@@ -1,3 +1,5 @@
+#include <limits.h>
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -17,22 +19,25 @@
 #define unreachable() __assume(0)
 #endif
 
-// TODO: gsh_expand_state?
-// Expansion -> Parsing?
 struct gsh_parse_state {
 	/* Iterator pointing to the word currently being parsed. */
 	const char **word_it;
 	size_t word_n;
 
+	/* Must be below ARG_MAX/__POSIX_ARG_MAX. */
+	size_t words_size;
+
 	/* Position within word to begin expansion. */
 	size_t expand_skip;
 
-	/* Stack of buffers for words that contain substitutions. */
-	size_t buf_n;
-	char *wordbufs[GSH_MAX_ARGS];
-
 	/* Pointer to the next word in the line, gotten by strtok_r(). */
 	char *lineptr;
+
+	const struct gsh_params *params;
+
+	/* Stack of buffers for words that contain substitutions. */
+	size_t buf_n;
+	char *wordbufs[];
 };
 
 struct gsh_fmt_span {
@@ -47,17 +52,21 @@ struct gsh_fmt_span {
 };
 
 void gsh_parse_init(struct gsh_parse_state **state,
-		    struct gsh_parsed_cmd **parsebufs)
+		    struct gsh_parsed_cmd **parsebufs,
+		    struct gsh_params *params)
 {
-	*parsebufs = calloc(1, sizeof(**parsebufs));
+	const size_t args_size = GSH_MIN_ARG_N * sizeof(char *);
 
-	*state = calloc(1, sizeof(**state));
+	*parsebufs = calloc(1, sizeof(**parsebufs) + args_size);
+
+	*state = calloc(1, sizeof(**state) + args_size);
 	(*state)->word_it = (const char **)(*parsebufs)->argv;
+	(*state)->params = params;
 }
 
 /*	Allocate and return a word buffer.
  */
-static char *gsh_alloc_wordbuf(struct gsh_parse_state *state, size_t inc)
+static char *gsh_alloc_wordbuf(struct gsh_parse_state *state, int inc)
 {
 	const size_t new_len = strlen(*state->word_it) + inc;
 	const size_t buf_n = state->buf_n;
@@ -72,10 +81,8 @@ static char *gsh_alloc_wordbuf(struct gsh_parse_state *state, size_t inc)
 	return newbuf;
 }
 
-// TODO: Keep track of length of each word?
-
 /*	Format a span within a word with the given args, allocating a buffer if
- * necessary.
+ *	necessary.
  */
 static void gsh_expand_span(struct gsh_parse_state *state,
 			    struct gsh_fmt_span *span, ...)
@@ -88,10 +95,11 @@ static void gsh_expand_span(struct gsh_parse_state *state,
 	va_end(fmt_args);
 
 	assert(print_len >= 0);
+	const int size_inc = print_len - span->len;
 
 	va_start(fmt_args, span);
 	// FIXME: We don't remove extra space after expansion!
-	if (span->len >= (size_t)print_len) {
+	if (size_inc <= 0) {
 		state->expand_skip +=
 			vsprintf(span->begin, span->fmt_str, fmt_args);
 
@@ -99,13 +107,14 @@ static void gsh_expand_span(struct gsh_parse_state *state,
 		return;
 	}
 
+	state->words_size += size_inc;
+	
+	const ptrdiff_t before_len = span->begin - *state->word_it;
+
 	// TODO: (Idea) Allocate and fill with empty space instead of duping
 	// after? Need to allocate.
 	char *after = strdup(span->begin + span->len);
-
-	const ptrdiff_t before_len = span->begin - *state->word_it;
-
-	span->begin = gsh_alloc_wordbuf(state, print_len - span->len) + before_len;
+	span->begin = gsh_alloc_wordbuf(state, size_inc) + before_len;
 
 	vsprintf(span->begin, span->fmt_str, fmt_args);
 	strcpy(span->begin + print_len, after);
@@ -125,24 +134,22 @@ static void gsh_expand_span(struct gsh_parse_state *state,
  *	string.
  */
 static void gsh_fmt_var(struct gsh_parse_state *state,
-			const struct gsh_params *params,
 			struct gsh_fmt_span *span)
 {
 	if (strcmp(*state->word_it, span->begin) == 0) {
-		*state->word_it = gsh_getenv(params, span->begin + 1);
+		*state->word_it = gsh_getenv(state->params, span->begin + 1);
 		return;
 	}
 
 	char *var_name = strndup(span->begin + 1, span->len - 1);
 
-	gsh_expand_span(state, span, gsh_getenv(params, var_name));
+	gsh_expand_span(state, span, gsh_getenv(state->params, var_name));
 	free(var_name);
 }
 
 /*      Substitute a parameter reference with its value.
  */
 static void gsh_fmt_param(struct gsh_parse_state *state,
-			  const struct gsh_params *params,
 			  char *const fmt_begin)
 {
 	struct gsh_fmt_span span = {
@@ -154,12 +161,12 @@ static void gsh_fmt_param(struct gsh_parse_state *state,
 	case GSH_STATUS_PARAM:
 		span.fmt_str = "%d";
 
-		gsh_expand_span(state, &span, params->last_status);
+		gsh_expand_span(state, &span, state->params->last_status);
 		break;
 	default:
 		span.fmt_str = "%s";
 
-		gsh_fmt_var(state, params, &span);
+		gsh_fmt_var(state, &span);
 		break;
 	}
 }
@@ -169,10 +176,9 @@ static void gsh_fmt_param(struct gsh_parse_state *state,
 	If the word consists only of the home character, it will be
 *	assigned to point to the value of $HOME.
 */
-static void gsh_fmt_home(struct gsh_parse_state *state,
-			 const struct gsh_params *params, char *const fmt_begin)
+static void gsh_fmt_home(struct gsh_parse_state *state, char *const fmt_begin)
 {
-	const char *homevar = gsh_getenv(params, "HOME");
+	const char *homevar = gsh_getenv(state->params, "HOME");
 
 	// TODO: Move the whole-word check out of the fmt_* functions so that
 	// it makes more sense with strpbrk() converting const char * to char *?
@@ -193,8 +199,7 @@ static void gsh_fmt_home(struct gsh_parse_state *state,
 /*      Expand the last word.
  *	Returns true while there are still expansions to be performed.
  */
-static bool gsh_expand_word(struct gsh_parse_state *state,
-			    const struct gsh_params *params)
+static bool gsh_expand_word(struct gsh_parse_state *state)
 {
 	char *fmt_begin = strpbrk(*state->word_it + state->expand_skip,
 				  gsh_special_chars);
@@ -204,10 +209,10 @@ static bool gsh_expand_word(struct gsh_parse_state *state,
 
 	switch ((enum gsh_special_char)fmt_begin[0]) {
 	case GSH_PARAM_CH:
-		gsh_fmt_param(state, params, fmt_begin);
+		gsh_fmt_param(state, fmt_begin);
 		return true;
 	case GSH_HOME_CH:
-		gsh_fmt_home(state, params, fmt_begin);
+		gsh_fmt_home(state, fmt_begin);
 		return true;
 	}
 
@@ -218,15 +223,30 @@ static bool gsh_expand_word(struct gsh_parse_state *state,
  *
  *	Returns next word or NULL if no next word, similar to strtok().
  */
-static const char *gsh_next_word(struct gsh_parse_state *state,
-				 const struct gsh_params *params, char *line)
+static const char *gsh_next_word(struct gsh_parse_state *state, char *line)
 {
 	*state->word_it = strtok_r(line, WHITESPACE, &state->lineptr);
 	if (!(*state->word_it))
 		return NULL;
 
-	while (gsh_expand_word(state, params))
+	const size_t old_words_size = state->words_size;
+
+	// FIXME: ... is using lineptr a good idea?
+	state->words_size += state->lineptr - *state->word_it;
+
+	while (gsh_expand_word(state))
 		;
+
+	const size_t word_len = state->words_size - old_words_size;
+
+	if (*state->word_it[word_len - 1] == ';')
+		// End current command, and begin another with remaining
+		// words.
+		//
+		// This could be done by checking that we have reached
+		// the end of the input buffer; if not, it must mean
+		// there was more than one command.
+		return;
 
 	state->expand_skip = 0;
 	if (state->wordbufs[state->buf_n])
@@ -239,44 +259,30 @@ static const char *gsh_next_word(struct gsh_parse_state *state,
 /*      Parse the first word in the input line, and place
  *      the filename in the argument array.
  */
-static bool gsh_parse_filename(struct gsh_parse_state *state,
-			       const struct gsh_params *params)
-{
-	const char *fn = gsh_next_word(state, params, state->lineptr);
-	if (!fn)
-		return false;
-
-	char *last_slash = strrchr(fn, '/');
-	if (last_slash)
-		state->word_it[-1] = last_slash + 1;
-
-	return !!state->word_it[-1];
-}
-
-/*	Parse words and place them into the argument array, which is
- *      then terminated with a NULL pointer.
- */
-static void gsh_parse_cmd_args(struct gsh_parse_state *state,
-			       const struct gsh_params *params)
-{
-	const char *next_word;
-
-	while (state->word_n <= GSH_MAX_ARGS) {
-		if (!(next_word = gsh_next_word(state, params, NULL)))
-			return;
-
-		// TODO: Don't use strlen() for this.
-		if (next_word[strlen(next_word) - 1] == ';')
-			// End current command, and begin another with remaining
-			// words.
-			//
-			// This could be done by checking that we have reached
-			// the end of the input buffer; if not, it must mean
-			// there was more than one command.
-			return;
-		
-	}
-}
+//static bool gsh_parse_filename(struct gsh_parse_state *state,
+//			       const struct gsh_params *params)
+//{
+//	const char *fn = gsh_next_word(state, params, state->lineptr);
+//	if (!fn)
+//		return false;
+//
+//	char *last_slash = strrchr(fn, '/');
+//	if (last_slash)
+//		state->word_it[-1] = last_slash + 1;
+//
+//	return !!state->word_it[-1];
+//}
+//
+///*	Parse words and place them into the argument array, which is
+// *      then terminated with a NULL pointer.
+// */
+//static void gsh_parse_cmd_args(struct gsh_parse_state *state,
+//			       const struct gsh_params *params)
+//{
+//	while (state->words_size <= (_POSIX_ARG_MAX - params->env_len))
+//		if (!gsh_next_word(state, params, NULL))
+//			return;
+//}
 
 static void gsh_free_parsed(struct gsh_parse_state *state)
 {
@@ -293,16 +299,26 @@ static void gsh_free_parsed(struct gsh_parse_state *state)
 		*(--state->word_it) = NULL;
 }
 
-void gsh_parse_reset(struct gsh_parse_state *state, char *line)
+void gsh_split_words(struct gsh_parse_state *state, char *line)
 {
 	gsh_free_parsed(state);
 	state->lineptr = line;
+
+	while (state->words_size <= (_POSIX_ARG_MAX - state->params->env_len))
+		if (!gsh_next_word(state, NULL))
+			return;
 }
 
 // TODO: Semicolon ';' command break.
-// TODO: Command stack.
+// TODO: Command queue.
 // 
-void gsh_parse_cmd(struct gsh_parse_state *state, const struct gsh_params *params,
+// For each input line, zero or more semicolon (or newline) terminated commands
+// are pushed onto the FIFO command queue.
+
+//	SPLIT into words -> PARSE ->
+//	->	1. PROCESS AND REMOVE OPTIONS
+//		2. Perform EXPANSIONS with '$' tokens followed by text tokens, etc.
+void gsh_parse_cmd(struct gsh_parse_state *state,
 		   struct gsh_parsed_cmd *cmd)
 {
 	if (state->lineptr[0] == '\0')
@@ -315,10 +331,10 @@ void gsh_parse_cmd(struct gsh_parse_state *state, const struct gsh_params *param
 	// Skip any whitespace preceding pathname.
 	cmd->pathname = state->lineptr + strspn(state->lineptr, WHITESPACE);
 
-	if (!gsh_parse_filename(state, params))
-		return;
+	//if (!gsh_parse_filename(state, params))
+	//	return;
 
-	gsh_parse_cmd_args(state, params);
+	//gsh_parse_cmd_args(state, params);
 
 	// Still more words in line, so start new command.
 	//if (*state->word_it)
