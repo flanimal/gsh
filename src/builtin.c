@@ -112,6 +112,9 @@ static int gsh_while(struct gsh_state* sh, int argc, char* const* argv)
 	return 0;
 }
 
+// FIXME: (!)
+//static int gsh_shopt
+
 static int gsh_puthelp(struct gsh_state *sh, int argc, char *const *argv);
 
 static struct gsh_builtin builtins[] = {

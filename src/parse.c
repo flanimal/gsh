@@ -163,7 +163,7 @@ static void gsh_fmt_param(struct gsh_parse_state *state,
 	};
 
 	switch ((enum gsh_special_param)span.begin[1]) {
-	case GSH_STATUS_PARAM:
+	case GSH_CHAR_PARAM_STATUS:
 		span.fmt_str = "%d";
 
 		gsh_expand_span(state, &span, state->params->last_status);
@@ -187,7 +187,7 @@ static void gsh_fmt_home(struct gsh_parse_state *state, char *const fmt_begin)
 
 	// TODO: Move the whole-word check out of the fmt_* functions so that
 	// it makes more sense with strpbrk() converting const char * to char *?
-	if (strcmp(*state->word_it, (char[]){ GSH_HOME_CH, '\0' }) == 0) {
+	if (strcmp(*state->word_it, (char[]){ GSH_CHAR_HOME, '\0' }) == 0) {
 		*state->word_it = homevar;
 		return;
 	}
@@ -213,10 +213,10 @@ static bool gsh_expand_word(struct gsh_parse_state *state)
 		return false;
 
 	switch ((enum gsh_special_char)fmt_begin[0]) {
-	case GSH_PARAM_CH:
+	case GSH_CHAR_PARAM:
 		gsh_fmt_param(state, fmt_begin);
 		return true;
-	case GSH_HOME_CH:
+	case GSH_CHAR_HOME:
 		gsh_fmt_home(state, fmt_begin);
 		return true;
 	}
@@ -358,26 +358,26 @@ void gsh_split_words(struct gsh_parse_state *state, char *line)
 */
 // Init.
 //
-// Step 0:	Clean up previous parse state.
+// Step 0:	[ ] Clean up previous parse state.
 // 
 // Splitting.
 // 
-// Step 1:	Split the ENTIRE line into words, and place the addresses
+// Step 1:	[x] Split the ENTIRE line into words, and place the addresses
 //		of these words in an array.
 
 // Parsing.
 // 
-// Step 2:	Using these words, parse tokens such as ';', '$' and '@', 
+// Step 2:	[ ] Using these words, parse tokens such as ';', '$' and '@', 
 //		as well as text and/or numbers.
 
 // Expansion.
 // 
-// Step 3:	Replace '$' tokens followed by text tokens with the corresponding values.
+// Step 3:	[ ] Replace '$' tokens followed by text tokens with the corresponding values.
 //		This is also where shell option tokens are processed and removed.
 
 // Creation of command objects.
 // 
-// Step 4:	Whenever a ';' token (or newline) is encountered, 
+// Step 4:	[ ] Whenever a ';' token (or newline) is encountered, 
 //		create a new command object consisting of the tokens 
 //		preceding the semicolon, and which have not yet been placed in a command.
 //
@@ -385,7 +385,8 @@ void gsh_split_words(struct gsh_parse_state *state, char *line)
 
 // Running.
 // 
-// Step 5:	Run and pop the command objects, starting from the first one.
+// Step 5:	[ ] Run and pop the command objects, starting from the first one.
+//
 void gsh_parse_cmd(struct gsh_parse_state *state,
 		   struct gsh_parsed_cmd *cmd)
 {
