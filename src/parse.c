@@ -285,7 +285,7 @@ static const char *gsh_next_word(struct gsh_parser *p, char *line)
 /*      Parse the first word in the input line, and place
  *      the filename in the argument array.
  */
- static bool gsh_parse_filename(struct gsh_parser *p)
+static bool gsh_parse_filename(struct gsh_parser *p)
 {
 	if (!p->words[0])
 		return false;
@@ -295,17 +295,6 @@ static const char *gsh_next_word(struct gsh_parser *p, char *line)
 		p->words[0] = last_slash + 1;
 
 	return !!p->words[0];
- }
-
- // FIXME:
-/*	Parse words and place them into the argument array, which is
- *      then terminated with a NULL pointer.
- */
- static void gsh_parse_cmd_args(struct gsh_parser *p)
- {
-	while (p->words_size <= (_POSIX_ARG_MAX - p->expand_st->params->env_len))
-		if (!gsh_next_word(p, NULL))
-			return;
 }
 
 static void gsh_free_parsed(struct gsh_parser *p)
@@ -321,45 +310,6 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	// Reset word list.
 	for (; p->word_n > 0; --p->word_n)
 		*(--p->word_it) = NULL;
-}
-
-// TODO: Make process_opt a builtin?
-/*
-	You don't want to have to specify explicitly what to do if
-	a token or part of token isn't found. It's verbose and clumsy.
-*/
-static void gsh_process_opt(struct gsh_state *sh, char *shopt_ch)
-{
-	if (!isalnum(shopt_ch[1])) {
-		// There wasn't a name following the '@' character,
-		// so remove the '@' and continue.
-		*shopt_ch = ' ';
-		return;
-	}
-
-	char *valstr = strpbrk(shopt_ch + 1, WHITESPACE);
-	char *after = valstr;
-
-	if (valstr && isalpha(valstr[1])) {
-		*valstr++ = '\0';
-
-		const int val = (strncmp(valstr, "on", 2) == 0)	 ? true :
-				(strncmp(valstr, "off", 3) == 0) ? false :
-								   -1;
-		if (val != -1) {
-			after = strpbrk(valstr, WHITESPACE);
-			// gsh_set_opt(sh, shopt_ch + 1, val);
-			//  FIXME: Push shopt command onto queue.
-		}
-	}
-
-	if (!after) {
-		*shopt_ch = '\0';
-		return;
-	}
-
-	while (shopt_ch != after + 1)
-		*shopt_ch++ = ' ';
 }
 
 void gsh_split_words(struct gsh_parser *p, char *line, size_t max_size)
@@ -386,13 +336,29 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	// Skip any whitespace preceding pathname.
 	cmd->pathname = p->lineptr + strspn(p->lineptr, WHITESPACE);
 
-	 if (!gsh_parse_filename(p))
+	if (!gsh_parse_filename(p))
 		return;
 
-	 gsh_parse_cmd_args(p);
+	// FIXME: Parsing/tokenization here.
+	cmd->argc = p->word_n;
+
+	// Tokens:
+	//	- Text
+	//	- Number(?)
+	//	- Command separator (semicolon ';')
+	//	- Reference (dollar sign '$')
+	//		- Home reference (tilde '~')
+	//	- Single-quote '
+	//	- Double-quote "
+	//	- Opening paren '('
+	//	- Closing paren ')'
+	for (const char **word_it = p->words;  word_it != p->word_it; ++word_it) {
+		// This handles tokens that are expanded.
+		while (gsh_expand_word(p->expand_st, word_it))
+			;
+
+	}
 
 	// Still more words in line, so start new command.
 	// if (*state->word_it)
-
-	cmd->argc = p->word_n;
 }
