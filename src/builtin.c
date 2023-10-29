@@ -113,6 +113,9 @@ static int gsh_while(struct gsh_state* sh, int argc, char* const* argv)
 }
 
 // FIXME: Make process_opt a builtin?
+// NOTE: If we make this a builtin, it will be special in that
+// no space between the builtin name and its argument (the shopt name)
+// is required.
 /*
 	You don't want to have to specify explicitly what to do if
 	a token or part of token isn't found. It's verbose and clumsy.
@@ -137,8 +140,7 @@ static int gsh_process_opt(struct gsh_state *sh, int argc, char *const *argv)
 								   -1;
 		if (val != -1) {
 			after = strpbrk(valstr, WHITESPACE);
-			// gsh_set_opt(sh, shopt_ch + 1, val);
-			//  FIXME: Push shopt command onto queue.
+			gsh_set_opt(sh, shopt_ch + 1, val);
 		}
 	}
 
@@ -161,6 +163,7 @@ static struct gsh_builtin builtins[] = {
 	{ "help", "Display this help page.", gsh_puthelp },
 	{ "type", "Display command type and location.", gsh_type },
 	{ "while", "Run command while a condition is true.", gsh_while },
+	{ "@", "Change shell options.", gsh_process_opt },
 	{ "exit", "Exit the shell.", NULL },
 };
 
@@ -169,18 +172,21 @@ static int gsh_puthelp(struct gsh_state *sh, int argc, char *const *argv)
 	char dots[15];
 	memset(dots, '.', sizeof(dots));
 
+	size_t cmd_len, dot_len;
+	cmd_len = dot_len = 0;
+
 	for (size_t i = 0; i < sizeof(builtins) / sizeof(*builtins); ++i) {
-		const size_t cmd_len = (size_t)printf("%s ", builtins[i].cmd);
+		cmd_len = (size_t)printf("%s ", builtins[i].cmd);
 
 		if (cmd_len > sizeof(dots)) {
 			puts(builtins[i].helpstr);
 			continue;
 		}
 
-		dots[sizeof(dots) - cmd_len] = '\0';
+		dots[dot_len] = '.';
+		dots[(dot_len = sizeof(dots) - cmd_len)] = '\0';
 
 		printf("%s %s\n", dots, builtins[i].helpstr);
-		dots[sizeof(dots) - cmd_len] = '.';
 	}
 
 	return 0;
