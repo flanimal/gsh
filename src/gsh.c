@@ -176,8 +176,6 @@ void gsh_set_opt(struct gsh_state *sh, char *name, bool value)
 		sh->shopts &= ~flag;
 }
 
-// NOTE: (Idea) The entire reason gsh_input_buf exists
-// is for gsh_run_cmd(). Should we move run_cmd() to input.c?
 void gsh_run_cmd(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);
@@ -189,10 +187,12 @@ void gsh_run_cmd(struct gsh_state *sh)
 
 	gsh_add_hist(sh->hist, sh->inputbuf->len, sh->inputbuf->line);
 
-	gsh_split_words(sh->parse_state, sh->inputbuf->line);
-	gsh_parse_cmd(sh->parse_state, sh->cmd);
-	
-	gsh_switch(sh, sh->cmd);
+	gsh_split_words(sh->parser, sh->inputbuf->line);
+
+	do {
+		gsh_parse_cmd(sh->parser, &sh->cmd_queue);
+		gsh_switch(sh, sh->cmd_queue.front);
+	} while (sh->cmd_queue.front);
 
 	sh->inputbuf->len = 0;
 }

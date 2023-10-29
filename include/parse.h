@@ -38,5 +38,5 @@ void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params);
 
 void gsh_split_words(struct gsh_parse_state *state, char *line);
 
-void gsh_parse_cmd(struct gsh_parse_state *state,
+void gsh_parse_cmd(struct gsh_parser *parser,
 		   struct gsh_cmd_queue *cmd_queue);
