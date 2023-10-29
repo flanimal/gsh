@@ -28,8 +28,6 @@ struct gsh_parser {
 	struct gsh_parse_state *parse_state;
 	struct gsh_expand_state *expand_state;
 
-	const struct gsh_params *params;
-
 	char *words[];
 };
 
@@ -48,6 +46,8 @@ struct gsh_parse_state {
 struct gsh_expand_state {
 	/* Position within word to begin expansion. */
 	size_t expand_skip;
+
+	const struct gsh_params *params;
 
 	/* Stack of buffers for words that contain substitutions. */
 	size_t buf_n;
@@ -82,7 +82,8 @@ void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
 	(*parser)->parse_state = calloc(1, sizeof(*(*parser)->parse_state));
 	(*parser)->parse_state->word_it = (const char **)(*parser)->words;
 
-	(*parser)->params = params;
+	(*parser)->expand_state = calloc(1, sizeof(*(*parser)->expand_state) + words_size);
+	(*parser)->expand_state->params = params;
 }
 
 /*	Allocate and return a word buffer.
@@ -372,7 +373,7 @@ void gsh_split_words(struct gsh_parser *parser, char *line)
 	gsh_free_parsed(parser);
 	parser->parse_state->lineptr = line;
 
-	while (parser->parse_state->words_size <= (_POSIX_ARG_MAX - parser->params->env_len))
+	while (parser->parse_state->words_size <= (_POSIX_ARG_MAX - parser->expand_state->params->env_len))
 		if (!gsh_next_word(parser, NULL))
 			return;
 }
