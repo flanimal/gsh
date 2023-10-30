@@ -40,7 +40,7 @@ struct gsh_parser {
 	char *words[];
 };
 
-// TODO: Should this be the state for a single expansion, or all so far?
+// NOTE: Should this be the state for a single expansion, or all so far?
 struct gsh_expand_state {
 	const struct gsh_params *params;
 
@@ -80,7 +80,7 @@ void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
 	*parser = calloc(1, sizeof(**parser) + words_size);
 	(*parser)->word_it = (const char **)(*parser)->words;
 
-	// FIXME: It may be unwise to initialize expand_state::bufs with
+	// TODO: It may be unwise to initialize expand_state::bufs with
 	// calloc().
 	(*parser)->expand_st =
 		calloc(1, sizeof(*(*parser)->expand_st) + words_size);
@@ -89,19 +89,19 @@ void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
 
 /*	Allocate and return a word buffer.
  */
-static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, char **word_it,
+static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, const char **word,
 			       int inc)
 {
 	// FIXME: May want to get rid of strlen().
-	const size_t new_len = strlen(*word_it) + inc;
+	const size_t new_len = strlen(*word) + inc;
 	const size_t buf_n = exp->buf_n;
 
 	char *newbuf = realloc(exp->bufs[buf_n], new_len + 1);
 	if (!exp->bufs[buf_n])
-		strcpy(newbuf, *word_it);
+		strcpy(newbuf, *word);
 
 	exp->bufs[buf_n] = newbuf;
-	*word_it = newbuf;
+	*word = newbuf;
 
 	return newbuf;
 }
@@ -109,42 +109,41 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, char **word_it,
 /*	Format a span within a word with the given args, allocating a buffer if
  *	necessary. Returns the increase in size if there is one.
  */
-static void gsh_expand_span(struct gsh_expand_state *exp, const char **word_it,
+static void gsh_expand_span(struct gsh_expand_state *exp, const char **word,
 			    struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
 
 	va_start(fmt_args, span);
+	const char nul_rep = span->begin[span->len];
 
-	// TODO: MAX_EXPAND_LEN?
-	const int print_len = vsnprintf(NULL, 0, span->fmt_str, fmt_args);
-	va_end(fmt_args);
-
+	const int print_len =
+		vsnprintf(span->begin, span->len, span->fmt_str, fmt_args);
+	
 	assert(print_len >= 0);
 
-	const int size_inc = print_len - span->len;
+	span->begin[span->len] = nul_rep;
+	va_end(fmt_args);
 
-	exp->size_inc += size_inc;
 	exp->skip += print_len;
 
-	va_start(fmt_args, span);
+	const int size_inc = print_len - span->len;
+	if (size_inc == 0)
+		return;
+
+	exp->size_inc += size_inc;
 
 	if (size_inc > 0) {
-		const ptrdiff_t before_len = span->begin - *word_it;
+		const ptrdiff_t before_len = span->begin - *word;
 		span->begin =
-			gsh_alloc_wordbuf(exp, word_it, size_inc) + before_len;
+			gsh_alloc_wordbuf(exp, word, size_inc) + before_len;
+
+		va_start(fmt_args, span);
+		vsprintf(span->begin, span->fmt_str, fmt_args);
+		va_end(fmt_args);
 	}
 
-	// If the printed length is less than the length of the unformatted
-	// span, there will be empty space. So, shift the rest of the string
-	// down. And of course, do this if the rest of the string would've
-	// been overwritten.
-	if (size_inc != 0)
-		memmove(span->begin + print_len, span->begin + span->len,
-			span->len);
-
-	vsprintf(span->begin, span->fmt_str, fmt_args);
-	va_end(fmt_args);
+	memmove(span->begin + print_len, span->begin + span->len, span->len);
 }
 
 /*	Substitute a variable reference with its value.
@@ -155,23 +154,23 @@ static void gsh_expand_span(struct gsh_expand_state *exp, const char **word_it,
  *	If the variable does not exist, the word will be assigned the empty
  *	string.
  */
-static void gsh_fmt_var(struct gsh_expand_state *exp, const char **word_it,
+static void gsh_fmt_var(struct gsh_expand_state *exp, const char **word,
 			struct gsh_fmt_span *span)
 {
-	if (strcmp(*word_it, span->begin) == 0) {
-		*word_it = gsh_getenv(exp->params, span->begin + 1);
+	if (strcmp(*word, span->begin) == 0) {
+		*word = gsh_getenv(exp->params, span->begin + 1);
 		return;
 	}
 
 	char *var_name = strndup(span->begin + 1, span->len - 1);
 
-	gsh_expand_span(exp, word_it, span, gsh_getenv(exp->params, var_name));
+	gsh_expand_span(exp, word, span, gsh_getenv(exp->params, var_name));
 	free(var_name);
 }
 
 /*      Substitute a parameter reference with its value.
  */
-static void gsh_fmt_param(struct gsh_expand_state *exp, const char **word_it,
+static void gsh_fmt_param(struct gsh_expand_state *exp, const char **word,
 			  char *const fmt_begin)
 {
 	struct gsh_fmt_span span = {
@@ -183,12 +182,12 @@ static void gsh_fmt_param(struct gsh_expand_state *exp, const char **word_it,
 	case GSH_CHAR_PARAM_STATUS:
 		span.fmt_str = "%d";
 
-		gsh_expand_span(exp, word_it, &span, exp->params->last_status);
+		gsh_expand_span(exp, word, &span, exp->params->last_status);
 		break;
 	default:
 		span.fmt_str = "%s";
 
-		gsh_fmt_var(exp, word_it, &span);
+		gsh_fmt_var(exp, word, &span);
 		break;
 	}
 }
@@ -198,15 +197,15 @@ static void gsh_fmt_param(struct gsh_expand_state *exp, const char **word_it,
 	If the word consists only of the home character, it will be
 *	assigned to point to the value of $HOME.
 */
-static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word_it,
+static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word,
 			 char *const fmt_begin)
 {
 	const char *homevar = gsh_getenv(exp->params, "HOME");
 
 	// TODO: Move the whole-word check out of the fmt_* functions so that
 	// it makes more sense with strpbrk() converting const char * to char *?
-	if (strcmp(*word_it, (char[]){ GSH_CHAR_HOME, '\0' }) == 0) {
-		*word_it = homevar;
+	if (strcmp(*word, (char[]){ GSH_CHAR_HOME, '\0' }) == 0) {
+		*word = homevar;
 		return;
 	}
 
@@ -333,7 +332,6 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	if (!gsh_parse_filename(p))
 		return;
 
-	// FIXME: Parsing/tokenization here.
 	cmd->argc = p->word_n;
 
 	// Tokens:
@@ -346,7 +344,6 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	//	- Double-quote "
 	//	- Opening paren '('
 	//	- Closing paren ')'
-	// FIXME: We need an actual _grammar_.
 	// E.g. If we reached a '$'
 
 	enum token_type {

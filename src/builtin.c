@@ -100,10 +100,6 @@ static int gsh_chdir(struct gsh_state *sh, int argc, char *const *argv)
 }
 
 // while COMMANDS; do COMMANDS; done
-// 
-// TODO: After encountering a `while` followed by a semicolon, modify
-// the parse state to expect a "do", followed by commands and a semicolon,
-// and then a "done".
 
 // This is an example of a "syntactic" builtin, or _keyword_.
 static int gsh_while(struct gsh_state* sh, int argc, char* const* argv)
@@ -156,26 +152,26 @@ static int gsh_process_opt(struct gsh_state *sh, int argc, char *const *argv)
 static int gsh_puthelp(struct gsh_state *sh, int argc, char *const *argv);
 
 static struct gsh_builtin builtins[] = {
-	{ "echo", "Write arguments to standard output.", gsh_echo },
+	{ "@", "Change shell options.", gsh_process_opt },
 	{ "r", "Execute the Nth last line.", gsh_recall },
 	{ "cd", "Change the shell working directory.", gsh_chdir },
+	{ "echo", "Write arguments to standard output.", gsh_echo },
 	{ "hist", "Display or clear line history.", gsh_list_hist },
 	{ "help", "Display this help page.", gsh_puthelp },
 	{ "type", "Display command type and location.", gsh_type },
-	{ "while", "Run command while a condition is true.", gsh_while },
-	{ "@", "Change shell options.", gsh_process_opt },
 	{ "exit", "Exit the shell.", NULL },
+	{ "while", "Run command while a condition is true.", gsh_while },
 };
 
 static int gsh_puthelp(struct gsh_state *sh, int argc, char *const *argv)
 {
-	char dots[15];
+	char dots[16];
 	memset(dots, '.', sizeof(dots));
 
 	size_t cmd_len, dot_len;
 	cmd_len = dot_len = 0;
 
-	for (size_t i = 0; i < sizeof(builtins) / sizeof(*builtins); ++i) {
+	for (size_t i = 0; i < (sizeof(builtins) / sizeof(*builtins)); ++i) {
 		cmd_len = (size_t)printf("%s ", builtins[i].cmd);
 
 		if (cmd_len > sizeof(dots)) {

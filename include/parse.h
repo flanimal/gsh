@@ -9,8 +9,6 @@
  */
 #define GSH_MIN_WORD_N 64
 
-// FIXME: Do we need a maximum number of commands per line?
-
 /*
  *	gsh_parser		: State, buffers used for parsing/tokenizing(?)
  *	gsh_parsed_cmd		: A stack of one or more parsed commands.
