@@ -190,8 +190,8 @@ void gsh_run_cmd(struct gsh_state *sh)
 	// FIXME: WARNING: We CAN'T split the line into words before parsing,
 	// because that would also include whitespace within quotes, etc.
 	// which is WRONG.
-	gsh_split_words(sh->parser, sh->inputbuf->line,
-			_POSIX_ARG_MAX - sh->params.env_len);
+	//gsh_split_words(sh->parser, sh->inputbuf->line,
+	//		_POSIX_ARG_MAX - sh->params.env_len);
 
 	do {
 		gsh_parse_cmd(sh->parser, &sh->cmd_queue);

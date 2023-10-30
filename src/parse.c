@@ -28,7 +28,7 @@ struct gsh_parser {
 	struct gsh_expand_state *expand_st;
 
 	/* Pointer to the next word in the line, gotten by strtok_r(). */
-	char *lineptr;
+	char *line_it;
 
 	// TODO: Use size stored in a word struct instead?
 	/* Must be below ARG_MAX/__POSIX_ARG_MAX. */
@@ -244,14 +244,14 @@ static bool gsh_expand_word(struct gsh_expand_state *exp, const char **word)
  */
 static const char *gsh_next_word(struct gsh_parser *p, char *line)
 {
-	char *word = strtok_r(line, WHITESPACE, &p->lineptr);
+	char *word = strtok_r(line, WHITESPACE, &p->line_it);
 	if (!word)
 		return NULL;
 
 	const size_t old_words_size = p->words_size;
 
 	// FIXME: ... is using lineptr a good idea?
-	p->words_size += p->lineptr - word;
+	p->words_size += p->line_it - word;
 
 	p->words_size += p->expand_st->size_inc;
 	const size_t word_len = p->words_size - old_words_size;
@@ -296,7 +296,7 @@ static void gsh_free_parsed(struct gsh_parser *p)
 void gsh_split_words(struct gsh_parser *p, char *line, size_t max_size)
 {
 	gsh_free_parsed(p);
-	p->lineptr = line;
+	p->line_it = line;
 
 	while (p->words_size <= max_size)
 		if (!gsh_next_word(p, NULL))
@@ -321,12 +321,11 @@ struct gsh_token {
 	enum gsh_token_type type;
 };
 
+// Iterate over each character in the input line individually
+// (until we have a reason to get more at a time).
 static bool gsh_get_token(struct gsh_parser* p, struct gsh_token *tok)
 {
-	tok->data = ch;
-	tok->type = WORD;
-
-	switch ((enum gsh_token_type)*ch) {
+	switch ((enum gsh_token_type)(*p->line_it)) {
 	case SINGLE_QUOTE:
 	case DOUBLE_QUOTE:
 	case OPEN_PAREN:
@@ -336,21 +335,28 @@ static bool gsh_get_token(struct gsh_parser* p, struct gsh_token *tok)
 	case PARAM_REF:
 	case HOME_REF:
 		tok->len = 1;
-		tok->type = (enum gsh_token_type) * ch;
+		tok->type = (enum gsh_token_type)(*p->line_it);
 
-		++ch;
-
-		return true;
+		break;
+	case '\0':
+		return false;
 	default:
-		++tok->len;
+
+		// Default type is WORD.
+		tok->type = WORD;
+		tok->data = p->line_it;
+		tok->len = strcspn(p->line_it, "$~\'\"();");
 
 		break;
 	}
+
+	p->line_it += tok->len;
+	return true;
 }
 
 void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 {
-	if (p->lineptr[0] == '\0')
+	if (p->line_it[0] == '\0')
 		return;
 
 	// FIXME: WARNING: THIS MIGHT BE WRONG!
@@ -360,7 +366,7 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	struct gsh_parsed_cmd *cmd = gsh_new_cmd(cmd_queue);
 
 	// Skip any whitespace preceding pathname.
-	cmd->pathname = p->lineptr + strspn(p->lineptr, WHITESPACE);
+	cmd->pathname = p->line_it + strspn(p->line_it, WHITESPACE);
 
 	if (!gsh_parse_filename(p))
 		return;
