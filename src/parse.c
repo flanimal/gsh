@@ -25,6 +25,8 @@
 void gsh_set_opt(struct gsh_state *sh, char *name, bool value);
 
 struct gsh_token {
+	struct gsh_token *back, *forw;
+
 	const char *data;
 	size_t len;
 
@@ -34,16 +36,15 @@ struct gsh_token {
 struct gsh_parser {
 	struct gsh_expand_state *expand_st;
 
-	/* Pointer to the next word in the line, gotten by strtok_r(). */
+	/* Pointer to the next token in the line. */
 	char *line_it;
 
-	// TODO: Use size stored in a word struct instead?
+	// TODO: Use size stored in token structs instead?
 	/* Must be below ARG_MAX/__POSIX_ARG_MAX. */
 	size_t tokens_size;
-	size_t token_n;
 
-	// TODO: Use a linked list?
-	char *tokens[];
+	/* Token queue. */
+	struct gsh_token *tokens;
 };
 
 // NOTE:	Should this be the state for a single expansion, or single word,
@@ -295,18 +296,24 @@ static void gsh_free_parsed(struct gsh_parser *p)
 		free(p->expand_st->bufs[p->expand_st->buf_n - 1]);
 		p->expand_st->bufs[p->expand_st->buf_n - 1] = NULL;
 	}
+}
 
-	// Reset word list.
-	while (p->token_n > 1)
-		p->tokens[--p->token_n] = NULL;
+static struct gsh_token *gsh_new_tok(struct gsh_token *front)
+{
+	struct gsh_token *tok = malloc(sizeof(*tok));
+	
+	insque(tok, front);
+	return tok;
 }
 
 // Iterate over each character in the input line individually
 // (until we have a reason to get more at a time).
-static bool gsh_get_token(struct gsh_parser* p, struct gsh_token *tok)
+static bool gsh_get_token(struct gsh_parser* p)
 {
 	if (*p->line_it == '\0')
 		return false;
+
+	struct gsh_token *tok = gsh_new_tok(p->tokens);
 
 	const size_t word_len = strcspn(p->line_it, gsh_special_chars);
 
@@ -321,8 +328,6 @@ static bool gsh_get_token(struct gsh_parser* p, struct gsh_token *tok)
 	tok->data = p->line_it;
 	p->line_it += tok->len;
 
-	++p->token_n;
-
 	return true;
 }
 
@@ -331,34 +336,16 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	if (p->line_it[0] == '\0')
 		return;
 
-	// FIXME: WARNING: THIS MIGHT BE WRONG!
-	// If the command is a keyword, there won't be a pathname.
-	// (At first.)
-
-	struct gsh_parsed_cmd *cmd = gsh_new_cmd(cmd_queue);
-
-	// Skip any whitespace preceding pathname.
-	cmd->pathname = p->line_it + strspn(p->line_it, WHITESPACE);
-
-	if (!gsh_parse_filename(p))
-		return;
-
-	cmd->argc = p->token_n;
-
-	
 	// Tokenize.
-	for (struct gsh_token *tok_it = p->tokens; gsh_get_token(p, tok_it++); )
+	while (gsh_get_token(p))
 		;
 
 	// TODO: Increment tokens_size AFTER expansions have been performed.
 
-	// Pop tokens to create command objects, and push those commands onto cmd_queue.
-	
-	while ()
-	switch () {
-	
+	// Pop tokens to create command objects, and push those commands onto
+	// cmd_queue.
+	while () {
+		switch () {
+		}
 	}
-
-
-	// FIXME: ...
 }
