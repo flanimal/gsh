@@ -317,12 +317,14 @@ static bool gsh_get_token(struct gsh_parser* p, struct gsh_token *tok)
 	if (*p->line_it == '\0')
 		return false;
 
-	if (strcspn(*p->line_it, gsh_special_chars) == 0) {
+	const size_t word_len = strcspn(p->line_it, gsh_special_chars);
+
+	if (word_len == 0) {
 		tok->type = (enum gsh_special_char)(*p->line_it);
 		tok->len = 1;
 	} else {
 		tok->type = GSH_WORD;
-		tok->len = strcspn(p->line_it, gsh_special_chars);
+		tok->len = word_len;
 	}
 
 	tok->data = p->line_it;
@@ -352,8 +354,8 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 
 	// TODO: Use a linked list?
 	struct gsh_token tokens[256];
-
-	for (struct gsh_token *tok_it = tokens; gsh_get_token(p, tok_it); ++tok_it)
+	
+	for (struct gsh_token *tok_it = tokens; gsh_get_token(p, tok_it++); )
 		;
 
 	// FIXME: ...
