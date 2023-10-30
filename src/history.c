@@ -11,7 +11,7 @@
 
 /* Line history entry. */
 struct gsh_hist_ent {
-	struct gsh_hist_ent *back, *forw;
+	struct gsh_hist_ent *newer, *older;
 
 	char *line;
 	size_t len;
@@ -50,7 +50,7 @@ static void new_hist_ent(struct gsh_cmd_hist *hist, size_t len,
 static void drop_hist_ent(struct gsh_cmd_hist *hist,
 			  struct gsh_hist_ent *ent)
 {
-	if (!(hist->oldest = ent->back))
+	if (!(hist->oldest = ent->newer))
 		hist->newest = NULL;
 
 	remque(ent);
@@ -89,7 +89,7 @@ int gsh_list_hist(struct gsh_state *sh, int argc, char *const *argv)
 	int n = 1;
 
 	for (struct gsh_hist_ent *hist_it = sh->hist->newest; hist_it;
-	     hist_it = hist_it->forw)
+	     hist_it = hist_it->older)
 		printf("%d: %s\n", n++, hist_it->line);
 
 	return 0;
@@ -107,8 +107,8 @@ int gsh_recall(struct gsh_state *sh, int argc, char *const *argv)
 
 	struct gsh_hist_ent *hist_it = sh->hist->newest;
 
-	while (hist_it->forw && n-- > 1)
-		hist_it = hist_it->forw;
+	while (hist_it->older && n-- > 1)
+		hist_it = hist_it->older;
 
 	printf("%s\n", hist_it->line);
 

@@ -25,7 +25,7 @@
 void gsh_set_opt(struct gsh_state *sh, char *name, bool value);
 
 struct gsh_token {
-	struct gsh_token *back, *forw;
+	struct gsh_token *next, *prev;
 
 	const char *data;
 	size_t len;
@@ -298,12 +298,32 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	}
 }
 
-static struct gsh_token *gsh_new_tok(struct gsh_token *front)
+static struct gsh_token *gsh_new_tok(struct gsh_token **last)
 {
 	struct gsh_token *tok = malloc(sizeof(*tok));
 	
-	insque(tok, front);
+	if (!(*last))
+		*last = tok;
+
+	insque(tok, *last);
 	return tok;
+}
+
+static bool gsh_pop_tok(struct gsh_token **last, struct gsh_token *out_pop)
+{
+	if (*last) {
+		out_pop = *last;
+
+		if (!(*last)->prev)
+			*last = NULL;
+
+		remque(*last);
+		free(*pop);
+
+		return true;
+	}
+
+	return false;
 }
 
 // Iterate over each character in the input line individually
@@ -344,7 +364,12 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 
 	// Pop tokens to create command objects, and push those commands onto
 	// cmd_queue.
-	while () {
+	// 
+	// To elaborate, the final argv list will be similar to the initial token list.
+	// Words will remain unmodified. However, parameter references and such will be
+	// substituted with a single word token each containing the referenced value.
+
+	for (struct gsh_token tok; gsh_pop_tok(&p->tokens, &tok)) {
 		switch () {
 		}
 	}
