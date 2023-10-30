@@ -30,9 +30,7 @@ struct gsh_parser {
 	/* Pointer to the next word in the line, gotten by strtok_r(). */
 	char *lineptr;
 
-	/* Iterator pointing to current word. */
-	const char **word_it;
-
+	// TODO: Use size stored in a word struct instead?
 	/* Must be below ARG_MAX/__POSIX_ARG_MAX. */
 	size_t words_size;
 	size_t word_n;
@@ -40,13 +38,14 @@ struct gsh_parser {
 	char *words[];
 };
 
-// NOTE: Should this be the state for a single expansion, or all so far?
+// NOTE:	Should this be the state for a single expansion, or single word,
+//		or should it be used for all?
 struct gsh_expand_state {
 	const struct gsh_params *params;
 
-	/* Position within word to begin expansion. */
+	/* The length within the word to skip. */
 	size_t skip;
-
+	/* Increase in word size after expansions. */
 	size_t size_inc;
 
 	/* Stack of buffers for words that contain substitutions. */
@@ -78,7 +77,6 @@ void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
 	const size_t words_size = GSH_MIN_WORD_N * sizeof(char *);
 
 	*parser = calloc(1, sizeof(**parser) + words_size);
-	(*parser)->word_it = (const char **)(*parser)->words;
 
 	// TODO: It may be unwise to initialize expand_state::bufs with
 	// calloc().
@@ -106,8 +104,7 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, const char **word,
 	return newbuf;
 }
 
-/*	Format a span within a word with the given args, allocating a buffer if
- *	necessary. Returns the increase in size if there is one.
+/*	Format a span within a word with the given args.
  */
 static void gsh_expand_span(struct gsh_expand_state *exp, const char **word,
 			    struct gsh_fmt_span *span, ...)
@@ -131,6 +128,7 @@ static void gsh_expand_span(struct gsh_expand_state *exp, const char **word,
 	if (size_inc == 0)
 		return;
 
+	// Need to allocate.
 	exp->size_inc += size_inc;
 
 	if (size_inc > 0) {
@@ -221,19 +219,19 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word,
 /*      Expand the last word.
  *	Returns true while there are still expansions to be performed.
  */
-static bool gsh_expand_word(struct gsh_expand_state *exp, const char **word_it)
+static bool gsh_expand_word(struct gsh_expand_state *exp, const char **word)
 {
-	char *fmt_begin = strpbrk(*word_it + exp->skip, gsh_special_chars);
+	char *fmt_begin = strpbrk(*word + exp->skip, gsh_special_chars);
 
 	if (!fmt_begin)
 		return false;
 
 	switch ((enum gsh_special_char)fmt_begin[0]) {
 	case GSH_CHAR_PARAM:
-		gsh_fmt_param(exp, word_it, fmt_begin);
+		gsh_fmt_param(exp, word, fmt_begin);
 		return true;
 	case GSH_CHAR_HOME:
-		gsh_fmt_home(exp, word_it, fmt_begin);
+		gsh_fmt_home(exp, word, fmt_begin);
 		return true;
 	}
 
@@ -246,33 +244,23 @@ static bool gsh_expand_word(struct gsh_expand_state *exp, const char **word_it)
  */
 static const char *gsh_next_word(struct gsh_parser *p, char *line)
 {
-	*p->word_it = strtok_r(line, WHITESPACE, &p->lineptr);
-	if (!(*p->word_it))
+	char *word = strtok_r(line, WHITESPACE, &p->lineptr);
+	if (!word)
 		return NULL;
 
 	const size_t old_words_size = p->words_size;
 
 	// FIXME: ... is using lineptr a good idea?
-	p->words_size += p->lineptr - *p->word_it;
+	p->words_size += p->lineptr - word;
 
 	p->words_size += p->expand_st->size_inc;
 	const size_t word_len = p->words_size - old_words_size;
-
-	if (*p->word_it[word_len - 1] == ';')
-		// End current command, and begin another with remaining
-		// words.
-		//
-		// This could be done by checking that we have reached
-		// the end of the input buffer; if not, it must mean
-		// there was more than one command.
-		return;
 
 	p->expand_st->skip = 0;
 	if (p->expand_st->bufs[p->expand_st->buf_n])
 		++p->expand_st->buf_n;
 
-	++p->word_n;
-	return *p->word_it++;
+	return (p->words[p->word_n++] = word);
 }
 
 /*      Parse the first word in the input line, and place
@@ -301,8 +289,8 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	}
 
 	// Reset word list.
-	for (; p->word_n > 0; --p->word_n)
-		*(--p->word_it) = NULL;
+	while (p->word_n > 1)
+		p->words[--p->word_n] = NULL;
 }
 
 void gsh_split_words(struct gsh_parser *p, char *line, size_t max_size)
@@ -313,6 +301,51 @@ void gsh_split_words(struct gsh_parser *p, char *line, size_t max_size)
 	while (p->words_size <= max_size)
 		if (!gsh_next_word(p, NULL))
 			return;
+}
+
+enum gsh_token_type {
+	WORD,
+	PARAM_REF = '$',
+	HOME_REF = '~',
+	SINGLE_QUOTE = '\'',
+	DOUBLE_QUOTE = '\"',
+	OPEN_PAREN = '(',
+	CLOSE_PAREN = ')',
+	CMD_SEP = ';',
+};
+
+struct gsh_token {
+	const char *data;
+	size_t len;
+
+	enum gsh_token_type type;
+};
+
+static bool gsh_get_token(struct gsh_parser* p, struct gsh_token *tok)
+{
+	tok->data = ch;
+	tok->type = WORD;
+
+	switch ((enum gsh_token_type)*ch) {
+	case SINGLE_QUOTE:
+	case DOUBLE_QUOTE:
+	case OPEN_PAREN:
+	case CLOSE_PAREN:
+	case CMD_SEP:
+
+	case PARAM_REF:
+	case HOME_REF:
+		tok->len = 1;
+		tok->type = (enum gsh_token_type) * ch;
+
+		++ch;
+
+		return true;
+	default:
+		++tok->len;
+
+		break;
+	}
 }
 
 void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
@@ -334,69 +367,11 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 
 	cmd->argc = p->word_n;
 
-	// Tokens:
-	//	- Text
-	//	- Number(?)
-	//	- Command separator (semicolon ';')
-	//	- Reference (dollar sign '$')
-	//		- Home reference (tilde '~')
-	//	- Single-quote '
-	//	- Double-quote "
-	//	- Opening paren '('
-	//	- Closing paren ')'
-	// E.g. If we reached a '$'
+	// TODO: Use a linked list?
+	struct gsh_token tokens[256];
 
-	enum token_type {
-		TEXT,
-		PARAM_REF,
-		SINGLE_QUOTE = '\'',
-		DOUBLE_QUOTE = '\"',
-		OPEN_PAREN = '(',
-		CLOSE_PAREN = ')',
-		CMD_SEP = ';',
-	};
+	for (struct gsh_token *tok_it = tokens; gsh_get_token(p, tok_it); ++tok_it)
+		;
 
-	struct token {
-		const char *data;
-		size_t len;
-		enum token_type type;
-	};
-
-	struct token tokens[256];
-	struct token *tok_it = tokens;
-
-	for (const char **word_it = p->words; word_it != p->word_it;
-	     ++word_it) {
-		char *ch = *word_it;
-		// This handles tokens that are expanded.
-		while (gsh_expand_word(p->expand_st, word_it))
-			;
-
-		while (*ch) {
-			tok_it->data = ch;
-			tok_it->type = TEXT;
-
-			switch (*ch) {
-			case '\'':
-			case '\"':
-			case '(':
-			case ')':
-			case ';':
-				tok_it->len = 1;
-				tok_it->type = (enum token_type)(*ch);
-
-				++ch;
-				++tok_it;
-
-				break;
-			default:
-				++tok_it->len;
-
-				break;
-			}
-		}
-	}
-
-	// Still more words in line, so start new command.
-	// if (*state->word_it)
+	// FIXME: ...
 }
