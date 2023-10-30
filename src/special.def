@@ -1,9 +1,13 @@
 /*
  *	Special characters.
  */
-#define SPECIAL_CHARS(X) \
-	X(HOME, '~')     \
-	X(PARAM, '$')    \
+#define SPECIAL_CHARS(X)      \
+	X(SINGLE_QUOTE, '\'') \
+	X(DOUBLE_QUOTE, '\"') \
+	X(OPEN_PAREN, '(')    \
+	X(CLOSE_PAREN, '\'')  \
+	X(HOME, '~')          \
+	X(PARAM, '$')         \
 	X(CMD_SEP, ';')
 
 /*
@@ -14,7 +18,7 @@
 #define CHAR_ENUM(name, ch) GSH_CHAR_##name = ch,
 #define CHAR_ARRAY(name, ch) ch,
 
-enum gsh_special_char { SPECIAL_CHARS(CHAR_ENUM) };
+enum gsh_special_char { GSH_WORD, SPECIAL_CHARS(CHAR_ENUM) };
 enum gsh_special_param { SPECIAL_PARAMS(CHAR_ENUM) };
 
 static const char gsh_special_chars[] = { SPECIAL_CHARS(CHAR_ARRAY) '\0' };

@@ -303,54 +303,31 @@ void gsh_split_words(struct gsh_parser *p, char *line, size_t max_size)
 			return;
 }
 
-enum gsh_token_type {
-	WORD,
-	PARAM_REF = '$',
-	HOME_REF = '~',
-	SINGLE_QUOTE = '\'',
-	DOUBLE_QUOTE = '\"',
-	OPEN_PAREN = '(',
-	CLOSE_PAREN = ')',
-	CMD_SEP = ';',
-};
-
 struct gsh_token {
 	const char *data;
 	size_t len;
 
-	enum gsh_token_type type;
+	enum gsh_special_char type;
 };
 
 // Iterate over each character in the input line individually
 // (until we have a reason to get more at a time).
 static bool gsh_get_token(struct gsh_parser* p, struct gsh_token *tok)
 {
-	switch ((enum gsh_token_type)(*p->line_it)) {
-	case SINGLE_QUOTE:
-	case DOUBLE_QUOTE:
-	case OPEN_PAREN:
-	case CLOSE_PAREN:
-	case CMD_SEP:
-
-	case PARAM_REF:
-	case HOME_REF:
-		tok->len = 1;
-		tok->type = (enum gsh_token_type)(*p->line_it);
-
-		break;
-	case '\0':
+	if (*p->line_it == '\0')
 		return false;
-	default:
 
-		// Default type is WORD.
-		tok->type = WORD;
-		tok->data = p->line_it;
-		tok->len = strcspn(p->line_it, "$~\'\"();");
-
-		break;
+	if (strcspn(*p->line_it, gsh_special_chars) == 0) {
+		tok->type = (enum gsh_special_char)(*p->line_it);
+		tok->len = 1;
+	} else {
+		tok->type = GSH_WORD;
+		tok->len = strcspn(p->line_it, gsh_special_chars);
 	}
 
+	tok->data = p->line_it;
 	p->line_it += tok->len;
+
 	return true;
 }
 
