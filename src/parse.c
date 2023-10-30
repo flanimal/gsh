@@ -24,6 +24,13 @@
 
 void gsh_set_opt(struct gsh_state *sh, char *name, bool value);
 
+struct gsh_token {
+	const char *data;
+	size_t len;
+
+	enum gsh_special_char type;
+};
+
 struct gsh_parser {
 	struct gsh_expand_state *expand_st;
 
@@ -32,10 +39,11 @@ struct gsh_parser {
 
 	// TODO: Use size stored in a word struct instead?
 	/* Must be below ARG_MAX/__POSIX_ARG_MAX. */
-	size_t words_size;
-	size_t word_n;
+	size_t tokens_size;
+	size_t token_n;
 
-	char *words[];
+	// TODO: Use a linked list?
+	char *tokens[];
 };
 
 // NOTE:	Should this be the state for a single expansion, or single word,
@@ -248,19 +256,19 @@ static const char *gsh_next_word(struct gsh_parser *p, char *line)
 	if (!word)
 		return NULL;
 
-	const size_t old_words_size = p->words_size;
+	const size_t old_words_size = p->tokens_size;
 
 	// FIXME: ... is using lineptr a good idea?
-	p->words_size += p->line_it - word;
+	p->tokens_size += p->line_it - word;
 
-	p->words_size += p->expand_st->size_inc;
-	const size_t word_len = p->words_size - old_words_size;
+	p->tokens_size += p->expand_st->size_inc;
+	const size_t word_len = p->tokens_size - old_words_size;
 
 	p->expand_st->skip = 0;
 	if (p->expand_st->bufs[p->expand_st->buf_n])
 		++p->expand_st->buf_n;
 
-	return (p->words[p->word_n++] = word);
+	return (p->tokens[p->token_n++] = word);
 }
 
 /*      Parse the first word in the input line, and place
@@ -268,14 +276,14 @@ static const char *gsh_next_word(struct gsh_parser *p, char *line)
  */
 static bool gsh_parse_filename(struct gsh_parser *p)
 {
-	if (!p->words[0])
+	if (!p->tokens[0])
 		return false;
 
-	char *last_slash = strrchr(p->words[0], '/');
+	char *last_slash = strrchr(p->tokens[0], '/');
 	if (last_slash)
-		p->words[0] = last_slash + 1;
+		p->tokens[0] = last_slash + 1;
 
-	return !!p->words[0];
+	return !!p->tokens[0];
 }
 
 static void gsh_free_parsed(struct gsh_parser *p)
@@ -289,26 +297,9 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	}
 
 	// Reset word list.
-	while (p->word_n > 1)
-		p->words[--p->word_n] = NULL;
+	while (p->token_n > 1)
+		p->tokens[--p->token_n] = NULL;
 }
-
-void gsh_split_words(struct gsh_parser *p, char *line, size_t max_size)
-{
-	gsh_free_parsed(p);
-	p->line_it = line;
-
-	while (p->words_size <= max_size)
-		if (!gsh_next_word(p, NULL))
-			return;
-}
-
-struct gsh_token {
-	const char *data;
-	size_t len;
-
-	enum gsh_special_char type;
-};
 
 // Iterate over each character in the input line individually
 // (until we have a reason to get more at a time).
@@ -330,6 +321,8 @@ static bool gsh_get_token(struct gsh_parser* p, struct gsh_token *tok)
 	tok->data = p->line_it;
 	p->line_it += tok->len;
 
+	++p->token_n;
+
 	return true;
 }
 
@@ -350,13 +343,22 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	if (!gsh_parse_filename(p))
 		return;
 
-	cmd->argc = p->word_n;
+	cmd->argc = p->token_n;
 
-	// TODO: Use a linked list?
-	struct gsh_token tokens[256];
 	
-	for (struct gsh_token *tok_it = tokens; gsh_get_token(p, tok_it++); )
+	// Tokenize.
+	for (struct gsh_token *tok_it = p->tokens; gsh_get_token(p, tok_it++); )
 		;
+
+	// TODO: Increment tokens_size AFTER expansions have been performed.
+
+	// Pop tokens to create command objects, and push those commands onto cmd_queue.
+	
+	while ()
+	switch () {
+	
+	}
+
 
 	// FIXME: ...
 }
