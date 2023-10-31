@@ -166,7 +166,7 @@ static void gsh_fmt_var(struct gsh_expand_state *exp, char **word,
 			struct gsh_fmt_span *span)
 {
 	if (strcmp(*word, span->begin) == 0) {
-		*word = gsh_getenv(exp->params, span->begin + 1);
+		*word = (char *)gsh_getenv(exp->params, span->begin + 1);
 		return;
 	}
 	// TODO: Max var name length?

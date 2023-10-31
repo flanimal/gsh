@@ -189,7 +189,7 @@ void gsh_run_cmd(struct gsh_state *sh)
 	
 	for (struct gsh_parsed_cmd *cmd = LIST_FIRST(sh->parser->cmd_front), *next;
 	     cmd; cmd = next) {
-		cmd = LIST_NEXT(cmd, entry);
+		next = LIST_NEXT(cmd, entry);
 		
 		gsh_switch(sh, cmd);
 
