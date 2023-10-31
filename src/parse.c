@@ -14,8 +14,6 @@
 #include "parse.h"
 #include "params.h"
 
-#include "special.def"
-
 #if defined(__GNUC__)
 #define unreachable() __builtin_unreachable()
 #elif defined(_MSC_VER)
@@ -23,29 +21,6 @@
 #endif
 
 void gsh_set_opt(struct gsh_state *sh, char *name, bool value);
-
-struct gsh_token {
-	struct gsh_token *next, *prev;
-
-	const char *data;
-	size_t len;
-
-	enum gsh_special_char type;
-};
-
-struct gsh_parser {
-	struct gsh_expand_state *expand_st;
-
-	/* Pointer to the next token in the line. */
-	char *line_it;
-
-	// TODO: Use size stored in token structs instead?
-	/* Must be below ARG_MAX/__POSIX_ARG_MAX. */
-	size_t tokens_size;
-
-	/* Token queue. */
-	struct gsh_token *tokens;
-};
 
 // NOTE:	Should this be the state for a single expansion, or single word,
 //		or should it be used for all?
@@ -73,12 +48,9 @@ struct gsh_fmt_span {
 	const char *fmt_str;
 };
 
-struct gsh_parsed_cmd *gsh_new_cmd(struct gsh_cmd_queue *queue)
+struct gsh_parsed_cmd *gsh_new_cmd()
 {
-	struct gsh_parsed_cmd *cmd = calloc(1, sizeof(*cmd));
-	insque(cmd, queue->front);
-
-	return cmd;
+	return calloc(1, sizeof(struct gsh_parsed_cmd));
 }
 
 void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
@@ -114,24 +86,24 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, const char **word,
 }
 
 /*	Format a span within a word with the given args.
- *	
+ *
  *	Automatically reallocates if the buffer is not large enough,
- *	and automatically shifts the rest of the string down when 
+ *	and automatically shifts the rest of the string down when
  *	there would be empty space.
- * 
+ *
  *	Example:
  *		Argument is integer 1245.
- * 
+ *
  *	Before : "Hello, world!"
  *		    {------}
  *		      Span
  *
  *	After :	"He1245ld!     "
- * 
+ *
  *	Example:
- *		Argument is string "ABCDEFGHIJKLMO" 
+ *		Argument is string "ABCDEFGHIJKLMO"
  *		(notice this is larger than buffer)
- * 
+ *
  *	Before : "Hello, world!"
  *		    {------}
  *		      Span
@@ -197,7 +169,7 @@ static void gsh_fmt_var(struct gsh_expand_state *exp, const char **word,
 		*word = gsh_getenv(exp->params, span->begin + 1);
 		return;
 	}
-
+	// TODO: Max var name length?
 	char *var_name = strndup(span->begin + 1, span->len - 1);
 
 	gsh_expand_span(exp, word, span, gsh_getenv(exp->params, var_name));
@@ -257,17 +229,17 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word,
 /*      Parse the first word in the input line, and place
  *      the filename in the argument array.
  */
-static bool gsh_parse_filename(struct gsh_parser *p)
-{
-	if (!p->tokens[0])
-		return false;
-
-	char *last_slash = strrchr(p->tokens[0], '/');
-	if (last_slash)
-		p->tokens[0] = last_slash + 1;
-
-	return !!p->tokens[0];
-}
+//static bool gsh_parse_filename(struct gsh_parser *p)
+//{
+//	if (!p->tokens[0])
+//		return false;
+//
+//	char *last_slash = strrchr(p->tokens[0], '/');
+//	if (last_slash)
+//		p->tokens[0] = last_slash + 1;
+//
+//	return !!p->tokens[0];
+//}
 
 static void gsh_free_parsed(struct gsh_parser *p)
 {
@@ -280,27 +252,93 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	}
 }
 
-/*
+/*	Pop a token from the queue and store in `out_pop`.
+ *
+ *	Returns true if there was a token to pop.
+ *
+ *	If the last token has been popped, sets the queue pointer to NULL.
  */
-static struct gsh_token *gsh_new_tok(struct gsh_token **queue)
+static bool gsh_pop_tok(struct tok_queue *front, struct gsh_token *to_pop)
 {
-	struct gsh_token *tok = malloc(sizeof(*tok));
-
-	if (!(*queue))
-		*queue = tok;
-
-	insque(tok, *queue);
-	return tok;
+	SLIST_REMOVE(front, to_pop, gsh_token, next);
+	free(to_pop);
 }
 
-// Iterate over each character in the input line individually
-// (until we have a reason to get more at a time).
-static bool gsh_get_token(struct gsh_parser *p)
+static void gsh_expand(struct gsh_expand_state *exp, const char **tok_data)
+{
+	while (1) {
+		char *exp_pos = strchr(*tok_data, "$");
+		if (exp_pos) {
+			gsh_fmt_param(exp, tok_data, &exp_pos);
+			continue;
+		}
+
+		exp_pos = strchr(*tok_data, "~");
+
+		if (exp_pos) {
+			gsh_fmt_home(exp, tok_data, &exp_pos);
+			continue;
+		}
+
+		return;
+	}
+}
+
+/*
+	Iterate tokens, starting from a quote and ending at 
+	a quote of the same time. 
+
+	Create an argument using all text between the two quotes,
+	exclusive.
+*/
+static char *gsh_parse_quoted(struct gsh_parser *p, struct gsh_token *begin,
+		      enum gsh_special_char quote_type)
+{
+	// Arg begins at text immediately following quote.
+	char *arg = SLIST_NEXT(begin, next)->data;
+	gsh_pop_tok(p->front, begin);
+
+	size_t arg_len = 0;
+
+	struct gsh_token *popped;
+
+	SLIST_FOREACH(popped, p->front, next)
+	{
+		if (popped->type != quote_type) {
+			// Reallocate the argument.
+			const size_t buf_n = p->expand_st->buf_n;
+
+			char *newbuf =
+				realloc(p->expand_st->bufs[buf_n], arg_len + popped->len + 1);
+			if (!p->expand_st->bufs[buf_n])
+				*stpncpy(newbuf, arg, arg_len) = '\0';
+
+			p->expand_st->bufs[buf_n] = newbuf;
+			arg = newbuf;
+
+			arg_len += popped->len;
+		}
+
+		// Remove and delete token.
+		gsh_pop_tok(p->front, popped);
+	}
+
+	return arg;
+}
+
+/*
+ */
+static struct gsh_token *gsh_new_tok()
+{
+	return malloc(sizeof(struct gsh_token));
+}
+
+static struct gsh_token *gsh_get_token(struct gsh_parser *p)
 {
 	if (*p->line_it == '\0')
-		return false;
+		return NULL;
 
-	struct gsh_token *tok = gsh_new_tok(p->tokens);
+	struct gsh_token *tok = gsh_new_tok();
 
 	const size_t word_len = strcspn(p->line_it, gsh_special_chars);
 
@@ -315,108 +353,49 @@ static bool gsh_get_token(struct gsh_parser *p)
 	tok->data = p->line_it;
 	p->line_it += tok->len;
 
-	return true;
+	return tok;
 }
 
-/*	Pop a token from the queue and store in `out_pop`.
- *
- *	Returns true if there was a token to pop.
- *
- *	If the last token has been popped, sets the queue pointer to NULL.
- */
-static bool gsh_pop_tok(struct gsh_token **queue, struct gsh_token *out_pop)
+void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 {
-	if (!(*queue))
-		return false;
+	// Get tokens (words, quotes, parentheses, etc.).
+	// NOTE: For now, we are keeping tokenization and parsing
+	// phases independent for simplicity.
+	struct gsh_token *prev, *forw;
 
-	*out_pop = **queue;
+	SLIST_INSERT_HEAD(p->front, (prev = gsh_get_token(p)), next);
 
-	free(*queue);
-	*queue = out_pop->prev;
-
-	remque(out_pop);
-
-	return true;
-}
-
-void gsh_parse_quoted(struct gsh_parser *p, struct gsh_token *prev,
-		      enum gsh_special_char quote_type)
-{
-	struct gsh_token popped;
-
-	gsh_pop_tok(&p->tokens, &popped);
-	char *data = popped.next->data;
-	size_t len = 0;
-
-	while (gsh_pop_tok(&p->tokens, &popped) && popped.type != quote_type) {
-		len += popped.len;
-		gsh_alloc_wordbuf(p->expand_st, &data, popped.len);
-	}
-
-	struct gsh_token *word = gsh_new_tok(&prev);
-	word->data = data;
-	word->len = len;
-	word->type = GSH_WORD;
-}
-
-void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
-{
-	// Tokenize.
-	while (gsh_get_token(p))
-		;
-
-	// TODO: Increment tokens_size AFTER expansions have been performed.
-
-	// Pop tokens to create command objects, and push those commands onto
-	// cmd_queue.
-	//
-	// NOTE: Using a queue means we can perform replacements in the middle,
-	// and that we don't have to use a separate list for the actual
-	// arguments to be returned in a parsed_cmd.
-
-	// There are two possible approaches.
-	// 1. Use the same queue for both tokens and the final argument list,
-	// and replace/combine tokens when necessary.
-	//
-	// 2. Use a queue for tokens that is separate from the final argument
-	// list.
-	//	This would require allocating memory for each parsed command's
-	//arguments.
-
-	struct gsh_parsed_cmd cmd;
+	for (; (forw = gsh_get_token(p));)
+		SLIST_INSERT_AFTER(prev, forw, next);
 
 	// I guess that here, we use "parse" to mean "combining/replacing tokens
 	// in the token queue".
 
-	for (struct gsh_token *tok_it = p->tokens; tok_it;
-	     tok_it = tok_it->next) {
+	struct gsh_parsed_cmd cmd;
+
+	struct gsh_token *tok_it;
+	SLIST_FOREACH(tok_it, p->front, next)
+	{
 		switch (tok_it->type) {
 		case GSH_WORD:
-			// gsh_new_cmd();
+			gsh_expand(p->expand_st, &tok_it->data);
+			cmd.argv[cmd.argc++] = tok_it->data;
+
 			break;
 		case GSH_CHAR_SINGLE_QUOTE:
 		case GSH_CHAR_DOUBLE_QUOTE:
-			// Replace any tokens from this quote to the next,
-			// inclusive, with a single word token.
-			gsh_parse_quoted(p, tok_it->prev, tok_it->type);
+			cmd.argv[cmd.argc++] = gsh_parse_quoted(p, tok_it, tok_it->type);
+
 			break;
 		case GSH_CHAR_CMD_SEP:
-			// gsh_push_cmd(&cmd, cmd_queue);
+
 			break;
-		case GSH_CHAR_HOME:
-			gsh_fmt_home();
-			break;
-		case GSH_CHAR_PARAM:
-			// Get a word for the param name.
-			gsh_fmt_param();
-			break;
-			// case GSH_CHAR_OPEN_PAREN:
-			//	break;
-			// case GSH_CHAR_CLOSE_PAREN:
-			//	break;
 		}
 	}
 
 	// Reached end of line.
 	// gsh_push_cmd(cmd_queue);
+	SLIST_INSERT_AFTER()
+
+	// TODO: Increment tokens_size AFTER expansions have been performed.
 }
