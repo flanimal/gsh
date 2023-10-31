@@ -114,6 +114,29 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, const char **word,
 }
 
 /*	Format a span within a word with the given args.
+ *	
+ *	Automatically reallocates if the buffer is not large enough,
+ *	and automatically shifts the rest of the string down when 
+ *	there would be empty space.
+ * 
+ *	Example:
+ *		Argument is integer 1245.
+ * 
+ *	Before : "Hello, world!"
+ *		    {------}
+ *		      Span
+ *
+ *	After :	"He1245ld!     "
+ * 
+ *	Example:
+ *		Argument is string "ABCDEFGHIJKLMO" 
+ *		(notice this is larger than buffer)
+ * 
+ *	Before : "Hello, world!"
+ *		    {------}
+ *		      Span
+ *
+ *	After :	"HeABCDEFGHIJKLMOld!"
  */
 static void gsh_expand_span(struct gsh_expand_state *exp, const char **word,
 			    struct gsh_fmt_span *span, ...)
@@ -229,31 +252,6 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word,
 	};
 
 	gsh_expand_span(exp, &span, homevar);
-}
-
-/*      Collect and insert a into the list.
- *
- *	Returns next word or NULL if no next word, similar to strtok().
- */
-static const char *gsh_next_word(struct gsh_parser *p, char *line)
-{
-	char *word = strtok_r(line, WHITESPACE, &p->line_it);
-	if (!word)
-		return NULL;
-
-	const size_t old_words_size = p->tokens_size;
-
-	// FIXME: ... is using lineptr a good idea?
-	p->tokens_size += p->line_it - word;
-
-	p->tokens_size += p->expand_st->size_inc;
-	const size_t word_len = p->tokens_size - old_words_size;
-
-	p->expand_st->skip = 0;
-	if (p->expand_st->bufs[p->expand_st->buf_n])
-		++p->expand_st->buf_n;
-
-	return (p->tokens[p->token_n++] = word);
 }
 
 /*      Parse the first word in the input line, and place
