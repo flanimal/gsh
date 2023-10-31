@@ -42,7 +42,8 @@ struct gsh_parser {
 	size_t tokens_size;
 
 	/* Token queue. */
-	LIST_HEAD(tok_queue, gsh_token) *front;
+	LIST_HEAD(tok_queue, gsh_token) *tok_front;
+	LIST_HEAD(cmd_queue, gsh_parsed_cmd) *cmd_front;
 };
 
 struct gsh_parsed_cmd {
@@ -56,8 +57,6 @@ struct gsh_parsed_cmd {
 	 */
 	char **argv;
 };
-
-LIST_HEAD(cmd_queue, gsh_parsed_cmd);
 
 void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params);
 

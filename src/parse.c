@@ -256,7 +256,7 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	// and another to hold the next element.
 
 	// Delete tokens and command objects.
-	for (struct gsh_token* tok_it = LIST_FIRST(p->front), *next;
+	for (struct gsh_token* tok_it = LIST_FIRST(p->tok_front), *next;
 		tok_it; tok_it = next)
 	{
 		next = LIST_NEXT(tok_it, entry);
@@ -265,8 +265,13 @@ static void gsh_free_parsed(struct gsh_parser *p)
 		free(tok_it);
 	}
 
+	for (struct gsh_parsed_cmd *cmd = LIST_FIRST(p->cmd_front), *next; cmd;
+	     cmd = next) {
+		next = LIST_NEXT(cmd, entry);
 
-
+		LIST_REMOVE(cmd, entry);
+		free(cmd);
+	}
 }
 
 /*	Pop a token from the queue and store in `out_pop`.
@@ -317,7 +322,7 @@ static char *gsh_parse_quoted(struct gsh_parser *p, struct gsh_token *begin,
 	char *arg = LIST_NEXT(begin, entry)->data;
 
 	struct gsh_token *popped;
-	LIST_FOREACH(popped, p->front, entry)
+	LIST_FOREACH(popped, p->tok_front, entry)
 	{
 		if (popped->type != quote_type) {
 			// Reallocate the argument.
@@ -380,7 +385,7 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 	if (!prev)
 		return;
 
-	LIST_INSERT_HEAD(p->front, prev, entry);
+	LIST_INSERT_HEAD(p->tok_front, prev, entry);
 
 	for (struct gsh_token *tok; (tok = gsh_get_token(p));) {
 		LIST_INSERT_AFTER(prev, tok, entry);
@@ -398,7 +403,7 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 	struct gsh_parsed_cmd *cmd;
 
 	struct gsh_token *tok_it;
-	LIST_FOREACH(tok_it, p->front, entry)
+	LIST_FOREACH(tok_it, p->tok_front, entry)
 	{
 		switch (tok_it->type) {
 		case GSH_WORD:
