@@ -227,21 +227,6 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, struct gsh_token *tok,
 	gsh_expand_span(exp, tok, &span, homevar);
 }
 
-/*      Parse the first word in the input line, and place
- *      the filename in the argument array.
- */
-// static bool gsh_parse_filename(struct gsh_parser *p)
-//{
-//	if (!p->tokens[0])
-//		return false;
-//
-//	char *last_slash = strrchr(p->tokens[0], '/');
-//	if (last_slash)
-//		p->tokens[0] = last_slash + 1;
-//
-//	return !!p->tokens[0];
-// }
-
 static void gsh_free_parsed(struct gsh_parser *p)
 {
 	p->expand_st->skip = 0;
@@ -351,6 +336,15 @@ static struct gsh_token *gsh_get_token(struct gsh_parser *p)
 	return tok;
 }
 
+static void gsh_push_cmd(struct gsh_parsed_cmd **cmd)
+{
+	(*cmd)->pathname = (*cmd)->argv[0];
+
+	char *last_slash = strrchr((*cmd)->argv[0], '/');
+	if (last_slash)
+		(*cmd)->argv[0] = last_slash + 1;
+}
+
 void gsh_parse_cmd(struct gsh_parser *p)
 {
 	// Get tokens (words, quotes, parentheses, etc.).
@@ -398,17 +392,23 @@ void gsh_parse_cmd(struct gsh_parser *p)
 				p, &tok_it, tok_it->type);
 
 			break;
-		case GSH_CHAR_CMD_SEP:
+		case GSH_CHAR_CMD_SEP: {
+			gsh_push_cmd(&cmd);
+
 			LIST_INSERT_AFTER(prev_cmd, cmd, entry);
 			prev_cmd = cmd;
+
 			cmd = gsh_new_cmd();
 
 			break;
+		}
 		default:
 			break;
 		}
 
 	}
+
+	gsh_push_cmd(&cmd);
 
 	// Reached end of line.
 	//LIST_INSERT_AFTER(prev_cmd, cmd, entry);
