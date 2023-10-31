@@ -229,7 +229,7 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word,
 /*      Parse the first word in the input line, and place
  *      the filename in the argument array.
  */
-//static bool gsh_parse_filename(struct gsh_parser *p)
+// static bool gsh_parse_filename(struct gsh_parser *p)
 //{
 //	if (!p->tokens[0])
 //		return false;
@@ -239,7 +239,7 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word,
 //		p->tokens[0] = last_slash + 1;
 //
 //	return !!p->tokens[0];
-//}
+// }
 
 static void gsh_free_parsed(struct gsh_parser *p)
 {
@@ -285,14 +285,14 @@ static void gsh_expand(struct gsh_expand_state *exp, const char **tok_data)
 }
 
 /*
-	Iterate tokens, starting from a quote and ending at 
-	a quote of the same time. 
+	Iterate tokens, starting from a quote and ending at
+	a quote of the same time.
 
 	Create an argument using all text between the two quotes,
 	exclusive.
 */
 static char *gsh_parse_quoted(struct gsh_parser *p, struct gsh_token *begin,
-		      enum gsh_special_char quote_type)
+			      enum gsh_special_char quote_type)
 {
 	size_t arg_len = 0;
 
@@ -306,8 +306,8 @@ static char *gsh_parse_quoted(struct gsh_parser *p, struct gsh_token *begin,
 			// Reallocate the argument.
 			const size_t buf_n = p->expand_st->buf_n;
 
-			char *newbuf =
-				realloc(p->expand_st->bufs[buf_n], arg_len + popped->len + 1);
+			char *newbuf = realloc(p->expand_st->bufs[buf_n],
+					       arg_len + popped->len + 1);
 			if (!p->expand_st->bufs[buf_n])
 				*stpncpy(newbuf, arg, arg_len) = '\0';
 
@@ -369,38 +369,39 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 	// I guess that here, we use "parse" to mean "combining/replacing tokens
 	// in the token queue".
 
-	// The first command to insert. There must 
+	// The first command to insert. There must
 	// be at least one command.
-	struct gsh_parsed_cmd *cmd = gsh_new_cmd();
-	LIST_INSERT_HEAD(cmd_queue, cmd, entry);
+	struct gsh_parsed_cmd *prev_cmd = gsh_new_cmd();
+	LIST_INSERT_HEAD(cmd_queue, prev_cmd, entry);
 
-	while () {
-		struct gsh_token *tok_it;
-		LIST_FOREACH(tok_it, p->front, entry)
-		{
-			switch (tok_it->type) {
-			case GSH_WORD:
-				gsh_expand(p->expand_st, &tok_it->data);
-				cmd.argv[cmd.argc++] = tok_it->data;
+	struct gsh_parsed_cmd *cmd;
 
-				break;
-			case GSH_CHAR_SINGLE_QUOTE:
-			case GSH_CHAR_DOUBLE_QUOTE:
-				cmd.argv[cmd.argc++] = gsh_parse_quoted(
-					p, tok_it, tok_it->type);
+	struct gsh_token *tok_it;
+	LIST_FOREACH(tok_it, p->front, entry)
+	{
+		switch (tok_it->type) {
+		case GSH_WORD:
+			gsh_expand(p->expand_st, &tok_it->data);
+			cmd->argv[cmd->argc++] = tok_it->data;
 
-				break;
-			case GSH_CHAR_CMD_SEP:
+			break;
+		case GSH_CHAR_SINGLE_QUOTE:
+		case GSH_CHAR_DOUBLE_QUOTE:
+			cmd->argv[cmd->argc++] = gsh_parse_quoted(
+				p, tok_it, tok_it->type);
 
-				break;
-			}
+			break;
+		case GSH_CHAR_CMD_SEP:
+			LIST_INSERT_AFTER(prev_cmd, cmd, entry);
+			cmd = gsh_new_cmd();
+
+			break;
 		}
-
-		LIST_INSERT_AFTER()
 	}
 
 	// Reached end of line.
 	// gsh_push_cmd(cmd_queue);
+	LIST_INSERT_AFTER(prev_cmd, cmd, entry);
 
 	// TODO: Increment tokens_size AFTER expansions have been performed.
 }
