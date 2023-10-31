@@ -330,10 +330,6 @@ static struct gsh_token *gsh_new_tok()
 
 static struct gsh_token *gsh_get_token(struct gsh_parser *p)
 {
-	// TODO: Do we need this check?
-	if (*p->line_it == '\0')
-		return NULL;
-
 	struct gsh_token *tok = gsh_new_tok();
 
 	const size_t word_len = strcspn(p->line_it, gsh_special_chars);
@@ -362,11 +358,6 @@ void gsh_parse_cmd(struct gsh_parser *p)
 
 	// Get first token. There must be at least one.
 	struct gsh_token *prev = gsh_get_token(p);
-
-	// TODO: Or this one?
-	if (!prev)
-		return;
-
 	LIST_INSERT_HEAD(p->tok_front, prev, entry);
 
 	for (struct gsh_token *tok; (tok = gsh_get_token(p));) {
