@@ -298,9 +298,7 @@ static char *gsh_parse_quoted(struct gsh_parser *p, struct gsh_token *begin,
 
 	// Arg begins at text immediately following quote.
 	char *arg = LIST_NEXT(begin, entry)->data;
-	gsh_pop_tok(p->front, begin);
 
-	// FIXME: WARNING: CANNOT FREE TOKEN IN THIS LOOP!!!
 	struct gsh_token *popped;
 	LIST_FOREACH(popped, p->front, entry)
 	{
@@ -318,9 +316,6 @@ static char *gsh_parse_quoted(struct gsh_parser *p, struct gsh_token *begin,
 
 			arg_len += popped->len;
 		}
-
-		// Remove and delete token.
-		gsh_pop_tok(p->front, popped);
 	}
 
 	return arg;
@@ -361,41 +356,51 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 	// Get tokens (words, quotes, parentheses, etc.).
 	// NOTE: For now, we are keeping tokenization and parsing
 	// phases independent for simplicity.
-	struct gsh_token *prev, *forw;
 
-	LIST_INSERT_HEAD(p->front, (prev = gsh_get_token(p)), entry);
+	// Get first token. There must be at least one.
+	struct gsh_token *prev = gsh_get_token(p);
+	LIST_INSERT_HEAD(p->front, prev, entry);
 
-	for (; (forw = gsh_get_token(p));)
-		LIST_INSERT_AFTER(prev, forw, entry);
+	for (struct gsh_token *tok; (tok = gsh_get_token(p));) {
+		LIST_INSERT_AFTER(prev, tok, entry);
+		prev = tok;
+	}
 
 	// I guess that here, we use "parse" to mean "combining/replacing tokens
 	// in the token queue".
 
-	struct gsh_parsed_cmd cmd;
+	// The first command to insert. There must 
+	// be at least one command.
+	struct gsh_parsed_cmd *cmd = gsh_new_cmd();
+	LIST_INSERT_HEAD(cmd_queue, cmd, entry);
 
-	struct gsh_token *tok_it;
-	LIST_FOREACH(tok_it, p->front, entry)
-	{
-		switch (tok_it->type) {
-		case GSH_WORD:
-			gsh_expand(p->expand_st, &tok_it->data);
-			cmd.argv[cmd.argc++] = tok_it->data;
+	while () {
+		struct gsh_token *tok_it;
+		LIST_FOREACH(tok_it, p->front, entry)
+		{
+			switch (tok_it->type) {
+			case GSH_WORD:
+				gsh_expand(p->expand_st, &tok_it->data);
+				cmd.argv[cmd.argc++] = tok_it->data;
 
-			break;
-		case GSH_CHAR_SINGLE_QUOTE:
-		case GSH_CHAR_DOUBLE_QUOTE:
-			cmd.argv[cmd.argc++] = gsh_parse_quoted(p, tok_it, tok_it->type);
+				break;
+			case GSH_CHAR_SINGLE_QUOTE:
+			case GSH_CHAR_DOUBLE_QUOTE:
+				cmd.argv[cmd.argc++] = gsh_parse_quoted(
+					p, tok_it, tok_it->type);
 
-			break;
-		case GSH_CHAR_CMD_SEP:
+				break;
+			case GSH_CHAR_CMD_SEP:
 
-			break;
+				break;
+			}
 		}
+
+		LIST_INSERT_AFTER()
 	}
 
 	// Reached end of line.
 	// gsh_push_cmd(cmd_queue);
-	LIST_INSERT_AFTER()
 
 	// TODO: Increment tokens_size AFTER expansions have been performed.
 }
