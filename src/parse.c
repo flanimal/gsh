@@ -306,14 +306,14 @@ static void gsh_free_parsed(struct gsh_parser *p)
 
 /*	
  */
-static struct gsh_token *gsh_new_tok(struct gsh_token **last)
+static struct gsh_token *gsh_new_tok(struct gsh_token **queue)
 {
 	struct gsh_token *tok = malloc(sizeof(*tok));
 
-	if (!(*last))
-		*last = tok;
+	if (!(*queue))
+		*queue = tok;
 
-	insque(tok, *last);
+	insque(tok, *queue);
 	return tok;
 }
 
@@ -345,16 +345,20 @@ static bool gsh_get_token(struct gsh_parser *p)
 /*	Pop a token from the queue and store in `out_pop`.
  * 
  *	Returns true if there was a token to pop.
+ * 
+ *	If the last token has been popped, sets the queue pointer to NULL.
  */
 static bool gsh_pop_tok(struct gsh_token **queue, struct gsh_token *out_pop)
 {
 	if (!(*queue))
 		return false;
 
-	remque(*queue);
 	*out_pop = **queue;
 
 	free(*queue);
+	*queue = out_pop->prev;
+	
+	remque(out_pop);
 
 	return true;
 }
@@ -376,7 +380,23 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	// containing the referenced value.
 
 	for (struct gsh_token tok; gsh_pop_tok(&p->tokens, &tok); ) {
-		switch () {
+		switch (tok.type) {
+		case GSH_WORD:
+			break;
+		case GSH_CHAR_SINGLE_QUOTE:
+			break;
+		case GSH_CHAR_DOUBLE_QUOTE:
+			break;
+		case GSH_CHAR_CMD_SEP:
+			break;
+		case GSH_CHAR_OPEN_PAREN:
+			break;
+		case GSH_CHAR_CLOSE_PAREN:
+			break;
+		case GSH_CHAR_HOME:
+			break;
+		case GSH_CHAR_PARAM:
+			break;
 		}
 	}
 }
