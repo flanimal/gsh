@@ -25,7 +25,7 @@ struct gsh_params;
 struct gsh_token {
 	LIST_ENTRY(gsh_token) entry;
 
-	const char *data;
+	char *data;
 	size_t len;
 
 	enum gsh_special_char type;
@@ -62,5 +62,4 @@ void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params);
 
 void gsh_split_words(struct gsh_parser *p, char *line, size_t max_size);
 
-void gsh_parse_cmd(struct gsh_parser *parser,
-		   struct gsh_cmd_queue *cmd_queue);
+void gsh_parse_cmd(struct gsh_parser *p);

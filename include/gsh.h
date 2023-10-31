@@ -6,6 +6,7 @@
 #include <stdbool.h>
 
 #include "params.h"
+#include "parse.h"
 
 /*	Allocates and creates a hashtable, filling it with
  *	elements from `elems`.
@@ -31,10 +32,6 @@ enum gsh_shopt_flags {
 	GSH_OPT_DEFAULTS = GSH_OPT_PROMPT_WORKDIR | GSH_OPT_ECHO,
 };
 
-struct gsh_cmd_queue {
-	struct gsh_parsed_cmd *front;
-};
-
 struct gsh_state {
 	/* Command history. */
 	struct gsh_cmd_hist *hist;
@@ -42,7 +39,6 @@ struct gsh_state {
 	struct gsh_input_buf *inputbuf;
 
 	struct gsh_parser *parser;
-	struct gsh_cmd_queue cmd_queue;
 
 	/* Current working directory of the shell process. */
 	char *cwd;

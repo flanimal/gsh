@@ -116,7 +116,6 @@ void gsh_init(struct gsh_state *sh)
 	sh->inputbuf = gsh_new_inputbuf();
 	sh->hist = gsh_new_hist();
 
-	sh->cmd_queue.front = NULL;
 	gsh_parse_init(&sh->parser, &sh->params);
 
 	sh->shopts = GSH_OPT_DEFAULTS;
@@ -186,11 +185,17 @@ void gsh_run_cmd(struct gsh_state *sh)
 	}
 
 	gsh_add_hist(sh->hist, sh->inputbuf->len, sh->inputbuf->line);
+	gsh_parse_cmd(sh->parser);
+	
+	for (struct gsh_parsed_cmd *cmd = LIST_FIRST(sh->parser->cmd_front), *next;
+	     cmd; cmd = next) {
+		cmd = LIST_NEXT(cmd, entry);
+		
+		gsh_switch(sh, cmd);
 
-	do {
-		gsh_parse_cmd(sh->parser, &sh->cmd_queue);
-		gsh_switch(sh, sh->cmd_queue.front);
-	} while (sh->cmd_queue.front);
+		LIST_REMOVE(cmd, entry);
+		free(cmd);
+	}
 
 	sh->inputbuf->len = 0;
 }

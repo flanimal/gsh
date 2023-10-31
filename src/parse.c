@@ -68,7 +68,7 @@ void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
 
 /*	Allocate and return a word buffer.
  */
-static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, const char **word,
+static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, char **word,
 			       int inc)
 {
 	// FIXME: May want to get rid of strlen().
@@ -110,7 +110,7 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, const char **word,
  *
  *	After :	"HeABCDEFGHIJKLMOld!"
  */
-static void gsh_expand_span(struct gsh_expand_state *exp, const char **word,
+static void gsh_expand_span(struct gsh_expand_state *exp, char **word,
 			    struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
@@ -162,7 +162,7 @@ static void gsh_expand_span(struct gsh_expand_state *exp, const char **word,
  *	If the variable does not exist, the word will be assigned the empty
  *	string.
  */
-static void gsh_fmt_var(struct gsh_expand_state *exp, const char **word,
+static void gsh_fmt_var(struct gsh_expand_state *exp, char **word,
 			struct gsh_fmt_span *span)
 {
 	if (strcmp(*word, span->begin) == 0) {
@@ -178,7 +178,7 @@ static void gsh_fmt_var(struct gsh_expand_state *exp, const char **word,
 
 /*      Substitute a parameter reference with its value.
  */
-static void gsh_fmt_param(struct gsh_expand_state *exp, const char **word,
+static void gsh_fmt_param(struct gsh_expand_state *exp, char **word,
 			  char *const fmt_begin)
 {
 	struct gsh_fmt_span span = {
@@ -205,7 +205,7 @@ static void gsh_fmt_param(struct gsh_expand_state *exp, const char **word,
 	If the word consists only of the home character, it will be
 *	assigned to point to the value of $HOME.
 */
-static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word,
+static void gsh_fmt_home(struct gsh_expand_state *exp, char **word,
 			 char *const fmt_begin)
 {
 	const char *homevar = gsh_getenv(exp->params, "HOME");
@@ -213,7 +213,7 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word,
 	// TODO: Move the whole-word check out of the fmt_* functions so that
 	// it makes more sense with strpbrk() converting const char * to char *?
 	if (strcmp(*word, (char[]){ GSH_CHAR_HOME, '\0' }) == 0) {
-		*word = homevar;
+		*word = (char*)homevar;
 		return;
 	}
 
@@ -223,7 +223,7 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word,
 		.fmt_str = "%s",
 	};
 
-	gsh_expand_span(exp, &span, homevar);
+	gsh_expand_span(exp, word, &span, homevar);
 }
 
 /*      Parse the first word in the input line, and place
@@ -264,41 +264,21 @@ static void gsh_free_parsed(struct gsh_parser *p)
 		LIST_REMOVE(tok_it, entry);
 		free(tok_it);
 	}
-
-	for (struct gsh_parsed_cmd *cmd = LIST_FIRST(p->cmd_front), *next; cmd;
-	     cmd = next) {
-		next = LIST_NEXT(cmd, entry);
-
-		LIST_REMOVE(cmd, entry);
-		free(cmd);
-	}
 }
 
-/*	Pop a token from the queue and store in `out_pop`.
- *
- *	Returns true if there was a token to pop.
- *
- *	If the last token has been popped, sets the queue pointer to NULL.
- */
-static bool gsh_pop_tok(struct tok_queue *front, struct gsh_token *to_pop)
-{
-	LIST_REMOVE(to_pop, entry);
-	free(to_pop);
-}
-
-static void gsh_expand(struct gsh_expand_state *exp, const char **tok_data)
+static void gsh_expand(struct gsh_expand_state *exp, char **tok_data)
 {
 	while (1) {
-		char *exp_pos = strchr(*tok_data, "$");
+		char *exp_pos = strchr(*tok_data, '$');
 		if (exp_pos) {
-			gsh_fmt_param(exp, tok_data, &exp_pos);
+			gsh_fmt_param(exp, tok_data, exp_pos);
 			continue;
 		}
 
-		exp_pos = strchr(*tok_data, "~");
+		exp_pos = strchr(*tok_data, '~');
 
 		if (exp_pos) {
-			gsh_fmt_home(exp, tok_data, &exp_pos);
+			gsh_fmt_home(exp, tok_data, exp_pos);
 			continue;
 		}
 
@@ -321,8 +301,8 @@ static char *gsh_parse_quoted(struct gsh_parser *p, struct gsh_token **tok_it,
 	// Arg begins at text immediately following quote.
 	char *arg = LIST_NEXT(*tok_it, entry)->data;
 
-	for (; (*tok_it = LIST_NEXT(*tok_it, entry)) &&
-	       ((*tok_it)->type != quote_type);)
+	while ((*tok_it = LIST_NEXT(*tok_it, entry)) &&
+	       ((*tok_it)->type != quote_type))
 	{
 		// Reallocate the argument.
 		const size_t buf_n = p->expand_st->buf_n;
@@ -350,6 +330,7 @@ static struct gsh_token *gsh_new_tok()
 
 static struct gsh_token *gsh_get_token(struct gsh_parser *p)
 {
+	// TODO: Do we need this check?
 	if (*p->line_it == '\0')
 		return NULL;
 
@@ -371,7 +352,7 @@ static struct gsh_token *gsh_get_token(struct gsh_parser *p)
 	return tok;
 }
 
-void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
+void gsh_parse_cmd(struct gsh_parser *p)
 {
 	// Get tokens (words, quotes, parentheses, etc.).
 	// NOTE: For now, we are keeping tokenization and parsing
@@ -382,6 +363,7 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 	// Get first token. There must be at least one.
 	struct gsh_token *prev = gsh_get_token(p);
 
+	// TODO: Or this one?
 	if (!prev)
 		return;
 
@@ -398,7 +380,7 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 	// The first command to insert. There must
 	// be at least one command.
 	struct gsh_parsed_cmd *cmd = gsh_new_cmd();
-	LIST_INSERT_HEAD(cmd_queue, cmd, entry);
+	LIST_INSERT_HEAD(p->cmd_front, cmd, entry);
 
 	struct gsh_parsed_cmd *prev_cmd;
 
@@ -424,7 +406,10 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 			cmd = gsh_new_cmd();
 
 			break;
+		default:
+			break;
 		}
+
 	}
 
 	// Reached end of line.
