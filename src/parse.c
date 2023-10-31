@@ -260,7 +260,7 @@ static void gsh_free_parsed(struct gsh_parser *p)
  */
 static bool gsh_pop_tok(struct tok_queue *front, struct gsh_token *to_pop)
 {
-	SLIST_REMOVE(front, to_pop, gsh_token, next);
+	LIST_REMOVE(to_pop, entry);
 	free(to_pop);
 }
 
@@ -294,15 +294,15 @@ static void gsh_expand(struct gsh_expand_state *exp, const char **tok_data)
 static char *gsh_parse_quoted(struct gsh_parser *p, struct gsh_token *begin,
 		      enum gsh_special_char quote_type)
 {
-	// Arg begins at text immediately following quote.
-	char *arg = SLIST_NEXT(begin, next)->data;
-	gsh_pop_tok(p->front, begin);
-
 	size_t arg_len = 0;
 
-	struct gsh_token *popped;
+	// Arg begins at text immediately following quote.
+	char *arg = LIST_NEXT(begin, entry)->data;
+	gsh_pop_tok(p->front, begin);
 
-	SLIST_FOREACH(popped, p->front, next)
+	// FIXME: WARNING: CANNOT FREE TOKEN IN THIS LOOP!!!
+	struct gsh_token *popped;
+	LIST_FOREACH(popped, p->front, entry)
 	{
 		if (popped->type != quote_type) {
 			// Reallocate the argument.
@@ -363,10 +363,10 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 	// phases independent for simplicity.
 	struct gsh_token *prev, *forw;
 
-	SLIST_INSERT_HEAD(p->front, (prev = gsh_get_token(p)), next);
+	LIST_INSERT_HEAD(p->front, (prev = gsh_get_token(p)), entry);
 
 	for (; (forw = gsh_get_token(p));)
-		SLIST_INSERT_AFTER(prev, forw, next);
+		LIST_INSERT_AFTER(prev, forw, entry);
 
 	// I guess that here, we use "parse" to mean "combining/replacing tokens
 	// in the token queue".
@@ -374,7 +374,7 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 	struct gsh_parsed_cmd cmd;
 
 	struct gsh_token *tok_it;
-	SLIST_FOREACH(tok_it, p->front, next)
+	LIST_FOREACH(tok_it, p->front, entry)
 	{
 		switch (tok_it->type) {
 		case GSH_WORD:
@@ -395,7 +395,7 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 
 	// Reached end of line.
 	// gsh_push_cmd(cmd_queue);
-	SLIST_INSERT_AFTER()
+	LIST_INSERT_AFTER()
 
 	// TODO: Increment tokens_size AFTER expansions have been performed.
 }

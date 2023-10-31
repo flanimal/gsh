@@ -23,7 +23,7 @@
 struct gsh_params;
 
 struct gsh_token {
-	SLIST_ENTRY(gsh_token) next;
+	LIST_ENTRY(gsh_token) entry;
 
 	const char *data;
 	size_t len;
@@ -42,11 +42,11 @@ struct gsh_parser {
 	size_t tokens_size;
 
 	/* Token queue. */
-	SLIST_HEAD(tok_queue, gsh_token) *front;
+	LIST_HEAD(tok_queue, gsh_token) *front;
 };
 
 struct gsh_parsed_cmd {
-	SLIST_ENTRY(gsh_parsed_cmd) next;
+	LIST_ENTRY(gsh_parsed_cmd) entry;
 
 	char *pathname;
 
@@ -57,7 +57,7 @@ struct gsh_parsed_cmd {
 	char **argv;
 };
 
-SLIST_HEAD(cmd_queue, gsh_parsed_cmd);
+LIST_HEAD(cmd_queue, gsh_parsed_cmd);
 
 void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params);
 
