@@ -53,9 +53,7 @@ struct gsh_parsed_cmd {
 
 	int argc;
 
-	/* Pointer to beginning of this command's arguments in the token list.
-	 */
-	char **argv;
+	char *argv[64];
 };
 
 void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params);

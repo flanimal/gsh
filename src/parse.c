@@ -68,19 +68,19 @@ void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
 
 /*	Allocate and return a word buffer.
  */
-static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, char **word,
+static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp,
+			       struct gsh_token *tok,
 			       int inc)
 {
-	// FIXME: May want to get rid of strlen().
-	const size_t new_len = strlen(*word) + inc;
+	const size_t new_len = tok->len + inc;
 	const size_t buf_n = exp->buf_n;
 
 	char *newbuf = realloc(exp->bufs[buf_n], new_len + 1);
 	if (!exp->bufs[buf_n])
-		strcpy(newbuf, *word);
+		strcpy(newbuf, tok->data);
 
 	exp->bufs[buf_n] = newbuf;
-	*word = newbuf;
+	tok->data = newbuf;
 
 	return newbuf;
 }
@@ -110,7 +110,8 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp, char **word,
  *
  *	After :	"HeABCDEFGHIJKLMOld!"
  */
-static void gsh_expand_span(struct gsh_expand_state *exp, char **word,
+static void gsh_expand_span(struct gsh_expand_state *exp,
+			    struct gsh_token *tok,
 			    struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
@@ -144,8 +145,8 @@ static void gsh_expand_span(struct gsh_expand_state *exp, char **word,
 	}
 
 	// Need to allocate.
-	const ptrdiff_t span_pos = span->begin - *word;
-	span->begin = gsh_alloc_wordbuf(exp, word, size_inc) + span_pos;
+	const ptrdiff_t span_pos = span->begin - tok->data;
+	span->begin = gsh_alloc_wordbuf(exp, tok, size_inc) + span_pos;
 
 	memmove(span->begin + print_len, span->begin + span->len, span->len);
 
@@ -162,23 +163,23 @@ static void gsh_expand_span(struct gsh_expand_state *exp, char **word,
  *	If the variable does not exist, the word will be assigned the empty
  *	string.
  */
-static void gsh_fmt_var(struct gsh_expand_state *exp, char **word,
+static void gsh_fmt_var(struct gsh_expand_state *exp, struct gsh_token *tok,
 			struct gsh_fmt_span *span)
 {
-	if (strcmp(*word, span->begin) == 0) {
-		*word = (char *)gsh_getenv(exp->params, span->begin + 1);
+	if (strcmp(tok->data, span->begin) == 0) {
+		tok->data = (char *)gsh_getenv(exp->params, span->begin + 1);
 		return;
 	}
 	// TODO: Max var name length?
 	char *var_name = strndup(span->begin + 1, span->len - 1);
 
-	gsh_expand_span(exp, word, span, gsh_getenv(exp->params, var_name));
+	gsh_expand_span(exp, tok, span, gsh_getenv(exp->params, var_name));
 	free(var_name);
 }
 
 /*      Substitute a parameter reference with its value.
  */
-static void gsh_fmt_param(struct gsh_expand_state *exp, char **word,
+static void gsh_fmt_param(struct gsh_expand_state *exp, struct gsh_token *tok,
 			  char *const fmt_begin)
 {
 	struct gsh_fmt_span span = {
@@ -190,12 +191,12 @@ static void gsh_fmt_param(struct gsh_expand_state *exp, char **word,
 	case GSH_CHAR_PARAM_STATUS:
 		span.fmt_str = "%d";
 
-		gsh_expand_span(exp, word, &span, exp->params->last_status);
+		gsh_expand_span(exp, tok, &span, exp->params->last_status);
 		break;
 	default:
 		span.fmt_str = "%s";
 
-		gsh_fmt_var(exp, word, &span);
+		gsh_fmt_var(exp, tok, &span);
 		break;
 	}
 }
@@ -205,15 +206,15 @@ static void gsh_fmt_param(struct gsh_expand_state *exp, char **word,
 	If the word consists only of the home character, it will be
 *	assigned to point to the value of $HOME.
 */
-static void gsh_fmt_home(struct gsh_expand_state *exp, char **word,
+static void gsh_fmt_home(struct gsh_expand_state *exp, struct gsh_token *tok,
 			 char *const fmt_begin)
 {
 	const char *homevar = gsh_getenv(exp->params, "HOME");
 
 	// TODO: Move the whole-word check out of the fmt_* functions so that
 	// it makes more sense with strpbrk() converting const char * to char *?
-	if (strcmp(*word, (char[]){ GSH_CHAR_HOME, '\0' }) == 0) {
-		*word = (char*)homevar;
+	if (strcmp(tok->data, (char[]){ GSH_CHAR_HOME, '\0' }) == 0) {
+		tok->data = (char*)homevar;
 		return;
 	}
 
@@ -223,7 +224,7 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, char **word,
 		.fmt_str = "%s",
 	};
 
-	gsh_expand_span(exp, word, &span, homevar);
+	gsh_expand_span(exp, tok, &span, homevar);
 }
 
 /*      Parse the first word in the input line, and place
@@ -266,23 +267,21 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	}
 }
 
-static char *gsh_expand(struct gsh_expand_state *exp, char *tok_data)
+static void gsh_expand(struct gsh_expand_state *exp, struct gsh_token *tok)
 {
-	for (char *fmt_begin = tok_data; (fmt_begin = strpbrk(fmt_begin, "$~"));) {
+	for (char *fmt_begin = tok->data;
+	     (fmt_begin = strpbrk(fmt_begin, "$~"));) {
 		switch ((enum gsh_special_char)fmt_begin[0]) {
 		case GSH_CHAR_PARAM:
-			gsh_fmt_param(exp, &tok_data, fmt_begin);
+			gsh_fmt_param(exp, tok, fmt_begin);
 			continue;
 		case GSH_CHAR_HOME:
-			gsh_fmt_home(exp, &tok_data, fmt_begin);
+			gsh_fmt_home(exp, tok, fmt_begin);
 			continue;
 		default:
 			unreachable();
 		}
-
 	}
-
-	return tok_data;
 }
 
 /*
@@ -329,6 +328,9 @@ static struct gsh_token *gsh_new_tok()
 
 static struct gsh_token *gsh_get_token(struct gsh_parser *p)
 {
+	if (*p->line_it == '\0')
+		return NULL;
+
 	struct gsh_token *tok = gsh_new_tok();
 
 	const size_t word_len = strcspn(p->line_it, gsh_special_chars);
@@ -381,8 +383,9 @@ void gsh_parse_cmd(struct gsh_parser *p)
 	{
 		switch (tok_it->type) {
 		case GSH_WORD:
-			cmd->argv[cmd->argc++] =
-				gsh_expand(p->expand_st, tok_it->data);
+			gsh_expand(p->expand_st, tok_it);
+			cmd->argv[cmd->argc++] = tok_it->data;
+				
 			p->tokens_size += p->expand_st->size_inc;
 			p->expand_st->size_inc = 0;
 
