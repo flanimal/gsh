@@ -250,6 +250,23 @@ static void gsh_free_parsed(struct gsh_parser *p)
 		free(p->expand_st->bufs[p->expand_st->buf_n - 1]);
 		p->expand_st->bufs[p->expand_st->buf_n - 1] = NULL;
 	}
+
+	// Remember that in order to free a linked list, you need
+	// two pointers-- one to hold the element to delete,
+	// and another to hold the next element.
+
+	// Delete tokens and command objects.
+	for (struct gsh_token* tok_it = LIST_FIRST(p->front), *next;
+		tok_it; tok_it = next)
+	{
+		next = LIST_NEXT(tok_it, entry);
+
+		LIST_REMOVE(tok_it, entry);
+		free(tok_it);
+	}
+
+
+
 }
 
 /*	Pop a token from the queue and store in `out_pop`.
@@ -359,6 +376,10 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 
 	// Get first token. There must be at least one.
 	struct gsh_token *prev = gsh_get_token(p);
+
+	if (!prev)
+		return;
+
 	LIST_INSERT_HEAD(p->front, prev, entry);
 
 	for (struct gsh_token *tok; (tok = gsh_get_token(p));) {

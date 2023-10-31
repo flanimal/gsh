@@ -187,10 +187,6 @@ void gsh_run_cmd(struct gsh_state *sh)
 
 	gsh_add_hist(sh->hist, sh->inputbuf->len, sh->inputbuf->line);
 
-	// FIXME: WARNING: We CAN'T split the line into words before parsing,
-	// because that would also include whitespace within quotes, etc.
-	// which is WRONG.
-
 	do {
 		gsh_parse_cmd(sh->parser, &sh->cmd_queue);
 		gsh_switch(sh, sh->cmd_queue.front);
