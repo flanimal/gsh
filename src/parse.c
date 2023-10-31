@@ -376,6 +376,7 @@ void gsh_parse_cmd(struct gsh_parser *p)
 	struct gsh_parsed_cmd *cmd = gsh_new_cmd();
 	LIST_INSERT_HEAD(&p->cmd_front, cmd, entry);
 
+	// FIXME: We need to assign prev_cmd!
 	struct gsh_parsed_cmd *prev_cmd;
 
 	struct gsh_token *tok_it;
@@ -410,5 +411,5 @@ void gsh_parse_cmd(struct gsh_parser *p)
 	}
 
 	// Reached end of line.
-	LIST_INSERT_AFTER(prev_cmd, cmd, entry);
+	//LIST_INSERT_AFTER(prev_cmd, cmd, entry);
 }
