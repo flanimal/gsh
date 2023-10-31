@@ -26,7 +26,7 @@ struct gsh_parsed_cmd
 
 	int argc;
 
-	/* Pointer to beginning of this command's arguments in the word list. */
+	/* Pointer to beginning of this command's arguments in the token list. */
 	char **argv;
 };
 

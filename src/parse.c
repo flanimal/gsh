@@ -231,28 +231,6 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, const char **word,
 	gsh_expand_span(exp, &span, homevar);
 }
 
-/*      Expand the last word.
- *	Returns true while there are still expansions to be performed.
- */
-static bool gsh_expand_word(struct gsh_expand_state *exp, const char **word)
-{
-	char *fmt_begin = strpbrk(*word + exp->skip, gsh_special_chars);
-
-	if (!fmt_begin)
-		return false;
-
-	switch ((enum gsh_special_char)fmt_begin[0]) {
-	case GSH_CHAR_PARAM:
-		gsh_fmt_param(exp, word, fmt_begin);
-		return true;
-	case GSH_CHAR_HOME:
-		gsh_fmt_home(exp, word, fmt_begin);
-		return true;
-	}
-
-	unreachable();
-}
-
 /*      Collect and insert a into the list.
  *
  *	Returns next word or NULL if no next word, similar to strtok().
@@ -304,7 +282,7 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	}
 }
 
-/*	
+/*
  */
 static struct gsh_token *gsh_new_tok(struct gsh_token **queue)
 {
@@ -343,9 +321,9 @@ static bool gsh_get_token(struct gsh_parser *p)
 }
 
 /*	Pop a token from the queue and store in `out_pop`.
- * 
+ *
  *	Returns true if there was a token to pop.
- * 
+ *
  *	If the last token has been popped, sets the queue pointer to NULL.
  */
 static bool gsh_pop_tok(struct gsh_token **queue, struct gsh_token *out_pop)
@@ -357,10 +335,30 @@ static bool gsh_pop_tok(struct gsh_token **queue, struct gsh_token *out_pop)
 
 	free(*queue);
 	*queue = out_pop->prev;
-	
+
 	remque(out_pop);
 
 	return true;
+}
+
+void gsh_parse_quoted(struct gsh_parser *p, struct gsh_token *prev,
+		      enum gsh_special_char quote_type)
+{
+	struct gsh_token popped;
+
+	gsh_pop_tok(&p->tokens, &popped);
+	char *data = popped.next->data;
+	size_t len = 0;
+
+	while (gsh_pop_tok(&p->tokens, &popped) && popped.type != quote_type) {
+		len += popped.len;
+		gsh_alloc_wordbuf(p->expand_st, &data, popped.len);
+	}
+
+	struct gsh_token *word = gsh_new_tok(&prev);
+	word->data = data;
+	word->len = len;
+	word->type = GSH_WORD;
 }
 
 void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
@@ -374,29 +372,53 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	// Pop tokens to create command objects, and push those commands onto
 	// cmd_queue.
 	//
-	// To elaborate, the final argv list will be similar to the initial
-	// token list. Words will remain unmodified. However, parameter
-	// references and such will be substituted with a single word token each
-	// containing the referenced value.
+	// NOTE: Using a queue means we can perform replacements in the middle,
+	// and that we don't have to use a separate list for the actual
+	// arguments to be returned in a parsed_cmd.
 
-	for (struct gsh_token tok; gsh_pop_tok(&p->tokens, &tok); ) {
-		switch (tok.type) {
+	// There are two possible approaches.
+	// 1. Use the same queue for both tokens and the final argument list,
+	// and replace/combine tokens when necessary.
+	//
+	// 2. Use a queue for tokens that is separate from the final argument
+	// list.
+	//	This would require allocating memory for each parsed command's
+	//arguments.
+
+	struct gsh_parsed_cmd cmd;
+
+	// I guess that here, we use "parse" to mean "combining/replacing tokens
+	// in the token queue".
+
+	for (struct gsh_token *tok_it = p->tokens; tok_it;
+	     tok_it = tok_it->next) {
+		switch (tok_it->type) {
 		case GSH_WORD:
+			// gsh_new_cmd();
 			break;
 		case GSH_CHAR_SINGLE_QUOTE:
-			break;
 		case GSH_CHAR_DOUBLE_QUOTE:
+			// Replace any tokens from this quote to the next,
+			// inclusive, with a single word token.
+			gsh_parse_quoted(p, tok_it->prev, tok_it->type);
 			break;
 		case GSH_CHAR_CMD_SEP:
-			break;
-		case GSH_CHAR_OPEN_PAREN:
-			break;
-		case GSH_CHAR_CLOSE_PAREN:
+			// gsh_push_cmd(&cmd, cmd_queue);
 			break;
 		case GSH_CHAR_HOME:
+			gsh_fmt_home();
 			break;
 		case GSH_CHAR_PARAM:
+			// Get a word for the param name.
+			gsh_fmt_param();
 			break;
+			// case GSH_CHAR_OPEN_PAREN:
+			//	break;
+			// case GSH_CHAR_CLOSE_PAREN:
+			//	break;
 		}
 	}
+
+	// Reached end of line.
+	// gsh_push_cmd(cmd_queue);
 }
