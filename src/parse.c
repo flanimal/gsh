@@ -268,21 +268,15 @@ static void gsh_free_parsed(struct gsh_parser *p)
 
 static void gsh_expand(struct gsh_expand_state *exp, char **tok_data)
 {
-	while (1) {
-		char *exp_pos = strchr(*tok_data, '$');
-		if (exp_pos) {
-			gsh_fmt_param(exp, tok_data, exp_pos);
+	for (char *fmt_begin; (fmt_begin = strpbrk(fmt_begin, "$~"));) {
+		switch ((enum gsh_special_char)fmt_begin[0]) {
+		case GSH_CHAR_PARAM:
+			gsh_fmt_param(exp, tok_data, fmt_begin);
+			continue;
+		case GSH_CHAR_HOME:
+			gsh_fmt_home(exp, tok_data, fmt_begin);
 			continue;
 		}
-
-		exp_pos = strchr(*tok_data, '~');
-
-		if (exp_pos) {
-			gsh_fmt_home(exp, tok_data, exp_pos);
-			continue;
-		}
-
-		return;
 	}
 }
 
