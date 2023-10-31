@@ -383,6 +383,8 @@ void gsh_parse_cmd(struct gsh_parser *p)
 		case GSH_WORD:
 			cmd->argv[cmd->argc++] =
 				gsh_expand(p->expand_st, tok_it->data);
+			p->tokens_size += p->expand_st->size_inc;
+			p->expand_st->size_inc = 0;
 
 			break;
 		case GSH_CHAR_SINGLE_QUOTE:
@@ -406,6 +408,4 @@ void gsh_parse_cmd(struct gsh_parser *p)
 
 	// Reached end of line.
 	LIST_INSERT_AFTER(prev_cmd, cmd, entry);
-
-	// TODO: Increment tokens_size AFTER expansions have been performed.
 }
