@@ -359,9 +359,6 @@ static bool gsh_get_token(struct gsh_parser *p)
 
 void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 {
-	if (p->line_it[0] == '\0')
-		return;
-
 	// Tokenize.
 	while (gsh_get_token(p))
 		;
