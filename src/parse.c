@@ -120,16 +120,19 @@ static void gsh_expand_span(struct gsh_expand_state *exp, const char **word,
 {
 	va_list fmt_args;
 
-	va_start(fmt_args, span);
-	const char nul_rep = span->begin[span->len];
+	int print_len;
+	{
+		const char nul_rep = span->begin[span->len];
 
-	const int print_len =
-		vsnprintf(span->begin, span->len, span->fmt_str, fmt_args);
-	
-	assert(print_len >= 0);
+		va_start(fmt_args, span);
+		print_len = vsnprintf(span->begin, span->len, span->fmt_str,
+				      fmt_args);
 
-	span->begin[span->len] = nul_rep;
-	va_end(fmt_args);
+		assert(print_len >= 0);
+		va_end(fmt_args);
+
+		span->begin[span->len] = nul_rep;
+	}
 
 	exp->skip += print_len;
 
@@ -137,20 +140,23 @@ static void gsh_expand_span(struct gsh_expand_state *exp, const char **word,
 	if (size_inc == 0)
 		return;
 
-	// Need to allocate.
 	exp->size_inc += size_inc;
 
-	if (size_inc > 0) {
-		const ptrdiff_t before_len = span->begin - *word;
-		span->begin =
-			gsh_alloc_wordbuf(exp, word, size_inc) + before_len;
-
-		va_start(fmt_args, span);
-		vsprintf(span->begin, span->fmt_str, fmt_args);
-		va_end(fmt_args);
+	if (size_inc < 0) {
+		memmove(span->begin + print_len, span->begin + span->len,
+			span->len);
+		return;
 	}
 
+	// Need to allocate.
+	const ptrdiff_t span_pos = span->begin - *word;
+	span->begin = gsh_alloc_wordbuf(exp, word, size_inc) + span_pos;
+
 	memmove(span->begin + print_len, span->begin + span->len, span->len);
+
+	va_start(fmt_args, span);
+	vsprintf(span->begin, span->fmt_str, fmt_args);
+	va_end(fmt_args);
 }
 
 /*	Substitute a variable reference with its value.
@@ -301,7 +307,7 @@ static void gsh_free_parsed(struct gsh_parser *p)
 static struct gsh_token *gsh_new_tok(struct gsh_token **last)
 {
 	struct gsh_token *tok = malloc(sizeof(*tok));
-	
+
 	if (!(*last))
 		*last = tok;
 
@@ -328,7 +334,7 @@ static bool gsh_pop_tok(struct gsh_token **last, struct gsh_token *out_pop)
 
 // Iterate over each character in the input line individually
 // (until we have a reason to get more at a time).
-static bool gsh_get_token(struct gsh_parser* p)
+static bool gsh_get_token(struct gsh_parser *p)
 {
 	if (*p->line_it == '\0')
 		return false;
@@ -364,10 +370,11 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 
 	// Pop tokens to create command objects, and push those commands onto
 	// cmd_queue.
-	// 
-	// To elaborate, the final argv list will be similar to the initial token list.
-	// Words will remain unmodified. However, parameter references and such will be
-	// substituted with a single word token each containing the referenced value.
+	//
+	// To elaborate, the final argv list will be similar to the initial
+	// token list. Words will remain unmodified. However, parameter
+	// references and such will be substituted with a single word token each
+	// containing the referenced value.
 
 	for (struct gsh_token tok; gsh_pop_tok(&p->tokens, &tok)) {
 		switch () {
