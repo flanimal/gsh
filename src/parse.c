@@ -266,18 +266,23 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	}
 }
 
-static void gsh_expand(struct gsh_expand_state *exp, char **tok_data)
+static char *gsh_expand(struct gsh_expand_state *exp, char *tok_data)
 {
-	for (char *fmt_begin; (fmt_begin = strpbrk(fmt_begin, "$~"));) {
+	for (char *fmt_begin = tok_data; (fmt_begin = strpbrk(fmt_begin, "$~"));) {
 		switch ((enum gsh_special_char)fmt_begin[0]) {
 		case GSH_CHAR_PARAM:
-			gsh_fmt_param(exp, tok_data, fmt_begin);
+			gsh_fmt_param(exp, &tok_data, fmt_begin);
 			continue;
 		case GSH_CHAR_HOME:
-			gsh_fmt_home(exp, tok_data, fmt_begin);
+			gsh_fmt_home(exp, &tok_data, fmt_begin);
 			continue;
+		default:
+			unreachable();
 		}
+
 	}
+
+	return tok_data;
 }
 
 /*
@@ -337,7 +342,9 @@ static struct gsh_token *gsh_get_token(struct gsh_parser *p)
 	}
 
 	tok->data = p->line_it;
+
 	p->line_it += tok->len;
+	p->tokens_size += tok->len;
 
 	return tok;
 }
@@ -374,8 +381,8 @@ void gsh_parse_cmd(struct gsh_parser *p)
 	{
 		switch (tok_it->type) {
 		case GSH_WORD:
-			gsh_expand(p->expand_st, &tok_it->data);
-			cmd->argv[cmd->argc++] = tok_it->data;
+			cmd->argv[cmd->argc++] =
+				gsh_expand(p->expand_st, tok_it->data);
 
 			break;
 		case GSH_CHAR_SINGLE_QUOTE:
