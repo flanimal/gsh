@@ -187,7 +187,7 @@ void gsh_run_cmd(struct gsh_state *sh)
 	gsh_add_hist(sh->hist, sh->inputbuf->len, sh->inputbuf->line);
 	gsh_parse_cmd(sh->parser);
 	
-	for (struct gsh_parsed_cmd *cmd = LIST_FIRST(sh->parser->cmd_front), *next;
+	for (struct gsh_parsed_cmd *cmd = LIST_FIRST(&sh->parser->cmd_front), *next;
 	     cmd; cmd = next) {
 		next = LIST_NEXT(cmd, entry);
 		

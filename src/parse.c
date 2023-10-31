@@ -256,7 +256,7 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	// and another to hold the next element.
 
 	// Delete tokens and command objects.
-	for (struct gsh_token* tok_it = LIST_FIRST(p->tok_front), *next;
+	for (struct gsh_token* tok_it = LIST_FIRST(&p->tok_front), *next;
 		tok_it; tok_it = next)
 	{
 		next = LIST_NEXT(tok_it, entry);
@@ -359,7 +359,7 @@ void gsh_parse_cmd(struct gsh_parser *p)
 
 	// Get first token. There must be at least one.
 	struct gsh_token *prev = gsh_get_token(p);
-	LIST_INSERT_HEAD(p->tok_front, prev, entry);
+	LIST_INSERT_HEAD(&p->tok_front, prev, entry);
 
 	for (struct gsh_token *tok; (tok = gsh_get_token(p));) {
 		LIST_INSERT_AFTER(prev, tok, entry);
@@ -372,12 +372,12 @@ void gsh_parse_cmd(struct gsh_parser *p)
 	// The first command to insert. There must
 	// be at least one command.
 	struct gsh_parsed_cmd *cmd = gsh_new_cmd();
-	LIST_INSERT_HEAD(p->cmd_front, cmd, entry);
+	LIST_INSERT_HEAD(&p->cmd_front, cmd, entry);
 
 	struct gsh_parsed_cmd *prev_cmd;
 
 	struct gsh_token *tok_it;
-	LIST_FOREACH(tok_it, p->tok_front, entry)
+	LIST_FOREACH(tok_it, &p->tok_front, entry)
 	{
 		switch (tok_it->type) {
 		case GSH_WORD:
