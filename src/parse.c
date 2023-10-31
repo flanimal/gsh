@@ -304,6 +304,8 @@ static void gsh_free_parsed(struct gsh_parser *p)
 	}
 }
 
+/*	
+ */
 static struct gsh_token *gsh_new_tok(struct gsh_token **last)
 {
 	struct gsh_token *tok = malloc(sizeof(*tok));
@@ -313,23 +315,6 @@ static struct gsh_token *gsh_new_tok(struct gsh_token **last)
 
 	insque(tok, *last);
 	return tok;
-}
-
-static bool gsh_pop_tok(struct gsh_token **last, struct gsh_token *out_pop)
-{
-	if (*last) {
-		out_pop = *last;
-
-		if (!(*last)->prev)
-			*last = NULL;
-
-		remque(*last);
-		free(*pop);
-
-		return true;
-	}
-
-	return false;
 }
 
 // Iterate over each character in the input line individually
@@ -357,6 +342,23 @@ static bool gsh_get_token(struct gsh_parser *p)
 	return true;
 }
 
+/*	Pop a token from the queue and store in `out_pop`.
+ * 
+ *	Returns true if there was a token to pop.
+ */
+static bool gsh_pop_tok(struct gsh_token **queue, struct gsh_token *out_pop)
+{
+	if (!(*queue))
+		return false;
+
+	remque(*queue);
+	*out_pop = **queue;
+
+	free(*queue);
+
+	return true;
+}
+
 void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 {
 	// Tokenize.
@@ -373,7 +375,7 @@ void gsh_parse_cmd(struct gsh_parser *p, struct gsh_cmd_queue *cmd_queue)
 	// references and such will be substituted with a single word token each
 	// containing the referenced value.
 
-	for (struct gsh_token tok; gsh_pop_tok(&p->tokens, &tok)) {
+	for (struct gsh_token tok; gsh_pop_tok(&p->tokens, &tok); ) {
 		switch () {
 		}
 	}
