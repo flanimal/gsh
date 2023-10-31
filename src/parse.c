@@ -377,6 +377,8 @@ void gsh_parse_cmd(struct gsh_parser *p, struct cmd_queue *cmd_queue)
 	// NOTE: For now, we are keeping tokenization and parsing
 	// phases independent for simplicity.
 
+	gsh_free_parsed(p);
+
 	// Get first token. There must be at least one.
 	struct gsh_token *prev = gsh_get_token(p);
 

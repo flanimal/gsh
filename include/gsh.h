@@ -53,8 +53,8 @@ struct gsh_state {
 	struct gsh_params params;
 	enum gsh_shopt_flags shopts;
 	
-	const struct hsearch_data *shopt_tbl;
-	const struct hsearch_data *builtin_tbl;
+	struct hsearch_data *shopt_tbl;
+	struct hsearch_data *builtin_tbl;
 };
 
 /*	Set initial values and resources for the shell. 
