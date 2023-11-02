@@ -29,7 +29,7 @@ add_executable (gsh
 	"src/parse.c" 
 	"src/special.def"
 	"src/main.c"
- "src/input.c")
+ "src/input.c" "src/lexer.c" "include/lexer.h")
 
 target_compile_definitions(gsh PRIVATE _GNU_SOURCE)
 target_include_directories(gsh PRIVATE "include/")

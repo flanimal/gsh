@@ -11,6 +11,7 @@
 
 // FIXME: Remove this include.
 #include "gsh.h"
+#include "lexer.h"
 #include "parse.h"
 #include "params.h"
 
@@ -53,7 +54,7 @@ struct gsh_parsed_cmd *gsh_new_cmd()
 	return calloc(1, sizeof(struct gsh_parsed_cmd));
 }
 
-void gsh_parse_init(struct gsh_parser **parser, struct gsh_params *params)
+void gsh_parse_init(struct gsh_parse_state **parser, struct gsh_params *params)
 {
 	const size_t words_size = GSH_MIN_WORD_N * sizeof(char *);
 
@@ -95,7 +96,7 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp,
  *		Argument is integer 1245.
  *
  *	Before : "Hello, world!"
- *		    {------}
+ *		    [------]
  *		      Span
  *
  *	After :	"He1245ld!     "
@@ -105,7 +106,7 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp,
  *		(notice this is larger than buffer)
  *
  *	Before : "Hello, world!"
- *		    {------}
+ *		    [------]
  *		      Span
  *
  *	After :	"HeABCDEFGHIJKLMOld!"
@@ -227,7 +228,7 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, struct gsh_token *tok,
 	gsh_expand_span(exp, tok, &span, homevar);
 }
 
-static void gsh_free_parsed(struct gsh_parser *p)
+static void gsh_free_parsed(struct gsh_parse_state *p)
 {
 	p->expand_st->skip = 0;
 
@@ -276,13 +277,12 @@ static void gsh_expand(struct gsh_expand_state *exp, struct gsh_token *tok)
 	Create an argument using all text between the two quotes,
 	exclusive.
 */
-static char *gsh_parse_quoted(struct gsh_parser *p, struct gsh_token **tok_it,
+static char *gsh_parse_quoted(struct gsh_parse_state *p, struct gsh_token **tok_it,
 			      enum gsh_special_char quote_type)
 {
 	size_t arg_len = 0;
 
-	// Arg begins at text immediately following quote.
-	char *arg = LIST_NEXT(*tok_it, entry)->data;
+	char *arg = (*tok_it)->data + 1;
 
 	while ((*tok_it = LIST_NEXT(*tok_it, entry)) &&
 	       ((*tok_it)->type != quote_type))
@@ -304,38 +304,6 @@ static char *gsh_parse_quoted(struct gsh_parser *p, struct gsh_token **tok_it,
 	return arg;
 }
 
-/*
- */
-static struct gsh_token *gsh_new_tok()
-{
-	return malloc(sizeof(struct gsh_token));
-}
-
-static struct gsh_token *gsh_get_token(struct gsh_parser *p)
-{
-	if (*p->line_it == '\0')
-		return NULL;
-
-	struct gsh_token *tok = gsh_new_tok();
-
-	const size_t word_len = strcspn(p->line_it, gsh_special_chars);
-
-	if (word_len == 0) {
-		tok->type = (enum gsh_special_char)(*p->line_it);
-		tok->len = 1;
-	} else {
-		tok->type = GSH_WORD;
-		tok->len = word_len;
-	}
-
-	tok->data = p->line_it;
-
-	p->line_it += tok->len;
-	p->tokens_size += tok->len;
-
-	return tok;
-}
-
 static void gsh_push_cmd(struct gsh_parsed_cmd **cmd)
 {
 	(*cmd)->pathname = (*cmd)->argv[0];
@@ -345,60 +313,22 @@ static void gsh_push_cmd(struct gsh_parsed_cmd **cmd)
 		(*cmd)->argv[0] = last_slash + 1;
 }
 
-void gsh_parse_cmd(struct gsh_parser *p)
+// FIXME: WARNING: We need to start from the first pushed node
+// for both queues.
+void gsh_parse_cmd(struct gsh_parse_state *p)
 {
-	// Get tokens (words, quotes, parentheses, etc.).
-	// NOTE: For now, we are keeping tokenization and parsing
-	// phases independent for simplicity.
-
 	gsh_free_parsed(p);
 
-	// Get first token. There must be at least one.
-	struct gsh_token *prev = gsh_get_token(p);
-	LIST_INSERT_HEAD(&p->tok_front, prev, entry);
+	struct gsh_lexer_state *lex = gsh_new_lexer_state();
 
-	for (struct gsh_token *tok; (tok = gsh_get_token(p));) {
-		LIST_INSERT_AFTER(prev, tok, entry);
-		prev = tok;
-	}
-
-	// I guess that here, we use "parse" to mean "combining/replacing tokens
-	// in the token queue".
-
-	// The first command to insert. There must
-	// be at least one command.
-	struct gsh_parsed_cmd *cmd = gsh_new_cmd();
-	LIST_INSERT_HEAD(&p->cmd_front, cmd, entry);
-
-	// FIXME: We need to assign prev_cmd!
-	struct gsh_parsed_cmd *prev_cmd;
-
-	struct gsh_token *tok_it;
-	LIST_FOREACH(tok_it, &p->tok_front, entry)
-	{
-		switch (tok_it->type) {
+	for (struct gsh_token *tok; (tok = gsh_get_token(lex));) {
+		switch (tok->type) {
 		case GSH_WORD:
-			gsh_expand(p->expand_st, tok_it);
-			cmd->argv[cmd->argc++] = tok_it->data;
-				
-			p->tokens_size += p->expand_st->size_inc;
-			p->expand_st->size_inc = 0;
-
 			break;
 		case GSH_CHAR_SINGLE_QUOTE:
 		case GSH_CHAR_DOUBLE_QUOTE:
-			cmd->argv[cmd->argc++] =
-				gsh_parse_quoted(
-				p, &tok_it, tok_it->type);
-
 			break;
 		case GSH_CHAR_CMD_SEP: {
-			gsh_push_cmd(&cmd);
-
-			LIST_INSERT_AFTER(prev_cmd, cmd, entry);
-			prev_cmd = cmd;
-
-			cmd = gsh_new_cmd();
 
 			break;
 		}
@@ -408,8 +338,4 @@ void gsh_parse_cmd(struct gsh_parser *p)
 
 	}
 
-	gsh_push_cmd(&cmd);
-
-	// Reached end of line.
-	//LIST_INSERT_AFTER(prev_cmd, cmd, entry);
 }

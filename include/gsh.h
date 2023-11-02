@@ -38,7 +38,7 @@ struct gsh_state {
 	
 	struct gsh_input_buf *inputbuf;
 
-	struct gsh_parser *parser;
+	struct gsh_parse_state *parser;
 
 	/* Current working directory of the shell process. */
 	char *cwd;
