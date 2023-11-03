@@ -27,7 +27,7 @@ add_executable (gsh
 	"src/gsh.c" 
 	"src/history.c" 
 	"src/parse.c" 
-	"src/special.def"
+	"src/special.def.c"
 	"src/main.c"
  "src/input.c" "src/lexer.c" "include/lexer.h")
 

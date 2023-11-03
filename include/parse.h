@@ -4,7 +4,7 @@
 
 #include <stddef.h>
 
-#include "../src/special.def"
+#include "../src/special.def.c"
 
 #define WHITESPACE " \f\n\r\t\v"
 

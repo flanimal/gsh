@@ -189,7 +189,7 @@ static void gsh_fmt_param(struct gsh_expand_state *exp, struct gsh_token *tok,
 	};
 
 	switch ((enum gsh_special_param)span.begin[1]) {
-	case GSH_CHAR_PARAM_STATUS:
+	case GSH_PARAM_STATUS:
 		span.fmt_str = "%d";
 
 		gsh_expand_span(exp, tok, &span, exp->params->last_status);
@@ -214,7 +214,7 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, struct gsh_token *tok,
 
 	// TODO: Move the whole-word check out of the fmt_* functions so that
 	// it makes more sense with strpbrk() converting const char * to char *?
-	if (strcmp(tok->data, (char[]){ GSH_CHAR_HOME, '\0' }) == 0) {
+	if (strcmp(tok->data, (char[]){ GSH_REF_HOME, '\0' }) == 0) {
 		tok->data = (char*)homevar;
 		return;
 	}
@@ -258,10 +258,10 @@ static void gsh_expand(struct gsh_expand_state *exp, struct gsh_token *tok)
 	for (char *fmt_begin = tok->data;
 	     (fmt_begin = strpbrk(fmt_begin, "$~"));) {
 		switch ((enum gsh_special_char)fmt_begin[0]) {
-		case GSH_CHAR_PARAM:
+		case GSH_REF_PARAM:
 			gsh_fmt_param(exp, tok, fmt_begin);
 			continue;
-		case GSH_CHAR_HOME:
+		case GSH_REF_HOME:
 			gsh_fmt_home(exp, tok, fmt_begin);
 			continue;
 		default:
@@ -325,13 +325,12 @@ void gsh_parse_cmd(struct gsh_parse_state *p)
 		switch (tok->type) {
 		case GSH_WORD:
 			break;
-		case GSH_CHAR_SINGLE_QUOTE:
-		case GSH_CHAR_DOUBLE_QUOTE:
+		case GSH_SINGLE_QUO:
+		case GSH_DOUBLE_QUO:
 			break;
-		case GSH_CHAR_CMD_SEP: {
+		case GSH_CMD_SEP:
 
 			break;
-		}
 		default:
 			break;
 		}
