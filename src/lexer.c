@@ -11,6 +11,8 @@
 
 #include "lexer.h"
 
+#include "special.def.c"
+
 struct gsh_lexer_state {
 	char *line_it;
 

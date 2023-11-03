@@ -15,14 +15,14 @@
  */
 #define SPECIAL_PARAMS(X) X(PARAM_STATUS, '?')
 
-#define CHAR_ENUM(name, ch) GSH_##name = ch,
-#define CHAR_ARRAY(name, ch) ch,
+#define AS_ENUM(name, ch) GSH_##name = ch,
+#define AS_ARRAY(name, ch) ch,
 
-enum gsh_special_char { GSH_WORD, SPECIAL_CHARS(CHAR_ENUM) };
-enum gsh_special_param { SPECIAL_PARAMS(CHAR_ENUM) };
+enum gsh_special_char { GSH_WORD, SPECIAL_CHARS(AS_ENUM) };
+enum gsh_special_param { SPECIAL_PARAMS(AS_ENUM) };
 
 static const char gsh_special_chars[] = {
-	SPECIAL_CHARS(CHAR_ARRAY) ' ', '\n', '\r', '\t', '\v', '\0'
+	SPECIAL_CHARS(AS_ARRAY) ' ', '\n', '\r', '\t', '\v', '\0'
 };
 
 #undef CHAR_ENUM

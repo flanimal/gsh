@@ -15,6 +15,8 @@
 #include "parse.h"
 #include "params.h"
 
+#include "special.def.c"
+
 #if defined(__GNUC__)
 #define unreachable() __builtin_unreachable()
 #elif defined(_MSC_VER)
