@@ -11,8 +11,6 @@
 
 #include "lexer.h"
 
-#include "special.def.c"
-
 struct gsh_lexer_state {
 	char *line_it;
 
@@ -45,7 +43,7 @@ struct gsh_token *gsh_get_token(struct gsh_lexer_state *lex)
 	const size_t word_len = strcspn(lex->line_it, gsh_special_chars);
 
 	if (word_len == 0) {
-		tok->type = (enum gsh_special_char)(*lex->line_it);
+		tok->type = (enum gsh_token_type)(*lex->line_it);
 		tok->len = 1;
 	} else {
 		tok->type = GSH_WORD;

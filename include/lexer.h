@@ -2,7 +2,7 @@
 
 #include <stddef.h>
 
-#include "../src/special.def"
+#include "special.def.h"
 
 struct gsh_token {
 	LIST_ENTRY(gsh_token) entry;
@@ -10,7 +10,7 @@ struct gsh_token {
 	char *data;
 	size_t len;
 
-	enum gsh_special_char type;
+	enum gsh_token_type type;
 };
 
 struct gsh_lexer_state;

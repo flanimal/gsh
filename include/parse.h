@@ -4,27 +4,25 @@
 
 #include <stddef.h>
 
-#define WHITESPACE " \f\n\r\t\v"
-
 // The previous approach was:
-// 
-// Tokenization --(Token stream)-> Parsing/Expansion 
+//
+// Tokenization --(Token stream)-> Parsing/Expansion
 //	-> (Command objects)
-// 
-//	Here, the "parser" gets tokens to first expand them, then generate 
-//	the resulting arguments, then create command objects from 
+//
+//	Here, the "parser" gets tokens to first expand them, then generate
+//	the resulting arguments, then create command objects from
 //	those arguments: _3_ jobs wrapped into one.
-// 
+//
 // A better approach might be:
-// 
-// Tokenization --(Token stream)-> Parsing --(AST)-> Argument generation 
+//
+// Tokenization --(Token stream)-> Parsing --(AST)-> Argument generation
 //	-> (Command objects)
 //
 // where the parser has only the single responsibility of generating
-// an AST. Expansion happens during argument generation, which itself 
+// an AST. Expansion happens during argument generation, which itself
 // is separate from creation of command objects.
 
-/*	The maximum number of words to accept before reallocating the 
+/*	The maximum number of words to accept before reallocating the
  *	word list.
  */
 #define GSH_MIN_WORD_N 64

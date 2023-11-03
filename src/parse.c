@@ -259,7 +259,7 @@ static void gsh_expand(struct gsh_expand_state *exp, struct gsh_token *tok)
 {
 	for (char *fmt_begin = tok->data;
 	     (fmt_begin = strpbrk(fmt_begin, "$~"));) {
-		switch ((enum gsh_special_char)fmt_begin[0]) {
+		switch ((enum gsh_token_type)fmt_begin[0]) {
 		case GSH_REF_PARAM:
 			gsh_fmt_param(exp, tok, fmt_begin);
 			continue;
@@ -280,7 +280,7 @@ static void gsh_expand(struct gsh_expand_state *exp, struct gsh_token *tok)
 	exclusive.
 */
 static char *gsh_parse_quoted(struct gsh_parse_state *p, struct gsh_token **tok_it,
-			      enum gsh_special_char quote_type)
+			      enum gsh_token_type quote_type)
 {
 	size_t arg_len = 0;
 

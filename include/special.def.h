@@ -1,3 +1,13 @@
+#define WHITESPACE_CHARS ' ', '\f', '\n', '\r', '\t', '\v',
+#define WHITESPACE               \
+	(char[])                 \
+	{                        \
+		WHITESPACE_CHARS \
+	}
+
+#define AS_ENUM(name, ch) GSH_##name = ch,
+#define AS_ARRAY(name, ch) ch,
+
 /*
  *	Special characters.
  */
@@ -10,20 +20,18 @@
 	X(REF_PARAM, '$')   \
 	X(CMD_SEP, ';')
 
+enum gsh_token_type { GSH_WORD, SPECIAL_CHARS(AS_ENUM) };
+
+static const char gsh_special_chars[] = {
+	SPECIAL_CHARS(AS_ARRAY) WHITESPACE_CHARS '\0'
+};
+
 /*
  *	Special parameters.
  */
 #define SPECIAL_PARAMS(X) X(PARAM_STATUS, '?')
 
-#define AS_ENUM(name, ch) GSH_##name = ch,
-#define AS_ARRAY(name, ch) ch,
-
-enum gsh_special_char { GSH_WORD, SPECIAL_CHARS(AS_ENUM) };
 enum gsh_special_param { SPECIAL_PARAMS(AS_ENUM) };
-
-static const char gsh_special_chars[] = {
-	SPECIAL_CHARS(AS_ARRAY) ' ', '\n', '\r', '\t', '\v', '\0'
-};
 
 #undef CHAR_ENUM
 #undef CHAR_ARRAY

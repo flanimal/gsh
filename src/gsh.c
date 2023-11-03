@@ -179,6 +179,7 @@ void gsh_run_cmd(struct gsh_state *sh)
 {
 	assert(g_gsh_initialized);
 
+	// FIXME: Move to lexer/parser/whatever.
 	if (strcspn(sh->inputbuf->line, WHITESPACE) == 0) {
 		sh->inputbuf->len = 0;
 		return;
