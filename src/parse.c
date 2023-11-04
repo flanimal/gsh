@@ -253,7 +253,7 @@ static void gsh_free_parsed(struct gsh_parse_state *p)
 		tok_it; tok_it = next)
 	{
 		next = LIST_NEXT(tok_it, entry);
-
+		//test
 		LIST_REMOVE(tok_it, entry);
 		free(tok_it);
 	}
