@@ -1,9 +1,5 @@
 #define WHITESPACE_CHARS ' ', '\f', '\n', '\r', '\t', '\v',
-#define WHITESPACE               \
-	(char[])                 \
-	{                        \
-		WHITESPACE_CHARS \
-	}
+#define WHITESPACE (char[]) { WHITESPACE_CHARS }
 
 #define AS_ENUM(name, ch) GSH_##name = ch,
 #define AS_ARRAY(name, ch) ch,
