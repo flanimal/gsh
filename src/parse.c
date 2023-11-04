@@ -15,7 +15,7 @@
 #include "parse.h"
 #include "params.h"
 
-#include "special.def.c"
+#include "special.def.h"
 
 #if defined(__GNUC__)
 #define unreachable() __builtin_unreachable()
@@ -179,6 +179,10 @@ static void gsh_fmt_var(struct gsh_expand_state *exp, struct gsh_token *tok,
 	gsh_expand_span(exp, tok, span, gsh_getenv(exp->params, var_name));
 	free(var_name);
 }
+
+enum gsh_special_param { 
+	GSH_PARAM_STATUS = '?' 
+};
 
 /*      Substitute a parameter reference with its value.
  */

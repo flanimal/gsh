@@ -26,15 +26,7 @@ static const char gsh_special_chars[] = {
 	SPECIAL_CHARS(AS_ARRAY) WHITESPACE_CHARS '\0'
 };
 
-/*
- *	Special parameters.
- */
-#define SPECIAL_PARAMS(X) X(PARAM_STATUS, '?')
-
-enum gsh_special_param { SPECIAL_PARAMS(AS_ENUM) };
-
-#undef CHAR_ENUM
-#undef CHAR_ARRAY
+#undef AS_ENUM
+#undef AS_ARRAY
 
 #undef SPECIAL_CHARS
-#undef SPECIAL_PARAMS
