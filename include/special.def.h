@@ -14,9 +14,10 @@
 	X(CLOSE_PAREN, ')') \
 	X(REF_HOME, '~')    \
 	X(REF_PARAM, '$')   \
-	X(CMD_SEP, ';')
+	X(CMD_SEP, ';')	    \
+	X(SUBSH_DELIM, '`')
 
-enum gsh_token_type { GSH_WORD, SPECIAL_CHARS(AS_ENUM) };
+enum gsh_token_type { GSH_WORD, GSH_WHITESPACE, SPECIAL_CHARS(AS_ENUM) };
 
 static const char gsh_special_chars[] = {
 	SPECIAL_CHARS(AS_ARRAY) WHITESPACE_CHARS '\0'

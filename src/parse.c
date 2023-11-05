@@ -319,28 +319,63 @@ static void gsh_push_cmd(struct gsh_parsed_cmd **cmd)
 		(*cmd)->argv[0] = last_slash + 1;
 }
 
-// FIXME: WARNING: We need to start from the first pushed node
-// for both queues.
-void gsh_parse_cmd(struct gsh_parse_state *p)
+enum gsh_node_type
+{
+	GSH_NODE_LINE,
+	GSH_NODE_CMD,
+	GSH_NODE_ARG,
+	GSH_NODE_REF,
+	GSH_NODE_TOK,
+};
+
+struct gsh_parse_node
+{
+	struct gsh_parse_node* parent;
+
+	enum gsh_node_type type;
+	void* data;
+
+	size_t desc_n;
+	struct gsh_parse_node* desc[];
+};
+
+static struct gsh_parse_node *gsh_new_node(enum gsh_node_type type, size_t desc_n) {
+	struct gsh_parse_node *node = malloc(sizeof(*node) + 
+		sizeof(node) * desc_n);
+
+	node->type = type;
+	node->desc_n = desc_n;
+
+	return node;
+}
+
+void gsh_parse_cmd(struct gsh_parse_state* p)
 {
 	gsh_free_parsed(p);
 
-	struct gsh_lexer_state *lex = gsh_new_lexer_state();
+	struct gsh_lexer_state* lex = gsh_new_lexer_state();
+	struct gsh_parse_node* root = gsh_new_node(GSH_NODE_LINE, 64);
 
-	for (struct gsh_token *tok; (tok = gsh_get_token(lex));) {
-		switch (tok->type) {
-		case GSH_WORD:
-			break;
-		case GSH_SINGLE_QUO:
-		case GSH_DOUBLE_QUO:
-			break;
-		case GSH_CMD_SEP:
+	size_t n = 0;
 
-			break;
-		default:
-			break;
-		}
-
+	for (struct gsh_token* tok; (tok = gsh_get_token(lex)) 
+		&& n < root->desc_n;)
+	{
+		(root->desc[n++] = gsh_new_node(GSH_NODE_TOK, 0))->data 
+			= tok->data;
 	}
+
+}
+
+static void gsh_parse_first()
+{
+
+}
+
+static void gsh_parse_second() {
+
+}
+
+static void gsh_parse_third() {
 
 }
