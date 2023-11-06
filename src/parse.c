@@ -72,8 +72,7 @@ void gsh_parse_init(struct gsh_parse_state **parser, struct gsh_params *params)
 /*	Allocate and return a word buffer.
  */
 static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp,
-			       struct gsh_token *tok,
-			       int inc)
+			       struct gsh_token *tok, int inc)
 {
 	const size_t new_len = tok->len + inc;
 	const size_t buf_n = exp->buf_n;
@@ -113,8 +112,7 @@ static char *gsh_alloc_wordbuf(struct gsh_expand_state *exp,
  *
  *	After :	"HeABCDEFGHIJKLMOld!"
  */
-static void gsh_expand_span(struct gsh_expand_state *exp,
-			    struct gsh_token *tok,
+static void gsh_expand_span(struct gsh_expand_state *exp, struct gsh_token *tok,
 			    struct gsh_fmt_span *span, ...)
 {
 	va_list fmt_args;
@@ -180,9 +178,7 @@ static void gsh_fmt_var(struct gsh_expand_state *exp, struct gsh_token *tok,
 	free(var_name);
 }
 
-enum gsh_special_param { 
-	GSH_PARAM_STATUS = '?' 
-};
+enum gsh_special_param { GSH_PARAM_STATUS = '?' };
 
 /*      Substitute a parameter reference with its value.
  */
@@ -221,7 +217,7 @@ static void gsh_fmt_home(struct gsh_expand_state *exp, struct gsh_token *tok,
 	// TODO: Move the whole-word check out of the fmt_* functions so that
 	// it makes more sense with strpbrk() converting const char * to char *?
 	if (strcmp(tok->data, (char[]){ GSH_REF_HOME, '\0' }) == 0) {
-		tok->data = (char*)homevar;
+		tok->data = (char *)homevar;
 		return;
 	}
 
@@ -249,11 +245,10 @@ static void gsh_free_parsed(struct gsh_parse_state *p)
 	// and another to hold the next element.
 
 	// Delete tokens and command objects.
-	for (struct gsh_token* tok_it = LIST_FIRST(&p->tok_front), *next;
-		tok_it; tok_it = next)
-	{
+	for (struct gsh_token *tok_it = LIST_FIRST(&p->tok_front), *next;
+	     tok_it; tok_it = next) {
 		next = LIST_NEXT(tok_it, entry);
-		//test
+		// test
 		LIST_REMOVE(tok_it, entry);
 		free(tok_it);
 	}
@@ -283,7 +278,8 @@ static void gsh_expand(struct gsh_expand_state *exp, struct gsh_token *tok)
 	Create an argument using all text between the two quotes,
 	exclusive.
 */
-static char *gsh_parse_quoted(struct gsh_parse_state *p, struct gsh_token **tok_it,
+static char *gsh_parse_quoted(struct gsh_parse_state *p,
+			      struct gsh_token **tok_it,
 			      enum gsh_token_type quote_type)
 {
 	size_t arg_len = 0;
@@ -291,13 +287,12 @@ static char *gsh_parse_quoted(struct gsh_parse_state *p, struct gsh_token **tok_
 	char *arg = (*tok_it)->data + 1;
 
 	while ((*tok_it = LIST_NEXT(*tok_it, entry)) &&
-	       ((*tok_it)->type != quote_type))
-	{
+	       ((*tok_it)->type != quote_type)) {
 		// Reallocate the argument.
 		const size_t buf_n = p->expand_st->buf_n;
 
 		char *newbuf = realloc(p->expand_st->bufs[buf_n],
-					arg_len + (*tok_it)->len + 1);
+				       arg_len + (*tok_it)->len + 1);
 		if (!p->expand_st->bufs[buf_n])
 			*stpncpy(newbuf, arg, arg_len) = '\0';
 
@@ -319,8 +314,7 @@ static void gsh_push_cmd(struct gsh_parsed_cmd **cmd)
 		(*cmd)->argv[0] = last_slash + 1;
 }
 
-enum gsh_node_type
-{
+enum gsh_node_type {
 	GSH_NODE_LINE,
 	GSH_NODE_CMD,
 	GSH_NODE_ARG,
@@ -328,20 +322,30 @@ enum gsh_node_type
 	GSH_NODE_TOK,
 };
 
-struct gsh_parse_node
-{
-	struct gsh_parse_node* parent;
-
-	enum gsh_node_type type;
-	void* data;
-
-	size_t desc_n;
-	struct gsh_parse_node* desc[];
+struct gsh_syntax_elem {
+	char *data;
+	size_t len;
 };
 
-static struct gsh_parse_node *gsh_new_node(enum gsh_node_type type, size_t desc_n) {
-	struct gsh_parse_node *node = malloc(sizeof(*node) + 
-		sizeof(node) * desc_n);
+struct gsh_parse_node {
+	struct gsh_parse_node *parent;
+
+	enum gsh_node_type type;
+
+	union {
+		struct gsh_syntax_elem elem;
+		struct gsh_token tok;
+	};
+
+	size_t desc_n;
+	struct gsh_parse_node **desc;
+};
+
+static struct gsh_parse_node *gsh_new_node(enum gsh_node_type type,
+					   size_t desc_n)
+{
+	struct gsh_parse_node *node =
+		malloc(sizeof(*node) + sizeof(node) * desc_n);
 
 	node->type = type;
 	node->desc_n = desc_n;
@@ -349,33 +353,97 @@ static struct gsh_parse_node *gsh_new_node(enum gsh_node_type type, size_t desc_
 	return node;
 }
 
-void gsh_parse_cmd(struct gsh_parse_state* p)
+/*
+*	There are currently two reasons that we output whitespace tokens:
+* 
+*	1.	To make separation of arguments possible, since they can consist
+*		of multiple word and ref tokens.
+* 
+*			- This _could_ also be done by checking if the location of the
+*			  next token immediately follows the last token: if not, there is
+*			  whitespace in between, and it is a new argument.
+* 
+*	2.	To output whitespace occurring within quotes that we don't want
+*		to remove.
+* 
+*			- If the lexer identified strings instead of the parser,
+//			  it would remove this need.
+//		
+//			  Of course, this raises the question of how substitutions 
+//			  within quotes would work.
+*/
+
+/*
+	1. Two string classes: `string` and `subst-string`
+	2. A normal `string` class in addition to `string-beg` and `string-end`
+		for strings with substitutions
+
+	Take C++ raw string as an example
+
+	*** I don't think the lexer should perform expansions.
+	
+	Example of the problem:
+
+	Line : hello$SHELL
+	vs.
+	Line : hello $SHELL
+
+	A rule that says that two neighboring word tokens are to be
+	concatenated won't solve this problem.
+
+	*** If the lexer can identify strings, I don't think identifying references
+	would be unreasonable.
+
+	*** What if we somehow _grouped_ contigious tokens together instead of explicitly
+	*** emitting whitespace tokens?
+	
+*/
+
+/* 
+	1. Initial lexing
+	2. Expansion of references
+	3. Pass to parser
+*/
+
+// The first parsing phase gets each token from the lexer, and creates a new
+// node for the token underneath a `Line` node.
+
+// Is there any reason to get tokens one at a time instead of all at once?
+//
+//	- Getting tokens one at a time means we can store them in nodes
+// immediately 	  without allocating a queue to push them to first.
+
+//	- Getting the tokens all at once means we know how many there are,
+//	  and can allocate memory accordingly.
+//		- However, this would require allocating twice for each token,
+//		  unless the lexer output an array of `gsh_parse_node`.
+
+//	So if we need to allocate anyway, should we just get them all at once?
+//
+void gsh_parse_cmd(struct gsh_parse_state *p)
 {
 	gsh_free_parsed(p);
 
-	struct gsh_lexer_state* lex = gsh_new_lexer_state();
-	struct gsh_parse_node* root = gsh_new_node(GSH_NODE_LINE, 64);
+	struct gsh_lexer_state *lex = gsh_new_lexer_state();
+	struct gsh_parse_node *root = gsh_new_node(GSH_NODE_LINE, 64);
 
 	size_t n = 0;
 
-	for (struct gsh_token* tok; (tok = gsh_get_token(lex)) 
-		&& n < root->desc_n;)
-	{
-		(root->desc[n++] = gsh_new_node(GSH_NODE_TOK, 0))->data 
-			= tok->data;
+	for (struct gsh_token *tok;
+	     (tok = gsh_get_token(lex)) && n < root->desc_n;) {
+		(root->desc[n++] = gsh_new_node(GSH_NODE_TOK, 0))->data =
+			tok->data;
 	}
-
 }
 
 static void gsh_parse_first()
 {
-
 }
 
-static void gsh_parse_second() {
-
+static void gsh_parse_second()
+{
 }
 
-static void gsh_parse_third() {
-
+static void gsh_parse_third()
+{
 }
