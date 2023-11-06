@@ -4,13 +4,21 @@
 
 #include "special.def.h"
 
+struct gsh_token_data
+{
+	char *data;
+	size_t len;
+};
+
 struct gsh_token {
 	LIST_ENTRY(gsh_token) entry;
 
-	char *data;
-	size_t len;
-
 	enum gsh_token_type type;
+
+	union {
+		struct gsh_token_data tok_text;
+		char tok_ch;
+	};
 };
 
 struct gsh_lexer_state;

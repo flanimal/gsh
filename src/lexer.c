@@ -44,16 +44,19 @@ struct gsh_token *gsh_get_token(struct gsh_lexer_state *lex)
 
 	if (word_len == 0) {
 		tok->type = (enum gsh_token_type)(*lex->line_it);
-		tok->len = 1;
+		
+		tok->tok_ch = *lex->line_it++;
+		++lex->tokens_size;
 	} else {
 		tok->type = GSH_WORD;
-		tok->len = word_len;
+
+		tok->tok_text.data = lex->line_it;
+
+		lex->line_it += word_len;
+		lex->tokens_size += word_len;
+
+		tok->tok_text.len = word_len;
 	}
-
-	tok->data = lex->line_it;
-
-	lex->line_it += tok->len;
-	lex->tokens_size += tok->len;
 
 	// FIXME: Head or not????
 	LIST_INSERT_HEAD(&lex->tok_front, tok, entry);
